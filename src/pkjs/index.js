@@ -7,6 +7,37 @@ var noiseBridge = require("./lib/noise-bridge");
 
 var APP_VERSION = "1.0.0"; // keep in step with package.json
 
+// Messages to the watch go through one queue: the watch takes one at a time, so two sent together
+// (e.g. the startup settings and a "start tracking" command right after the app launches) would
+// collide and one would be lost. Each is retried a few times if the watch is busy.
+var outbox = [];
+var outboxBusy = false;
+
+function sendToWatch(dict, onOk, onFail) {
+  outbox.push({ dict: dict, onOk: onOk, onFail: onFail, tries: 0 });
+  pumpOutbox();
+}
+
+function pumpOutbox() {
+  if (outboxBusy || !outbox.length) return;
+  outboxBusy = true;
+  var item = outbox[0];
+  Pebble.sendAppMessage(item.dict, function() {
+    outbox.shift();
+    outboxBusy = false;
+    if (item.onOk) item.onOk();
+    pumpOutbox();
+  }, function(err) {
+    outboxBusy = false;
+    item.tries++;
+    if (item.tries >= 5) {
+      outbox.shift();
+      if (item.onFail) item.onFail(err);
+    }
+    setTimeout(pumpOutbox, 1500);
+  });
+}
+
 var soundInterval = null;
 var isTracking = false;
 
@@ -48,7 +79,7 @@ function startSoundMonitoring() {
     }
     noiseBridge.status(function(n) {
       if (!n || !n.listening || !n.avg) return;
-      Pebble.sendAppMessage({ PHONE_SOUND_SAMPLE: n.avg }, function() {
+      sendToWatch({ PHONE_SOUND_SAMPLE: n.avg }, function() {
         console.log("SleepSense PKJS: Room noise " + n.avg + " dB sent");
       }, function(e) {
         console.log("SleepSense PKJS: Error sending noise level: " + JSON.stringify(e));
@@ -97,7 +128,7 @@ function listenForCommands() {
   phoneAlarm.waitForCommand(function(cmd) {
     if (cmd === "start" && !isTracking) {
       console.log("SleepSense PKJS: Start tracking requested from the phone");
-      Pebble.sendAppMessage({ COMMAND_START_TRACKING: 1 }, function() {}, function(err) {
+      sendToWatch({ COMMAND_START_TRACKING: 1 }, function() {}, function(err) {
         console.log("SleepSense PKJS: Could not send start command: " + JSON.stringify(err));
       });
     }
@@ -131,7 +162,7 @@ function syncPhoneAlarm() {
       dict.ALARM_TARGET_HOUR = a.hour;
       dict.ALARM_TARGET_MIN = a.min;
     }
-    Pebble.sendAppMessage(dict, function() {
+    sendToWatch(dict, function() {
       console.log("SleepSense PKJS: Phone alarm " + key + " sent to watch");
       localStorage.setItem("phone_alarm_last", key);
       if (a.rev !== undefined) localStorage.setItem("phone_alarm_rev", a.rev);
@@ -171,7 +202,7 @@ Pebble.addEventListener("ready", function(e) {
     dict.SMART_WINDOW_MIN = savedSmartWin ? parseInt(savedSmartWin, 10) : 30;
     dict.SMART_ALARM_ENABLED = (savedAlarmEn === "false") ? 0 : 1;
   }
-  Pebble.sendAppMessage(dict, function() {
+  sendToWatch(dict, function() {
     console.log("SleepSense PKJS: Restored saved settings to watch");
   }, function(err) {
     console.log("SleepSense PKJS: Failed to restore settings: " + JSON.stringify(err));
@@ -301,7 +332,7 @@ Pebble.addEventListener("webviewclosed", function(e) {
   var sensors = sensorDict();
   for (var k in sensors) dict[k] = sensors[k];
 
-  Pebble.sendAppMessage(dict, function() {
+  sendToWatch(dict, function() {
     console.log("SleepSense PKJS: Sent configuration to watch");
   }, function(err) {
     console.log("SleepSense PKJS: Error sending configuration to watch: " + JSON.stringify(err));
