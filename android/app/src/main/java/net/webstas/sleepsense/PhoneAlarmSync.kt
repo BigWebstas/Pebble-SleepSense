@@ -16,6 +16,7 @@ object PhoneAlarmSync {
     private const val PREFS = "alarm_sync"
     private const val KEY_ENABLED = "enabled"
     private const val KEY_LAST_REQUEST = "last_request"
+    private const val KEY_REVISION = "revision"
 
     fun isEnabled(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_ENABLED, true)
@@ -31,10 +32,17 @@ object PhoneAlarmSync {
         return time.hour to time.minute
     }
 
-    /** What the watchapp's JS gets: {"sync":true,"enabled":true,"hour":6,"min":45}. */
+    /** Counts every change Android reports to the next alarm, so a quick off/on is never missed. */
+    fun noteAlarmChanged(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        prefs.edit { putLong(KEY_REVISION, prefs.getLong(KEY_REVISION, 0) + 1) }
+    }
+
+    /** What the watchapp's JS gets: {"sync":true,"rev":3,"enabled":true,"hour":6,"min":45}. */
     fun json(context: Context): String {
         val alarm = phoneAlarm(context)
-        return """{"sync":${isEnabled(context)},"enabled":${alarm != null},"hour":${alarm?.first ?: 0},"min":${alarm?.second ?: 0}}"""
+        val rev = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong(KEY_REVISION, 0)
+        return """{"sync":${isEnabled(context)},"rev":$rev,"enabled":${alarm != null},"hour":${alarm?.first ?: 0},"min":${alarm?.second ?: 0}}"""
     }
 
     fun noteRequest(context: Context, now: Long = System.currentTimeMillis()) {

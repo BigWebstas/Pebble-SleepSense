@@ -1,13 +1,18 @@
 package net.webstas.sleepsense
 
+import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.os.IBinder
 import android.util.Log
+import androidx.core.content.ContextCompat
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
@@ -24,6 +29,14 @@ const val ALARM_BRIDGE_PORT = 8765
 class AlarmBridgeService : Service() {
     private var server: ServerSocket? = null
 
+    // The service is always running, so it sees every change to the next alarm as it happens
+    private val alarmChanged = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            PhoneAlarmSync.noteAlarmChanged(context)
+            Log.i(TAG, "next alarm changed")
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         val channel = NotificationChannel("bridge", "Alarm bridge", NotificationManager.IMPORTANCE_MIN)
@@ -35,6 +48,11 @@ class AlarmBridgeService : Service() {
             .setOngoing(true)
             .build()
         startForeground(1, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+
+        ContextCompat.registerReceiver(
+            this, alarmChanged, IntentFilter(AlarmManager.ACTION_NEXT_ALARM_CLOCK_CHANGED),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
 
         thread(name = "alarm-bridge", isDaemon = true) {
             try {
@@ -70,6 +88,7 @@ class AlarmBridgeService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        unregisterReceiver(alarmChanged)
         server?.close()
         super.onDestroy()
     }

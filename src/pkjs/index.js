@@ -75,12 +75,18 @@ function syncPhoneAlarm() {
   phoneAlarm.fetchPhoneAlarm(function(a) {
     if (!a || !a.sync) return;
     var key = a.enabled ? (a.hour + ":" + a.min) : "none";
+    // The Android app counts every alarm change, so even a quick off/on (or re-enabling at the
+    // same time) is seen as a change here
+    var revChanged = a.rev !== undefined && String(a.rev) !== localStorage.getItem("phone_alarm_rev");
     var watchOn = localStorage.getItem("alarm_en") !== "false";
     var differs = a.enabled
       ? (parseInt(localStorage.getItem("alarm_hour"), 10) !== a.hour ||
          parseInt(localStorage.getItem("alarm_min"), 10) !== a.min)
       : watchOn; // the phone has no alarm: the watch alarm is turned off to match
-    if (key === localStorage.getItem("phone_alarm_last") && !differs) return;
+    console.log("SleepSense PKJS: phone alarm " + key + " rev " + a.rev + " (last " +
+      localStorage.getItem("phone_alarm_last") + "/" + localStorage.getItem("phone_alarm_rev") +
+      ") watchOn=" + watchOn + " differs=" + differs);
+    if (key === localStorage.getItem("phone_alarm_last") && !differs && !revChanged) return;
 
     var dict = { SMART_ALARM_ENABLED: a.enabled ? 1 : 0 };
     if (a.enabled) {
@@ -90,6 +96,7 @@ function syncPhoneAlarm() {
     Pebble.sendAppMessage(dict, function() {
       console.log("SleepSense PKJS: Phone alarm " + key + " sent to watch");
       localStorage.setItem("phone_alarm_last", key);
+      if (a.rev !== undefined) localStorage.setItem("phone_alarm_rev", a.rev);
       // The watch confirms in its next status message; keep the settings page right meanwhile
       localStorage.setItem("alarm_en", a.enabled);
       if (a.enabled) {
