@@ -146,7 +146,7 @@ Open the app once so it can start the bridge (it restarts itself after updates a
 ## Project structure
 
 ```
-PebbleSleepTracker/
+Pebble-SleepSense/
 ├── package.json                   # App UUID, capabilities, message keys, menu icon
 ├── wscript                        # Pebble build configuration
 ├── resources/images/icon.png      # Watch app menu icon
