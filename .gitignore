@@ -1,0 +1,4 @@
+build/
+.lock-waf*
+.claude/settings.local.json
+pebble_screenshot_*.png

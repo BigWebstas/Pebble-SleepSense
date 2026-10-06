@@ -1,0 +1,54 @@
+{
+  "name": "pebble-sleep-tracker",
+  "author": "PebbleDev",
+  "version": "1.0.0",
+  "keywords": [
+    "pebble-app",
+    "sleep-tracker",
+    "health",
+    "actigraphy"
+  ],
+  "private": true,
+  "dependencies": {},
+  "pebble": {
+    "displayName": "SleepSense",
+    "uuid": "5ea5372b-32c6-4fbe-90e6-f465981b9230",
+    "sdkVersion": "3",
+    "enableMultiJS": true,
+    "targetPlatforms": [
+      "aplite",
+      "basalt",
+      "chalk",
+      "diorite",
+      "emery",
+      "flint",
+      "gabbro"
+    ],
+    "capabilities": [
+      "health",
+      "configurable"
+    ],
+    "watchapp": {
+      "watchface": false
+    },
+    "messageKeys": [
+      "STATUS_STATE",
+      "STATUS_DURATION",
+      "STATUS_DEEP_DURATION",
+      "STATUS_LIGHT_LEVEL",
+      "STATUS_SOUND_LEVEL",
+      "STATUS_CYCLE_COUNT",
+      "STATUS_SLEEP_SCORE",
+      "ALARM_TARGET_HOUR",
+      "ALARM_TARGET_MIN",
+      "SMART_WINDOW_MIN",
+      "SMART_ALARM_ENABLED",
+      "TRACKING_ACTIVE",
+      "PHONE_SOUND_SAMPLE",
+      "VOICE_NOTE_TRANSCRIPT"
+    ],
+    "resources": {
+      "media": []
+    }
+  }
+}

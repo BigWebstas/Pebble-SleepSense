@@ -1,0 +1,35 @@
+#pragma once
+#include <pebble.h>
+#include "../model/sleep_types.h"
+
+typedef void (*SmartAlarmTriggerCallback)(bool is_smart_wake);
+
+//! Initialize smart alarm module and read saved preferences
+void smart_alarm_init(void);
+
+//! Tear down smart alarm module
+void smart_alarm_deinit(void);
+
+//! Get reference to alarm settings
+SmartAlarmSettings *smart_alarm_get_settings(void);
+
+//! Set target alarm time (hour: 0-23, min: 0-59)
+void smart_alarm_set_target(uint8_t hour, uint8_t min);
+
+//! Toggle smart alarm enabled/disabled
+void smart_alarm_toggle(void);
+
+//! Cycle smart wake window duration (15m -> 30m -> 45m)
+void smart_alarm_cycle_window(void);
+
+//! Evaluate current time and sleep stage for alarm triggering
+void smart_alarm_evaluate(SleepStage current_stage);
+
+//! Dismiss an active ringing alarm
+void smart_alarm_dismiss(void);
+
+//! Returns true if the alarm is currently ringing
+bool smart_alarm_is_active(void);
+
+//! Set trigger callback to update UI when alarm goes off
+void smart_alarm_set_trigger_callback(SmartAlarmTriggerCallback callback);
