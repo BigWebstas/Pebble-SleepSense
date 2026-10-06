@@ -23,6 +23,9 @@ object WatchProtocol {
     const val KEY_STATUS_STATE: UInt = 10000u
     const val KEY_TRACKING_ACTIVE: UInt = 10011u
     const val KEY_STATUS_HEART_RATE: UInt = 10014u
+    const val KEY_ALARM_TARGET_HOUR: UInt = 10007u
+    const val KEY_ALARM_TARGET_MIN: UInt = 10008u
+    const val KEY_SMART_ALARM_ENABLED: UInt = 10010u
 }
 
 private const val PREFS = "sleep_state"
