@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Sleep history</title>
+<style>
+  :root { --bg: #fff; --fg: #111; --hint: #666; --field-bg: #fff; --field-border: #ccc;
+          --btn-2-bg: #eee; --btn-2-fg: #111; --danger: #c00; --ok: #0a0; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1c1c1e; --fg: #e6e6e9; --hint: #9a9aa0; --field-bg: #2c2c2e; --field-border: #48484a;
+            --btn-2-bg: #2c2c2e; --btn-2-fg: #e6e6e9; --danger: #ff6b6b; --ok: #4ade80; }
+  }
+  body { font-family: -apple-system, Roboto, sans-serif; margin: 0; padding: 16px; background: var(--bg); color: var(--fg); }
+  h1 { font-size: 18px; }
+  h2 { font-size: 15px; margin-top: 24px; }
+  h3 { font-size: 13px; margin: 14px 0 4px; color: var(--hint); }
+  label { display: block; margin-top: 14px; font-size: 13px; font-weight: 600; }
+  select { width: 100%; box-sizing: border-box; padding: 10px; font-size: 15px; margin-top: 4px; border: 1px solid var(--field-border); border-radius: 6px; background: var(--field-bg); color: var(--fg); }
+  button { width: 100%; padding: 12px; font-size: 15px; margin-top: 8px; border: none; border-radius: 6px; background: var(--btn-2-bg); color: var(--btn-2-fg); }
+  p.hint { font-size: 12px; color: var(--hint); }
+  p.error { font-size: 13px; color: var(--danger); }
+  p.success { font-size: 13px; color: var(--ok); }
+  table.stats { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+  table.stats td { padding: 6px 0; border-bottom: 1px solid var(--field-border); }
+  table.stats td:last-child { text-align: right; font-weight: 600; }
+  svg .ax { fill: var(--hint); font-size: 11px; }
+  svg .plot { fill: var(--field-bg); stroke: var(--field-border); stroke-width: 0.5; }
+  textarea { width: 100%; box-sizing: border-box; height: 160px; margin-top: 4px; padding: 10px;
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; white-space: pre;
+    border: 1px solid var(--field-border); border-radius: 6px; background: var(--field-bg); color: var(--fg); }
+</style>
+<!--REPORT_CORE-->
+</head>
+<body>
+  <h1>Sleep history</h1>
+  <p class="hint">Graphs for a recorded session, and your sleep data as Markdown with mermaid charts. The history comes from the SleepSense watchapp, which keeps the last 35 days.</p>
+
+  <div id="historyEmpty" class="hint" style="display:none">No sessions yet. Track sleep on the watch (Select), and open SleepSense on the watch afterwards so it can send the history here.</div>
+  <div id="historyBox">
+    <label for="sessionPick">Session</label>
+    <select id="sessionPick"></select>
+    <div id="graphs"></div>
+  </div>
+
+  <h2>Export</h2>
+  <p class="hint">Copy it anywhere that renders mermaid. Sessions still being tracked are left out.</p>
+  <label for="range">Date range</label>
+  <select id="range">
+    <option value="7">Last 7 days</option>
+    <option value="14">Last 14 days</option>
+    <option value="30">Last 30 days</option>
+    <option value="since" id="sinceOpt">Since last export</option>
+  </select>
+  <p class="hint" id="exportInfo"></p>
+  <textarea id="exportText" readonly></textarea>
+  <button id="copyBtn">Copy to clipboard</button>
+  <button id="saveBtn">Save as .md file</button>
+  <p id="status"></p>
+
+<script>
+(function () {
+  var report = module.exports();
+  var sessions = JSON.parse(Android.sessions()); // oldest first
+  var DATA = { lastExport: Android.lastExport(), now: Date.now() };
+  var DAY = 86400000;
+
+  function $(id) { return document.getElementById(id); }
+  function setStatus(msg, isError) {
+    $('status').textContent = msg;
+    $('status').className = isError ? 'error' : 'success';
+  }
+
+  // ---- Session picker ----
+  var pick = $('sessionPick');
+  if (!sessions.length) {
+    $('historyBox').style.display = 'none';
+    $('historyEmpty').style.display = 'block';
+  }
+  sessions.slice().reverse().forEach(function (s) {
+    var opt = document.createElement('option');
+    opt.value = String(sessions.indexOf(s));
+    opt.textContent = report.sessionLabel(s);
+    pick.appendChild(opt);
+  });
+  function showSession() {
+    if (!sessions.length) { return; }
+    var s = sessions[parseInt(pick.value, 10)];
+    $('graphs').innerHTML = report.sessionStats(s) + report.sessionGraphs(s);
+  }
+  pick.addEventListener('change', showSession);
+  showSession();
+
+  // ---- Export ----
+  var RANGE_LABELS = { 7: 'Last 7 days', 14: 'Last 14 days', 30: 'Last 30 days' };
+  function sinceLabel() {
+    return DATA.lastExport ? 'Since last export (' + report.fmtStamp(DATA.lastExport) + ')'
+                           : 'Since last export (never exported - everything)';
+  }
+  $('sinceOpt').textContent = sinceLabel();
+
+  function currentExport() {
+    var range = $('range').value;
+    var finished = sessions.filter(function (s) { return !s.open; });
+    var picked, label;
+    if (range === 'since') {
+      picked = finished.filter(function (s) { return s.end > DATA.lastExport; });
+      label = DATA.lastExport ? sinceLabel() : 'Everything (never exported)';
+    } else {
+      var cutoff = DATA.now - parseInt(range, 10) * DAY;
+      picked = finished.filter(function (s) { return s.end >= cutoff; });
+      label = RANGE_LABELS[range];
+    }
+    return { sessions: picked, text: report.exportMarkdown(picked, label, DATA.now) };
+  }
+  function refreshExport() {
+    var e = currentExport();
+    $('exportText').value = e.text;
+    $('exportInfo').textContent = e.sessions.length + (e.sessions.length === 1 ? ' session' : ' sessions') + ' in this range.';
+  }
+  $('range').addEventListener('change', refreshExport);
+  refreshExport();
+
+  function markExported(msg) {
+    DATA.lastExport = Date.now();
+    Android.markExported(DATA.lastExport);
+    $('sinceOpt').textContent = sinceLabel();
+    setStatus(msg, false);
+  }
+  $('copyBtn').addEventListener('click', function () {
+    Android.copy($('exportText').value);
+    markExported('Copied.');
+  });
+  // The native side calls back with the outcome of the file picker
+  window.onSaved = function (ok) {
+    if (ok) { markExported('Saved.'); } else { setStatus('Not saved.', true); }
+  };
+  $('saveBtn').addEventListener('click', function () {
+    Android.save('sleepsense-' + report.fmtDate(DATA.now) + '.md', $('exportText').value);
+  });
+})();
+</script>
+</body>
+</html>

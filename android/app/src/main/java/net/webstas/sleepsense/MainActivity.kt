@@ -50,6 +50,10 @@ class MainActivity : ComponentActivity() {
             addView(grant)
             addView(alarmSwitch)
             addView(alarmStatus)
+            addView(Button(this@MainActivity).apply {
+                text = "Sleep history and export"
+                setOnClickListener { startActivity(Intent(this@MainActivity, HistoryActivity::class.java)) }
+            })
         })
     }
 

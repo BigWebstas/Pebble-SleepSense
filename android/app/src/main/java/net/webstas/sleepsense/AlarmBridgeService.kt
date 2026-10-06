@@ -20,6 +20,7 @@ import kotlin.concurrent.thread
 
 private const val TAG = "AlarmBridgeService"
 const val ALARM_BRIDGE_PORT = 8765
+private const val MAX_BODY = 5 * 1024 * 1024 // a month of history is ~150 KB
 
 /**
  * Serves the phone's next alarm to the SleepSense watchapp's phone-side JavaScript, which runs
@@ -68,19 +69,58 @@ class AlarmBridgeService : Service() {
         }
     }
 
-    // Plain HTTP: GET /alarm -> JSON; anything else -> 404
+    // Plain HTTP on loopback: GET /alarm -> next alarm JSON; POST /sessions -> store the history.
     private fun handle(client: Socket) = client.use {
         client.soTimeout = 5000
-        val request = client.getInputStream().bufferedReader().readLine().orEmpty()
-        val ok = request.startsWith("GET /alarm")
-        if (ok) PhoneAlarmSync.noteRequest(this)
-        val body = if (ok) PhoneAlarmSync.json(this) else "not found"
-        Log.i(TAG, "$request -> ${if (ok) body else 404}")
-        val status = if (ok) "200 OK" else "404 Not Found"
+        val input = client.getInputStream().buffered()
+        val request = readLine(input)
+        var contentLength = 0
+        while (true) {
+            val header = readLine(input)
+            if (header.isEmpty()) break
+            if (header.startsWith("Content-Length:", ignoreCase = true)) {
+                contentLength = header.substringAfter(':').trim().toIntOrNull() ?: 0
+            }
+        }
+
+        val (status, body) = when {
+            request.startsWith("GET /alarm") -> {
+                PhoneAlarmSync.noteRequest(this)
+                "200 OK" to PhoneAlarmSync.json(this)
+            }
+            request.startsWith("POST /sessions") && contentLength in 1..MAX_BODY -> {
+                val bytes = ByteArray(contentLength)
+                var read = 0
+                while (read < contentLength) {
+                    val n = input.read(bytes, read, contentLength - read)
+                    if (n < 0) break
+                    read += n
+                }
+                if (read == contentLength) {
+                    SessionStore.save(this, String(bytes, Charsets.UTF_8))
+                    "200 OK" to """{"ok":true,"bytes":$read}"""
+                } else {
+                    "400 Bad Request" to "incomplete body"
+                }
+            }
+            else -> "404 Not Found" to "not found"
+        }
+        Log.i(TAG, "$request -> $status")
         client.getOutputStream().write(
             ("HTTP/1.1 $status\r\nContent-Type: application/json\r\nContent-Length: ${body.toByteArray().size}\r\n" +
                 "Connection: close\r\n\r\n$body").toByteArray(),
         )
+    }
+
+    // One header line without its CRLF (bytes read raw so a body is never swallowed by a text reader)
+    private fun readLine(input: java.io.InputStream): String {
+        val line = java.io.ByteArrayOutputStream()
+        while (true) {
+            val c = input.read()
+            if (c < 0 || c == '\n'.code) break
+            if (c != '\r'.code) line.write(c)
+        }
+        return line.toString(Charsets.UTF_8.name())
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int) = START_STICKY

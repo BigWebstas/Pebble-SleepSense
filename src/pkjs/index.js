@@ -2,6 +2,7 @@
 var sleepHistory = require("./lib/history");
 var configPage = require("./lib/config-page");
 var phoneAlarm = require("./lib/phone-alarm");
+var sessionPush = require("./lib/session-push");
 
 var APP_VERSION = "1.0.0"; // keep in step with package.json
 
@@ -68,6 +69,21 @@ function stopSoundMonitoring() {
   }
 }
 
+// ---- Sleep history for the Android app ----
+var lastPush = 0;
+var PUSH_EVERY_MS = 10 * 60000; // while tracking, so tonight's graph stays fresh
+var PUSH_MIN_GAP_MS = 20000;
+
+// Sends the whole history; `force` for a session that just ended, else at most every 10 minutes
+function pushHistory(force) {
+  var now = Date.now();
+  if (now - lastPush < (force ? PUSH_MIN_GAP_MS : PUSH_EVERY_MS)) return;
+  lastPush = now;
+  sessionPush.pushSessions(sleepHistory.getBucketedSessions(), function(ok) {
+    if (!ok) lastPush = 0; // no app there (or it failed): try again at the next chance
+  });
+}
+
 // ---- Phone alarm sync (needs the SleepSense Android companion app) ----
 // The phone drives: when its next alarm changes, or the watch shows a different time, the
 // watch is told the new time (or to turn the smart alarm off when the phone has no alarm).
@@ -114,6 +130,7 @@ Pebble.addEventListener("ready", function(e) {
 
   // First check after the startup message above has gone out, then every minute while open
   setTimeout(syncPhoneAlarm, 4000);
+  setTimeout(function() { pushHistory(true); }, 8000);
   setInterval(syncPhoneAlarm, 60000);
 
   // Send saved alarm settings to watch if present
@@ -144,6 +161,7 @@ Pebble.addEventListener("appmessage", function(e) {
 
   if (dict.TRACKING_ACTIVE !== undefined) {
     sleepHistory.record(dict.TRACKING_ACTIVE === 1, dict, Date.now());
+    pushHistory(dict.TRACKING_ACTIVE === 0);
     isTracking = (dict.TRACKING_ACTIVE === 1);
     if (isTracking && sensorEnabled("mic_en")) {
       startSoundMonitoring();
