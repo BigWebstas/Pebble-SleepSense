@@ -11,7 +11,7 @@
   - **Ambient Light Sensor**: Minute-level ambient light level classification (`AmbientLightLevel`: `VeryDark`, `Dark`, `Light`, `VeryLight`) to detect room illumination changes (sleep onset, waking up, mid-night disruptions).
   - **Microphone & Audio**:
     - **Continuous Room Noise Monitoring**: PebbleKit JS phone companion samples ambient sound levels (dB) and relays disturbance events to the watch.
-    - **Voice Dream Journal**: On watches with microphones (`basalt`, `chalk`, `diorite`, `emery`), long-pressing the Select button activates a `DictationSession` to dictate morning dream notes directly into the companion log.
+    - **Voice Dream Journal**: On watches with microphones (`basalt`, `chalk`, `diorite`, `emery`), double-pressing the Select button activates a `DictationSession` to dictate morning dream notes directly into the companion log.
 - **Smart Wake Alarm**:
   - Configurable target wake-up time and flexible smart wake window (15m, 30m, 45m).
   - Triggers a gentle, progressive vibration as soon as you enter **Light Sleep** during the smart window, preventing sleep inertia.
@@ -24,12 +24,14 @@
 
 ## Watch Controls
 
-| Button | Action During Tracking | Action When Alarm Rings |
-| :--- | :--- | :--- |
-| **SELECT (Short)** | Start / Stop sleep tracking session | Dismiss alarm |
-| **SELECT (Long)** | Launch Voice Dream Journal (Microphone dictation) | Dismiss alarm |
-| **UP** | Toggle Smart Alarm ON / OFF | Dismiss alarm |
-| **DOWN** | Cycle Smart Wake Window (15m &rarr; 30m &rarr; 45m) | Dismiss alarm |
+Changes need a deliberate **hold** (about a second; the watch buzzes once to confirm), so a stray press
+while you sleep does nothing. A ringing alarm is the exception: any press stops it, and Down snoozes it.
+
+| Button | Hold | Press / double-press | While the alarm rings |
+| :--- | :--- | :--- | :--- |
+| **SELECT** | Start / stop sleep tracking | Double-press: Voice Dream Journal (microphone dictation) | Press: stop the alarm |
+| **UP** | Turn the smart alarm on / off | Nothing | Press: stop the alarm |
+| **DOWN** | Cycle the smart wake window (15m &rarr; 30m &rarr; 45m) | Nothing | Press: snooze (when enabled) |
 
 ---
 
