@@ -6,6 +6,7 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import android.widget.RemoteViews
 import io.rebble.pebblekit2.client.DefaultPebbleSender
 import kotlinx.coroutines.CoroutineScope
@@ -29,6 +30,7 @@ class SleepWidgetProvider : AppWidgetProvider() {
     }
 
     private fun tap(context: Context) {
+        Log.i(TAG, "tap: watchAppOpen=${WidgetState.watchAppOpen(context)} tracking=${WidgetState.tracking(context)}")
         if (WidgetState.tracking(context)) {
             context.startActivity(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             return
@@ -37,23 +39,30 @@ class SleepWidgetProvider : AppWidgetProvider() {
         WidgetState.markStarting(context)
         refreshAll(context)
         if (!WidgetState.watchAppOpen(context)) openWatchApp(context)
+        Log.i(TAG, "tap: start queued")
     }
 
-    // The Pebble app opens SleepSense on the watch; the app's JS then collects the queued command
+    // The Pebble app opens SleepSense on the watch; the app's JS then collects the queued command.
+    // A broadcast receiver's own context may not bind to other apps, so use the application's, and
+    // never let a failure here take the whole app (and its background bridge) down.
     private fun openWatchApp(context: Context) {
         val result = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
-            val sender = DefaultPebbleSender(context)
+            var sender: DefaultPebbleSender? = null
             try {
-                sender.startAppOnTheWatch(WatchProtocol.APP_UUID, null)
+                sender = DefaultPebbleSender(context.applicationContext)
+                Log.i(TAG, "open watch app -> " + sender.startAppOnTheWatch(WatchProtocol.APP_UUID, null))
+            } catch (e: Exception) {
+                Log.w(TAG, "could not open the watch app: $e")
             } finally {
-                sender.close()
+                runCatching { sender?.close() }
                 result.finish()
             }
         }
     }
 
     companion object {
+        private const val TAG = "SleepWidget"
         const val ACTION_TAP = "net.webstas.sleepsense.WIDGET_TAP"
 
         private fun views(context: Context): RemoteViews {
