@@ -56,6 +56,7 @@
   <p class="hint" id="exportInfo"></p>
   <textarea id="exportText" readonly></textarea>
   <button id="copyBtn">Copy to clipboard</button>
+  <button id="shareBtn">Share</button>
   <button id="saveBtn">Save as .md file</button>
   <p id="status"></p>
 
@@ -131,6 +132,11 @@
   $('copyBtn').addEventListener('click', function () {
     Android.copy($('exportText').value);
     markExported('Copied.');
+  });
+  $('shareBtn').addEventListener('click', function () {
+    Android.share('sleepsense-' + report.fmtDate(DATA.now) + '.md', $('exportText').value);
+    // The share sheet doesn't say whether anything was sent, so this counts as exported
+    markExported('Share sheet opened.');
   });
   // The native side calls back with the outcome of the file picker
   window.onSaved = function (ok) {
