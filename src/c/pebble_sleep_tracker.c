@@ -21,6 +21,7 @@ static void prv_init(void) {
   ui_main_init();
 
   sleep_engine_set_update_callback(prv_engine_update_handler);
+  sleep_engine_set_minute_callback(ui_main_refresh_clock);
   smart_alarm_set_trigger_callback(prv_alarm_trigger_handler);
 }
 

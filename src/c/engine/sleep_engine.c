@@ -15,6 +15,7 @@
 static SleepSession s_session;
 static SensorSettings s_sensors = { .light = true, .mic = true, .heart_rate = true };
 static SleepEngineUpdateCallback s_update_cb = NULL;
+static SleepEngineMinuteCallback s_minute_cb = NULL;
 static uint32_t s_minute_accel_acc = 0;
 static uint16_t s_minute_accel_samples = 0;
 static bool s_accel_subscribed = false;
@@ -306,6 +307,9 @@ static void prv_process_minute(void) {
 
 static void prv_minute_tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   prv_process_minute();
+  if (s_minute_cb) {
+    s_minute_cb();
+  }
 }
 
 void sleep_engine_init(void) {
@@ -418,6 +422,10 @@ void sleep_engine_update_sound(uint8_t sound_level) {
   if (s_update_cb) {
     s_update_cb(&s_session);
   }
+}
+
+void sleep_engine_set_minute_callback(SleepEngineMinuteCallback callback) {
+  s_minute_cb = callback;
 }
 
 void sleep_engine_set_update_callback(SleepEngineUpdateCallback callback) {

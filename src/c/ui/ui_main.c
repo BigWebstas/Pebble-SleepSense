@@ -9,6 +9,13 @@ static TextLayer *s_stage_layer;
 static TextLayer *s_duration_layer;
 static TextLayer *s_sensors_layer;
 static TextLayer *s_alarm_layer;
+#if defined(PBL_PLATFORM_EMERY)
+// Only the Time 2 screen has room under the alarm row
+static TextLayer *s_time_layer;
+static TextLayer *s_date_layer;
+static char s_time_buf[16];
+static char s_date_buf[24];
+#endif
 static Layer *s_hypnogram_layer;
 
 static char s_header_buf[32];
@@ -81,6 +88,18 @@ static void prv_hypnogram_update_proc(Layer *layer, GContext *ctx) {
     graphics_context_set_fill_color(ctx, sleep_engine_stage_color(epoch->stage));
     graphics_fill_rect(ctx, GRect(x, bar_y, w, bar_h), 0, GCornerNone);
   }
+}
+
+void ui_main_refresh_clock(void) {
+#if defined(PBL_PLATFORM_EMERY)
+  if (!s_time_layer) return;
+  time_t now = time(NULL);
+  struct tm *t = localtime(&now);
+  strftime(s_time_buf, sizeof(s_time_buf), clock_is_24h_style() ? "%H:%M" : "%I:%M %p", t);
+  strftime(s_date_buf, sizeof(s_date_buf), "%a %b %d", t);
+  text_layer_set_text(s_time_layer, s_time_buf);
+  text_layer_set_text(s_date_layer, s_date_buf);
+#endif
 }
 
 void ui_main_update(const SleepSession *session) {
@@ -300,8 +319,28 @@ static void prv_window_load(Window *window) {
 #endif
   layer_add_child(window_layer, text_layer_get_layer(s_alarm_layer));
 
+#if defined(PBL_PLATFORM_EMERY)
+  // 7. Date and time under the alarm row
+  y += 26;
+  s_time_layer = text_layer_create(GRect(4, y, w - 8, 36));
+  text_layer_set_font(s_time_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
+  text_layer_set_text_alignment(s_time_layer, GTextAlignmentCenter);
+  text_layer_set_background_color(s_time_layer, GColorClear);
+  text_layer_set_text_color(s_time_layer, GColorWhite);
+  layer_add_child(window_layer, text_layer_get_layer(s_time_layer));
+  y += 34;
+
+  s_date_layer = text_layer_create(GRect(4, y, w - 8, 24));
+  text_layer_set_font(s_date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
+  text_layer_set_text_alignment(s_date_layer, GTextAlignmentCenter);
+  text_layer_set_background_color(s_date_layer, GColorClear);
+  text_layer_set_text_color(s_date_layer, GColorLightGray);
+  layer_add_child(window_layer, text_layer_get_layer(s_date_layer));
+#endif
+
   // Initial render
   ui_main_update(sleep_engine_get_session());
+  ui_main_refresh_clock();
 }
 
 static void prv_window_unload(Window *window) {
@@ -311,6 +350,12 @@ static void prv_window_unload(Window *window) {
   text_layer_destroy(s_sensors_layer);
   text_layer_destroy(s_alarm_layer);
   layer_destroy(s_hypnogram_layer);
+#if defined(PBL_PLATFORM_EMERY)
+  text_layer_destroy(s_time_layer);
+  text_layer_destroy(s_date_layer);
+  s_time_layer = NULL;
+  s_date_layer = NULL;
+#endif
 }
 
 void ui_main_init(void) {

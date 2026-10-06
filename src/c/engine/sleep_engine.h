@@ -34,6 +34,10 @@ void sleep_engine_set_update_callback(SleepEngineUpdateCallback callback);
 //! Get human readable string for a sleep stage
 const char *sleep_engine_stage_name(SleepStage stage);
 
+//! Called every minute (tracking or not), e.g. to refresh a clock on screen
+typedef void (*SleepEngineMinuteCallback)(void);
+void sleep_engine_set_minute_callback(SleepEngineMinuteCallback callback);
+
 //! Count a snooze of the given length against the current session
 void sleep_engine_add_snooze(uint32_t seconds);
 
