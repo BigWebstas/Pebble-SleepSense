@@ -51,6 +51,11 @@ class MainActivity : ComponentActivity() {
             insets
         }
 
+        id<Button>(R.id.clock_button).setIcon(R.drawable.ic_alarm)
+        id<Button>(R.id.clips_button).setIcon(R.drawable.ic_mic)
+        id<Button>(R.id.history_button).setIcon(R.drawable.ic_history)
+        id<Button>(R.id.grant_hc_button).setIcon(R.drawable.ic_favorite)
+        id<Button>(R.id.widget_button).setIcon(R.drawable.ic_widgets)
         id<Button>(R.id.tracking_button).setOnClickListener {
             if (WidgetState.tracking(this)) TrackingControl.stop(this) else TrackingControl.start(this)
             refreshTracking()
@@ -106,7 +111,10 @@ class MainActivity : ComponentActivity() {
         val (title, subtitle) = WidgetState.lines(this)
         id<TextView>(R.id.tracking_status_text).text = title
         id<TextView>(R.id.alarm_status_text).text = PhoneAlarmSync.describe(this).lineSequence().first()
-        id<Button>(R.id.tracking_button).setText(if (tracking) R.string.stop_tracking_button else R.string.start_tracking_button)
+        id<Button>(R.id.tracking_button).apply {
+            setText(if (tracking) R.string.stop_tracking_button else R.string.start_tracking_button)
+            setIcon(if (tracking) R.drawable.ic_stop else R.drawable.ic_play_arrow)
+        }
     }
 
     // Opens the Clock app's alarm list: the standard Clock app if there are several that can

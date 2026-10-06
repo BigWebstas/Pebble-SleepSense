@@ -97,13 +97,14 @@ class ClipsActivity : ComponentActivity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.START
         }
-        fun add(label: String, action: () -> Unit) = buttons.addView(Button(this).apply {
+        fun add(label: String, icon: Int, action: () -> Unit) = buttons.addView(Button(this).apply {
             text = label
+            setIcon(icon)
             setOnClickListener { action() }
         })
-        add("Play") { play(file) }
-        add("Share") { share(file) }
-        add("Delete") { file.delete(); stopPlayback(); render() }
+        add("Play", R.drawable.ic_play_arrow) { play(file) }
+        add("Share", R.drawable.ic_share) { share(file) }
+        add("Delete", R.drawable.ic_delete) { file.delete(); stopPlayback(); render() }
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(0, 16, 0, 16)

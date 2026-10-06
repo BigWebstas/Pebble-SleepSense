@@ -20,6 +20,13 @@ function jsonForScript(value) {
   return JSON.stringify(value).replace(/</g, '\\u003c').replace(/[\u2028\u2029]/g, '');
 }
 
+// Material icons (Apache License 2.0), drawn in the button's text colour
+function icon(path) {
+  return '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="' + path + '"/></svg>';
+}
+var ICON_COPY = icon('M16,1L4,1c-1.1,0 -2,0.9 -2,2v14h2L4,3h12L16,1zM19,5L8,5c-1.1,0 -2,0.9 -2,2v14c0,1.1 0.9,2 2,2h11c1.1,0 2,-0.9 2,-2L21,7c0,-1.1 -0.9,-2 -2,-2zM19,21L8,21L8,7h11v14z');
+var ICON_SAVE = icon('M19,9h-4V3H9v6H5l7,7 7,-7zM5,18v2h14v-2H5z');
+
 function pad(n) { return ('0' + n).slice(-2); }
 
 function options(list, selected) {
@@ -69,6 +76,7 @@ function buildConfigPageUrl(opts) {
 '  .checkbox-row input { width: auto; margin: 0; }\n' +
 '  .checkbox-row label { display: inline; margin: 0; font-weight: normal; }\n' +
 '  button { width: 100%; padding: 12px; font-size: 15px; margin-top: 16px; border: none; border-radius: 6px; background: #1a73e8; color: #fff; }\n' +
+'  .ic { width: 18px; height: 18px; vertical-align: -4px; margin-right: 8px; }\n' +
 '  button.secondary { background: var(--btn-2-bg); color: var(--btn-2-fg); margin-top: 8px; }\n' +
 '  p.hint { font-size: 12px; color: var(--hint); }\n' +
 '  p.error { font-size: 13px; color: var(--danger); }\n' +
@@ -131,8 +139,8 @@ checkbox('hrEn', 'Heart rate', 'Samples every minute while tracking. Needs a wat
 '  </select>\n' +
 '  <p class="hint" id="exportInfo"></p>\n' +
 '  <textarea id="exportText" readonly></textarea>\n' +
-'  <button id="copyBtn" class="secondary">Copy to clipboard</button>\n' +
-'  <button id="downloadBtn" class="secondary">Download .md file</button>\n' +
+'  <button id="copyBtn" class="secondary">'+ICON_COPY+'Copy to clipboard</button>\n' +
+'  <button id="downloadBtn" class="secondary">'+ICON_SAVE+'Download .md file</button>\n' +
 '  <p id="status"></p>\n' +
 '\n' +
 '  <button id="saveBtn">Save &amp; sync</button>\n' +
