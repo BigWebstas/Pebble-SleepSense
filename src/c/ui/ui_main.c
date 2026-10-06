@@ -228,6 +228,7 @@ static void prv_up_click_handler(ClickRecognizerRef recognizer, void *context) {
     return;
   }
   smart_alarm_toggle();
+  comm_send_session_update(sleep_engine_get_session()); // phone-side copy learns of it at once
   ui_main_update(sleep_engine_get_session());
 }
 
