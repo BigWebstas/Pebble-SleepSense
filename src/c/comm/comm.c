@@ -119,6 +119,14 @@ void comm_send_session_update(const SleepSession *session) {
   // 0 = quiet, 1 = ringing, 2 = snoozed (the phone turns changes into timeline events)
   uint8_t alarm_state = smart_alarm_is_active() ? 1 : (smart_alarm_get_settings()->snooze_until ? 2 : 0);
   dict_write_uint8(out_iter, MESSAGE_KEY_STATUS_ALARM_STATE, alarm_state);
+  // The watch owns the alarm settings; report them so the phone's copy (and any companion app)
+  // always matches. These reuse the keys the phone uses to set them.
+  const SmartAlarmSettings *alarm = smart_alarm_get_settings();
+  dict_write_uint8(out_iter, MESSAGE_KEY_ALARM_TARGET_HOUR, alarm->target_hour);
+  dict_write_uint8(out_iter, MESSAGE_KEY_ALARM_TARGET_MIN, alarm->target_min);
+  dict_write_uint8(out_iter, MESSAGE_KEY_SMART_WINDOW_MIN, alarm->window_minutes);
+  dict_write_uint8(out_iter, MESSAGE_KEY_SMART_ALARM_ENABLED, alarm->enabled ? 1 : 0);
+  dict_write_uint8(out_iter, MESSAGE_KEY_SNOOZE_MINUTES, alarm->snooze_minutes);
   dict_write_uint8(out_iter, MESSAGE_KEY_TRACKING_ACTIVE, session->is_tracking ? 1 : 0);
 
   app_message_outbox_send();

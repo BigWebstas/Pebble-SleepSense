@@ -106,6 +106,16 @@ Pebble.addEventListener("appmessage", function(e) {
     }
   }
 
+  // The watch owns the alarm settings (a phone companion app may change them there),
+  // so keep this side's copy, which feeds the settings page and the startup restore, in step.
+  if (dict.ALARM_TARGET_HOUR !== undefined && dict.SMART_ALARM_ENABLED !== undefined) {
+    localStorage.setItem("alarm_hour", dict.ALARM_TARGET_HOUR);
+    localStorage.setItem("alarm_min", dict.ALARM_TARGET_MIN);
+    localStorage.setItem("smart_win", dict.SMART_WINDOW_MIN);
+    localStorage.setItem("alarm_en", dict.SMART_ALARM_ENABLED !== 0);
+    localStorage.setItem("snooze_min", dict.SNOOZE_MINUTES);
+  }
+
   if (dict.STATUS_STATE !== undefined) {
     var stageStr = stageNames[dict.STATUS_STATE] || "UNKNOWN";
     var lightStr = lightNames[dict.STATUS_LIGHT_LEVEL] || "Unknown";
