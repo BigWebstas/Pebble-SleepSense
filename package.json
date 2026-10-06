@@ -45,7 +45,8 @@
       "SMART_ALARM_ENABLED",
       "TRACKING_ACTIVE",
       "PHONE_SOUND_SAMPLE",
-      "VOICE_NOTE_TRANSCRIPT"
+      "VOICE_NOTE_TRANSCRIPT",
+      "STATUS_HEART_RATE"
     ],
     "resources": {
       "media": []

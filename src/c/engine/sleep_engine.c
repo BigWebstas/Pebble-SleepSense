@@ -11,6 +11,13 @@
 #define SOUND_THRESHOLD_DISTURBANCE 70
 #define SOUND_THRESHOLD_AWAKE 85
 
+//! Ask the watch for a heart rate reading every minute while tracking (0 restores the default)
+static void prv_set_hr_sampling(bool fast) {
+#if defined(PBL_HEALTH)
+  health_service_set_heart_rate_sample_period(fast ? 60 : 0);
+#endif
+}
+
 static SleepSession s_session;
 static SleepEngineUpdateCallback s_update_cb = NULL;
 static uint32_t s_minute_accel_acc = 0;
@@ -101,7 +108,8 @@ static SleepStage prv_classify_epoch(uint16_t vmc, AppLightLevel light, uint8_t 
   return SLEEP_STAGE_DEEP;
 }
 
-static void prv_record_epoch(uint16_t vmc, AppLightLevel light, uint8_t sound, uint8_t orientation) {
+static void prv_record_epoch(uint16_t vmc, AppLightLevel light, uint8_t sound, uint8_t orientation,
+                             uint8_t heart_rate) {
   time_t now = time(NULL);
   uint32_t elapsed_sec = (s_session.session_start > 0) ? (now - s_session.session_start) : 0;
 
@@ -111,6 +119,7 @@ static void prv_record_epoch(uint16_t vmc, AppLightLevel light, uint8_t sound, u
   s_session.current_light = light;
   s_session.current_sound = sound;
   s_session.current_vmc = vmc;
+  s_session.current_hr = heart_rate;
 
   // Insert into circular history buffer
   SleepEpoch epoch = {
@@ -119,6 +128,7 @@ static void prv_record_epoch(uint16_t vmc, AppLightLevel light, uint8_t sound, u
     .light_level = (uint8_t)light,
     .sound_level = sound,
     .orientation = orientation,
+    .heart_rate = heart_rate,
     .stage = stage,
   };
 
@@ -205,6 +215,7 @@ static void prv_process_minute(void) {
   uint16_t vmc = 0;
   AppLightLevel light = s_session.current_light;
   uint8_t orientation = 0;
+  uint8_t heart_rate = 0;
 
 #if defined(PBL_HEALTH)
   time_t now = time(NULL);
@@ -217,6 +228,7 @@ static void prv_process_minute(void) {
     vmc = records[0].vmc;
     light = prv_convert_health_light(records[0].light);
     orientation = records[0].orientation;
+    heart_rate = records[0].heart_rate_bpm;
   } else
 #endif
   {
@@ -230,7 +242,7 @@ static void prv_process_minute(void) {
   s_minute_accel_acc = 0;
   s_minute_accel_samples = 0;
 
-  prv_record_epoch(vmc, light, s_session.current_sound, orientation);
+  prv_record_epoch(vmc, light, s_session.current_sound, orientation, heart_rate);
 }
 
 static void prv_minute_tick_handler(struct tm *tick_time, TimeUnits units_changed) {
@@ -246,11 +258,13 @@ void sleep_engine_init(void) {
     accel_service_set_sampling_rate(ACCEL_SAMPLING_10HZ);
     accel_data_service_subscribe(10, prv_accel_handler);
     s_accel_subscribed = true;
+    prv_set_hr_sampling(true);
   }
 }
 
 void sleep_engine_deinit(void) {
   tick_timer_service_unsubscribe();
+  prv_set_hr_sampling(false);
   if (s_accel_subscribed) {
     accel_data_service_unsubscribe();
     s_accel_subscribed = false;
@@ -273,6 +287,7 @@ void sleep_engine_start_session(void) {
   s_session.current_stage = SLEEP_STAGE_AWAKE;
   s_session.epoch_count = 0;
   s_session.epoch_head = 0;
+  s_session.current_hr = 0;
   s_minute_accel_acc = 0;
   s_minute_accel_samples = 0;
 
@@ -281,6 +296,7 @@ void sleep_engine_start_session(void) {
     accel_data_service_subscribe(10, prv_accel_handler);
     s_accel_subscribed = true;
   }
+  prv_set_hr_sampling(true);
 
   prv_save_session();
   if (s_update_cb) {
@@ -291,6 +307,8 @@ void sleep_engine_start_session(void) {
 void sleep_engine_stop_session(void) {
   s_session.is_tracking = false;
   s_session.session_end = time(NULL);
+  s_session.current_hr = 0;
+  prv_set_hr_sampling(false);
 
   if (s_accel_subscribed) {
     accel_data_service_unsubscribe();

@@ -92,6 +92,8 @@ void ui_main_update(const SleepSession *session) {
   // 1. Header
   if (is_ringing) {
     snprintf(s_header_buf, sizeof(s_header_buf), "ALARM RINGING!");
+  } else if (session->is_tracking && session->current_hr > 0) {
+    snprintf(s_header_buf, sizeof(s_header_buf), "[REC]  HR %d", session->current_hr);
   } else if (session->is_tracking) {
     snprintf(s_header_buf, sizeof(s_header_buf), "SleepSense  [REC]");
   } else {

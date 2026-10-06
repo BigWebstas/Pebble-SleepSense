@@ -29,6 +29,7 @@ typedef struct {
   uint8_t light_level;     //!< AppLightLevel
   uint8_t sound_level;     //!< Phone mic sound level (0 - 100)
   uint8_t orientation;     //!< Pitch/yaw orientation
+  uint8_t heart_rate;      //!< Beats per minute, 0 if unavailable
   SleepStage stage;        //!< Staged classification
 } SleepEpoch;
 
@@ -51,6 +52,7 @@ typedef struct {
   AppLightLevel current_light;
   uint8_t current_sound;   //!< Latest mic sound level
   uint16_t current_vmc;    //!< Latest movement VMC
+  uint8_t current_hr;      //!< Latest heart rate (bpm), 0 if unavailable
 
   //! Circular buffer of minute epochs
   SleepEpoch epochs[SLEEP_EPOCH_HISTORY_MAX];

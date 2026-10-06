@@ -99,6 +99,7 @@ void comm_send_session_update(const SleepSession *session) {
   dict_write_uint8(out_iter, MESSAGE_KEY_STATUS_SOUND_LEVEL, session->current_sound);
   dict_write_uint8(out_iter, MESSAGE_KEY_STATUS_CYCLE_COUNT, session->cycle_count);
   dict_write_uint8(out_iter, MESSAGE_KEY_STATUS_SLEEP_SCORE, session->sleep_score);
+  dict_write_uint8(out_iter, MESSAGE_KEY_STATUS_HEART_RATE, session->current_hr);
   dict_write_uint8(out_iter, MESSAGE_KEY_TRACKING_ACTIVE, session->is_tracking ? 1 : 0);
 
   app_message_outbox_send();
