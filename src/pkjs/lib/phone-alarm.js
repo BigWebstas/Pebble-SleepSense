@@ -38,7 +38,25 @@ function disablePhoneAlarm(callback) {
   xhr.send();
 }
 
+// Asks the app to make sure the phone has an alarm at hour:min (Pebble alarm turned on)
+function enablePhoneAlarm(hour, min, callback) {
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', 'http://127.0.0.1:8765/enable?hour=' + hour + '&min=' + min, true);
+  xhr.timeout = 4000;
+  xhr.onload = function () {
+    try {
+      callback(JSON.parse(xhr.responseText).result);
+    } catch (err) {
+      callback(null);
+    }
+  };
+  xhr.onerror = function () { callback(null); };
+  xhr.ontimeout = function () { callback(null); };
+  xhr.send();
+}
+
 module.exports = {
   fetchPhoneAlarm: fetchPhoneAlarm,
-  disablePhoneAlarm: disablePhoneAlarm
+  disablePhoneAlarm: disablePhoneAlarm,
+  enablePhoneAlarm: enablePhoneAlarm
 };

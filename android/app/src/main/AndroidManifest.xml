@@ -17,6 +17,9 @@
         <intent>
             <action android:name="android.intent.action.DISMISS_ALARM" />
         </intent>
+        <intent>
+            <action android:name="android.intent.action.SET_ALARM" />
+        </intent>
         <package android:name="com.google.android.apps.healthdata" />
     </queries>
 

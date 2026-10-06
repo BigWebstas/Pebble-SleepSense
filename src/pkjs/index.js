@@ -147,9 +147,15 @@ Pebble.addEventListener("appmessage", function(e) {
   // so keep this side's copy, which feeds the settings page and the startup restore, in step.
   if (dict.ALARM_TARGET_HOUR !== undefined && dict.SMART_ALARM_ENABLED !== undefined) {
     // Turned off on the watch (our own copy still said on): turn off the phone alarm too
-    if (localStorage.getItem("alarm_en") !== "false" && dict.SMART_ALARM_ENABLED === 0) {
+    var wasOn = localStorage.getItem("alarm_en") !== "false";
+    if (wasOn && dict.SMART_ALARM_ENABLED === 0) {
       phoneAlarm.disablePhoneAlarm(function(result) {
         console.log("SleepSense PKJS: Pebble alarm turned off, phone alarm: " + result);
+      });
+    } else if (!wasOn && dict.SMART_ALARM_ENABLED !== 0) {
+      // Turned back on: make sure the phone has an alarm at the watch's wake time
+      phoneAlarm.enablePhoneAlarm(dict.ALARM_TARGET_HOUR, dict.ALARM_TARGET_MIN, function(result) {
+        console.log("SleepSense PKJS: Pebble alarm turned on, phone alarm: " + result);
       });
     }
     localStorage.setItem("alarm_hour", dict.ALARM_TARGET_HOUR);

@@ -41,7 +41,7 @@ class MainActivity : ComponentActivity() {
             }
         }
         val disableSwitch = Switch(this).apply {
-            text = "Turn off phone alarm when the Pebble alarm is turned off"
+            text = "Turn the phone alarm off/on with the Pebble alarm (switches off the whole alarm in Clock, even a repeating one; turning on adds a one-time alarm)"
             isChecked = PhoneAlarmSync.isDisableOnWatchOff(this@MainActivity)
             setOnCheckedChangeListener { _, on -> PhoneAlarmSync.setDisableOnWatchOff(this@MainActivity, on) }
         }

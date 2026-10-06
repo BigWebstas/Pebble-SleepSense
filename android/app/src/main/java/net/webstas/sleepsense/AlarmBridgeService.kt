@@ -54,8 +54,15 @@ class AlarmBridgeService : Service() {
     private fun handle(client: Socket) = client.use {
         client.soTimeout = 5000
         val request = client.getInputStream().bufferedReader().readLine().orEmpty()
-        val ok = request.startsWith("GET /alarm") || request.startsWith("GET /disable")
+        val ok = request.startsWith("GET /alarm") || request.startsWith("GET /disable") || request.startsWith("GET /enable")
         val body = when {
+            request.startsWith("GET /enable") -> {
+                // GET /enable?hour=6&min=15
+                val hour = Regex("hour=(\\d+)").find(request)?.groupValues?.get(1)?.toIntOrNull()
+                val min = Regex("min=(\\d+)").find(request)?.groupValues?.get(1)?.toIntOrNull()
+                if (hour == null || min == null || hour > 23 || min > 59) """{"result":"bad request"}"""
+                else """{"result":"${PhoneAlarmSync.enablePhoneAlarm(this, hour, min)}"}"""
+            }
             request.startsWith("GET /disable") -> """{"result":"${PhoneAlarmSync.disablePhoneAlarm(this)}"}"""
             request.startsWith("GET /alarm") -> {
                 PhoneAlarmSync.noteRequest(this)

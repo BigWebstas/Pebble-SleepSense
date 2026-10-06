@@ -34,7 +34,7 @@ object PhoneAlarmSync {
 
     /** Whether turning the Pebble alarm off also turns off the phone alarm. */
     fun isDisableOnWatchOff(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_DISABLE, true)
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_DISABLE, false) // opt-in: it switches off a whole repeating alarm
 
     fun setDisableOnWatchOff(context: Context, on: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean(KEY_DISABLE, on) }
@@ -58,27 +58,73 @@ object PhoneAlarmSync {
             clock?.let { setPackage(it) }
         }
         // Only run it unattended when it can go to exactly one known Clock app (else a chooser opens)
-        val outcome = if (Settings.canDrawOverlays(context) && clock != null) {
-            context.startActivity(dismiss)
-            "asked the Clock app to turn off the $label alarm"
+        return launchOrNotify(context, dismiss, clock != null, "turn off the $label alarm",
+            "Pebble alarm turned off", "Tap to turn off the $label phone alarm too")
+    }
+
+    /**
+     * The Pebble alarm was turned on at [hour]:[min]. Android can't re-enable an alarm (or undo a
+     * skipped one), so unless the phone already has an alarm at or before that time, ask the Clock
+     * app to set one. Same unattended-vs-notification rules as [disablePhoneAlarm].
+     */
+    fun enablePhoneAlarm(context: Context, hour: Int, min: Int): String {
+        if (!isEnabled(context) || !isDisableOnWatchOff(context)) return "turned off in this app's settings"
+        val label = "%02d:%02d".format(hour, min)
+
+        val zone = ZoneId.systemDefault()
+        val now = java.time.ZonedDateTime.now(zone)
+        var target = now.toLocalDate().atTime(hour, min).atZone(zone)
+        if (!target.isAfter(now)) target = target.plusDays(1)
+        val alarmManager = context.getSystemService(AlarmManager::class.java)
+        // Android occasionally reports no next alarm for a moment; look again before concluding that
+        // so a glitch doesn't create a duplicate alarm.
+        var next = alarmManager.nextAlarmClock
+        if (next == null) {
+            Thread.sleep(1500)
+            next = alarmManager.nextAlarmClock
+        }
+        if (next != null && next.triggerTime <= target.toInstant().toEpochMilli() + 60_000) {
+            return "the phone already has an alarm at or before $label"
+        }
+
+        val clock = clockPackage(context, AlarmClock.ACTION_SET_ALARM)
+        val set = Intent(AlarmClock.ACTION_SET_ALARM).apply {
+            putExtra(AlarmClock.EXTRA_HOUR, hour)
+            putExtra(AlarmClock.EXTRA_MINUTES, min)
+            putExtra(AlarmClock.EXTRA_MESSAGE, "SleepSense")
+            putExtra(AlarmClock.EXTRA_SKIP_UI, true)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            clock?.let { setPackage(it) }
+        }
+        return launchOrNotify(context, set, clock != null, "set a $label alarm",
+            "Pebble alarm turned on", "Tap to set the $label phone alarm too")
+    }
+
+    /** Runs a Clock command unattended when allowed, else posts a notification to tap. */
+    private fun launchOrNotify(
+        context: Context, command: Intent, unambiguous: Boolean, what: String, title: String, text: String,
+    ): String {
+        val outcome = if (Settings.canDrawOverlays(context) && unambiguous) {
+            context.startActivity(command)
+            "asked the Clock app to $what"
         } else {
             val nm = context.getSystemService(NotificationManager::class.java)
             nm.createNotificationChannel(
                 NotificationChannel("alarm_action", "Alarm actions", NotificationManager.IMPORTANCE_HIGH),
             )
             nm.notify(
-                2,
+                title.hashCode(),
                 android.app.Notification.Builder(context, "alarm_action")
                     .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-                    .setContentTitle("Pebble alarm turned off")
-                    .setContentText("Tap to turn off the $label phone alarm too")
-                    .setContentIntent(PendingIntent.getActivity(context, 0, dismiss, PendingIntent.FLAG_IMMUTABLE))
+                    .setContentTitle(title)
+                    .setContentText(text)
+                    .setContentIntent(PendingIntent.getActivity(context, title.hashCode(), command, PendingIntent.FLAG_IMMUTABLE))
                     .setAutoCancel(true)
                     .build(),
             )
             "posted a notification to tap (needs the display-over-other-apps permission and a single Clock app to run unattended)"
         }
-        Log.i(TAG, "disablePhoneAlarm: $outcome")
+        Log.i(TAG, "alarm command: $outcome")
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
             putString(KEY_LAST_DISABLE, "%tR: %s".format(System.currentTimeMillis(), outcome))
         }
@@ -86,12 +132,12 @@ object PhoneAlarmSync {
     }
 
     /**
-     * The Clock app that should receive the "turn off alarm" command: the only app that handles it,
+     * The Clock app that should receive an alarm command ([action]): the only app that handles it,
      * or the standard Clock app if there are several; null if it is ambiguous.
      */
-    fun clockPackage(context: Context): String? {
+    fun clockPackage(context: Context, action: String = AlarmClock.ACTION_DISMISS_ALARM): String? {
         val handlers = context.packageManager
-            .queryIntentActivities(Intent(AlarmClock.ACTION_DISMISS_ALARM), 0)
+            .queryIntentActivities(Intent(action), 0)
             .map { it.activityInfo.packageName }.distinct()
         return handlers.singleOrNull()
             ?: handlers.firstOrNull { it == "com.google.android.deskclock" || it == "com.android.deskclock" }
