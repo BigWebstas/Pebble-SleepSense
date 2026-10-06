@@ -127,7 +127,7 @@ void ui_main_update(const SleepSession *session) {
     text_layer_set_background_color(s_stage_layer, GColorOrange);
     text_layer_set_text_color(s_stage_layer, GColorBlack);
   } else if (!session->is_tracking) {
-    snprintf(s_stage_buf, sizeof(s_stage_buf), "PRESS SELECT");
+    snprintf(s_stage_buf, sizeof(s_stage_buf), "HOLD SELECT");
     text_layer_set_background_color(s_stage_layer, GColorClear);
 #if defined(PBL_COLOR)
     text_layer_set_text_color(s_stage_layer, GColorWhite);
@@ -181,7 +181,7 @@ void ui_main_update(const SleepSession *session) {
     snprintf(s_alarm_buf, sizeof(s_alarm_buf), "Alarm %02d:%02d (%dm smart)",
              alarm->target_hour, alarm->target_min, alarm->window_minutes);
   } else {
-    snprintf(s_alarm_buf, sizeof(s_alarm_buf), "Alarm: OFF (UP to on)");
+    snprintf(s_alarm_buf, sizeof(s_alarm_buf), "Alarm: OFF (hold UP)");
   }
   text_layer_set_text(s_alarm_layer, s_alarm_buf);
 
@@ -207,16 +207,30 @@ static bool prv_handle_alarm_press(bool snooze) {
   return true;
 }
 
+// Changing anything needs a deliberate hold, so a stray press while asleep does nothing. The one
+// exception is a ringing alarm: any press stops it (Down snoozes), as it must be easy half asleep.
+#define HOLD_MS 800
+
+static void prv_confirm_buzz(void) {
+  vibes_short_pulse(); // tells a half-asleep wearer the hold was taken
+}
+
 static void prv_select_click_handler(ClickRecognizerRef recognizer, void *context) {
+  prv_handle_alarm_press(false);
+}
+
+static void prv_select_long_click_handler(ClickRecognizerRef recognizer, void *context) {
   if (prv_handle_alarm_press(false)) {
     return;
   }
+  prv_confirm_buzz();
   sleep_engine_toggle_session();
   comm_send_session_update(sleep_engine_get_session());
   ui_main_update(sleep_engine_get_session());
 }
 
-static void prv_select_long_click_handler(ClickRecognizerRef recognizer, void *context) {
+// Voice dream journal: double-press Select
+static void prv_select_double_click_handler(ClickRecognizerRef recognizer, void *context) {
   if (prv_handle_alarm_press(false)) {
     return;
   }
@@ -224,27 +238,41 @@ static void prv_select_long_click_handler(ClickRecognizerRef recognizer, void *c
 }
 
 static void prv_up_click_handler(ClickRecognizerRef recognizer, void *context) {
+  prv_handle_alarm_press(false);
+}
+
+static void prv_up_long_click_handler(ClickRecognizerRef recognizer, void *context) {
   if (prv_handle_alarm_press(false)) {
     return;
   }
+  prv_confirm_buzz();
   smart_alarm_toggle();
   comm_send_session_update(sleep_engine_get_session()); // phone-side copy learns of it at once
   ui_main_update(sleep_engine_get_session());
 }
 
 static void prv_down_click_handler(ClickRecognizerRef recognizer, void *context) {
+  prv_handle_alarm_press(true);
+}
+
+static void prv_down_long_click_handler(ClickRecognizerRef recognizer, void *context) {
   if (prv_handle_alarm_press(true)) {
     return;
   }
+  prv_confirm_buzz();
   smart_alarm_cycle_window();
+  comm_send_session_update(sleep_engine_get_session());
   ui_main_update(sleep_engine_get_session());
 }
 
 static void prv_click_config_provider(void *context) {
   window_single_click_subscribe(BUTTON_ID_SELECT, prv_select_click_handler);
-  window_long_click_subscribe(BUTTON_ID_SELECT, 700, prv_select_long_click_handler, NULL);
+  window_multi_click_subscribe(BUTTON_ID_SELECT, 2, 2, 300, true, prv_select_double_click_handler);
+  window_long_click_subscribe(BUTTON_ID_SELECT, HOLD_MS, prv_select_long_click_handler, NULL);
   window_single_click_subscribe(BUTTON_ID_UP, prv_up_click_handler);
+  window_long_click_subscribe(BUTTON_ID_UP, HOLD_MS, prv_up_long_click_handler, NULL);
   window_single_click_subscribe(BUTTON_ID_DOWN, prv_down_click_handler);
+  window_long_click_subscribe(BUTTON_ID_DOWN, HOLD_MS, prv_down_long_click_handler, NULL);
 }
 
 static void prv_window_load(Window *window) {
