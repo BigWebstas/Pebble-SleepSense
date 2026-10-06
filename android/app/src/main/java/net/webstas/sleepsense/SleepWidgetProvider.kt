@@ -35,6 +35,8 @@ class SleepWidgetProvider : AppWidgetProvider() {
             context.startActivity(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             return
         }
+        // The queued command is collected through the bridge service, so make sure it is running
+        context.startForegroundService(Intent(context, AlarmBridgeService::class.java))
         Commands.queueStart()
         WidgetState.markStarting(context)
         refreshAll(context)
