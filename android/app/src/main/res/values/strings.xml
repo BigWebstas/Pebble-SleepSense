@@ -29,4 +29,14 @@
     <string name="noise_clips_button">Noise clips</string>
     <string name="history_button">Sleep history and export</string>
     <string name="version_label">Version %1$s</string>
+    <string name="install_watch_button">Install watch app</string>
+    <string name="install_watch_missing">No watch app is bundled in this build. Run pebble build, then rebuild this app.</string>
+    <string name="install_watch_no_handler">No app can open a .pbw file. Is the Pebble app installed?</string>
+    <string name="check_update_button">Check for updates</string>
+    <string name="download_update_button">Get the update</string>
+    <string name="update_checking">Checking for updates…</string>
+    <string name="update_current">Up to date (version %1$s)</string>
+    <string name="update_available">Update available: %1$s (you have %2$s)</string>
+    <string name="update_none_published">No releases published yet</string>
+    <string name="update_failed">Couldn\'t check for updates</string>
 </resources>

@@ -95,6 +95,8 @@ Laid out like the other Pebble companion apps: logo, status, buttons, then setti
 - **Sync phone alarm to Pebble**: see below.
 - **Record clips on noise spikes while tracking**: see below (off until you turn it on).
 - **Noise clips**, **Sleep history and export**, **Health Connect** access, **Add widget to home screen**.
+- **Install watch app**: hands the watch app bundled in this APK to the Pebble app (choose **Pebble** in the "Open with" list), which installs it on your watch and opens it. A quick way to update the watch app from the phone.
+- **Check for updates**: looks at the latest GitHub release of this project and tells you if a newer version exists (and offers **Get the update**, which opens the release page). It checks quietly when the app opens, at most twice a day.
 
 ### Features
 
@@ -112,7 +114,7 @@ Laid out like the other Pebble companion apps: logo, status, buttons, then setti
 | Microphone | Noise tracking and clips (asked when you switch it on) |
 | Foreground service (special use, microphone) | The bridge runs all the time; the microphone type is added only while listening |
 | Notifications | The bridge's quiet foreground notification |
-| Internet | Only for the local socket on `127.0.0.1` |
+| Internet | The local socket on `127.0.0.1`, and the update check (a single request to `api.github.com`) |
 | Receive boot completed | Restart the bridge after a reboot or an app update |
 | Health Connect (write sleep, write heart rate) | The experimental Health Connect export |
 
@@ -134,6 +136,8 @@ cd android
 ./gradlew assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
+
+The **Install watch app** button needs the watch app to be bundled in the APK: run `pebble build` in the repository root *before* `./gradlew assembleDebug` (the build copies `build/PebbleSleepTracker.pbw` into the app; without it the button explains what to do).
 
 Open the app once so it can start the bridge (it restarts itself after updates and reboots). The history screen bundles `src/pkjs/lib/report-core.js` through a symbolic link in `android/app/src/main/assets/`.
 
@@ -170,6 +174,7 @@ PebbleSleepTracker/
         │   ├── AlarmBridgeService.kt   # The local bridge (foreground service)
         │   ├── PhoneAlarmSync.kt, WidgetState.kt, TrackingControl.kt, SleepWidgetProvider.kt
         │   ├── NoiseMonitor.kt         # Microphone level, spike detection, clips
+        │   ├── UpdateChecker.kt        # Looks for a newer GitHub release
         │   ├── SessionStore.kt, SleepSession.kt, SleepListenerService.kt   # History and Health Connect
         │   └── BootReceiver.kt
         ├── assets/                     # history.html and a link to report-core.js

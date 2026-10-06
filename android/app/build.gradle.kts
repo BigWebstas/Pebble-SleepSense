@@ -21,6 +21,17 @@ android {
     }
 }
 
+// Bundle the watch app so the "Install watch app" button can hand it to the Pebble app. Run
+// `pebble build` first; if the watch app has not been built, this leaves the bundle as it is.
+val syncWatchApp by tasks.registering(Copy::class) {
+    val source = rootProject.file("../build/PebbleSleepTracker.pbw")
+    onlyIf { source.exists() }
+    from(source)
+    rename { "watch.pbw" }
+    into("src/main/assets")
+}
+tasks.named("preBuild") { dependsOn(syncWatchApp) }
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.ktx)

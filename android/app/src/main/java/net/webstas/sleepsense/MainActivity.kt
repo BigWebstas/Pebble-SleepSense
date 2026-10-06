@@ -2,9 +2,11 @@ package net.webstas.sleepsense
 
 import android.Manifest
 import android.appwidget.AppWidgetManager
+import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -18,7 +20,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
+import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.IOException
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
@@ -36,6 +43,8 @@ class MainActivity : ComponentActivity() {
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { refreshNoise() }
     private val requestHealth =
         registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { refreshHealth() }
+
+    private var update: UpdateResult? = null
 
     private fun <T : android.view.View> id(res: Int): T = findViewById(res)
 
@@ -86,6 +95,18 @@ class MainActivity : ComponentActivity() {
                 manager.requestPinAppWidget(ComponentName(this, SleepWidgetProvider::class.java), null, null)
             }
         }
+        id<Button>(R.id.install_watch_button).apply {
+            setIcon(R.drawable.ic_watch)
+            setOnClickListener { installWatchApp() }
+        }
+        id<Button>(R.id.update_button).apply {
+            setOnClickListener {
+                val found = update
+                if (found is UpdateResult.Available) startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(found.pageUrl)))
+                else checkForUpdate()
+            }
+        }
+        if (UpdateChecker.dueForAutoCheck(this)) checkForUpdate() else refreshUpdate()
         id<TextView>(R.id.version_text).text =
             getString(R.string.version_label, packageManager.getPackageInfo(packageName, 0).versionName)
     }
@@ -128,6 +149,53 @@ class MainActivity : ComponentActivity() {
             Toast.makeText(this, R.string.open_clock_missing, Toast.LENGTH_SHORT).show()
         } else {
             startActivity(show)
+        }
+    }
+
+    private fun installedVersion() = packageManager.getPackageInfo(packageName, 0).versionName ?: "0"
+
+    private fun checkForUpdate() {
+        id<TextView>(R.id.update_status_text).setText(R.string.update_checking)
+        lifecycleScope.launch {
+            update = withContext(Dispatchers.IO) { UpdateChecker.check(this@MainActivity, installedVersion()) }
+            refreshUpdate()
+        }
+    }
+
+    private fun refreshUpdate() {
+        val status = id<TextView>(R.id.update_status_text)
+        val button = id<Button>(R.id.update_button)
+        val found = update
+        status.text = when (found) {
+            is UpdateResult.Available -> getString(R.string.update_available, found.version, installedVersion())
+            is UpdateResult.UpToDate -> getString(R.string.update_current, found.version)
+            UpdateResult.NoReleases -> getString(R.string.update_none_published)
+            UpdateResult.Failed -> getString(R.string.update_failed)
+            null -> getString(R.string.version_label, installedVersion())
+        }
+        button.setText(if (found is UpdateResult.Available) R.string.download_update_button else R.string.check_update_button)
+        button.setIcon(R.drawable.ic_system_update)
+    }
+
+    // Hands the bundled watch app to the Pebble app, which offers to install it on the watch
+    private fun installWatchApp() {
+        val dir = File(cacheDir, "watchapp").apply { mkdirs() }
+        val copy = File(dir, "SleepSense.pbw")
+        try {
+            assets.open("watch.pbw").use { input -> copy.outputStream().use { input.copyTo(it) } }
+        } catch (e: IOException) {
+            Toast.makeText(this, R.string.install_watch_missing, Toast.LENGTH_LONG).show()
+            return
+        }
+        val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", copy)
+        val open = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/octet-stream")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        try {
+            startActivity(open)
+        } catch (e: ActivityNotFoundException) {
+            Toast.makeText(this, R.string.install_watch_no_handler, Toast.LENGTH_LONG).show()
         }
     }
 
