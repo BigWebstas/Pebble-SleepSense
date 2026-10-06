@@ -54,9 +54,15 @@ class AlarmBridgeService : Service() {
     private fun handle(client: Socket) = client.use {
         client.soTimeout = 5000
         val request = client.getInputStream().bufferedReader().readLine().orEmpty()
-        val ok = request.startsWith("GET /alarm")
-        if (ok) PhoneAlarmSync.noteRequest(this)
-        val body = if (ok) PhoneAlarmSync.json(this) else "not found"
+        val ok = request.startsWith("GET /alarm") || request.startsWith("GET /disable")
+        val body = when {
+            request.startsWith("GET /disable") -> """{"result":"${PhoneAlarmSync.disablePhoneAlarm(this)}"}"""
+            request.startsWith("GET /alarm") -> {
+                PhoneAlarmSync.noteRequest(this)
+                PhoneAlarmSync.json(this)
+            }
+            else -> "not found"
+        }
         Log.i(TAG, "$request -> ${if (ok) body else 404}")
         val status = if (ok) "200 OK" else "404 Not Found"
         client.getOutputStream().write(

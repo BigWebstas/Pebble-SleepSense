@@ -21,6 +21,24 @@ function fetchPhoneAlarm(callback) {
   xhr.send();
 }
 
+// Asks the app to turn off the phone's next alarm; calls back with its one-line outcome (or null)
+function disablePhoneAlarm(callback) {
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', 'http://127.0.0.1:8765/disable', true);
+  xhr.timeout = 4000;
+  xhr.onload = function () {
+    try {
+      callback(JSON.parse(xhr.responseText).result);
+    } catch (err) {
+      callback(null);
+    }
+  };
+  xhr.onerror = function () { callback(null); };
+  xhr.ontimeout = function () { callback(null); };
+  xhr.send();
+}
+
 module.exports = {
-  fetchPhoneAlarm: fetchPhoneAlarm
+  fetchPhoneAlarm: fetchPhoneAlarm,
+  disablePhoneAlarm: disablePhoneAlarm
 };

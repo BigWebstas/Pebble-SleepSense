@@ -1,6 +1,8 @@
 package net.webstas.sleepsense
 
 import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import android.os.Bundle
 import android.widget.Button
 import android.widget.LinearLayout
@@ -16,6 +18,7 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     private lateinit var status: TextView
     private lateinit var alarmStatus: TextView
+    private lateinit var overlayStatus: TextView
 
     private val requestPermission =
         registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { refresh() }
@@ -37,6 +40,18 @@ class MainActivity : ComponentActivity() {
                 refreshAlarm()
             }
         }
+        val disableSwitch = Switch(this).apply {
+            text = "Turn off phone alarm when the Pebble alarm is turned off"
+            isChecked = PhoneAlarmSync.isDisableOnWatchOff(this@MainActivity)
+            setOnCheckedChangeListener { _, on -> PhoneAlarmSync.setDisableOnWatchOff(this@MainActivity, on) }
+        }
+        overlayStatus = TextView(this).apply { textSize = 14f; setPadding(0, 8, 0, 8) }
+        val overlayButton = Button(this).apply {
+            text = "Allow display over other apps"
+            setOnClickListener {
+                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+            }
+        }
         setContentView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(48, 96, 48, 48)
@@ -44,6 +59,9 @@ class MainActivity : ComponentActivity() {
             addView(grant)
             addView(alarmSwitch)
             addView(alarmStatus)
+            addView(disableSwitch)
+            addView(overlayStatus)
+            addView(overlayButton)
         })
     }
 
@@ -55,6 +73,8 @@ class MainActivity : ComponentActivity() {
 
     private fun refreshAlarm() {
         alarmStatus.text = PhoneAlarmSync.describe(this)
+        overlayStatus.text = if (Settings.canDrawOverlays(this)) "Display over other apps: allowed, so the phone alarm is turned off automatically."
+        else "Display over other apps: not allowed, so you'll get a notification to tap instead."
     }
 
     private fun refresh() = lifecycleScope.launch {
