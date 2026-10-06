@@ -2,6 +2,7 @@ package net.webstas.sleepsense
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.WindowInsets
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.Switch
@@ -39,7 +40,12 @@ class MainActivity : ComponentActivity() {
         }
         setContentView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(48, 96, 48, 48)
+            // The app draws edge to edge: keep content clear of the status and navigation bars
+            setOnApplyWindowInsetsListener { view, insets ->
+                val bars = insets.getInsets(WindowInsets.Type.systemBars())
+                view.setPadding(48 + bars.left, 48 + bars.top, 48 + bars.right, 48 + bars.bottom)
+                insets
+            }
             addView(status)
             addView(grant)
             addView(alarmSwitch)
