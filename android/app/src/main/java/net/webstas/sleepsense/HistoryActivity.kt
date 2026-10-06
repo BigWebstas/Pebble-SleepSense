@@ -12,8 +12,6 @@ import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.FileProvider
-import java.io.File
 
 /**
  * Sleep history graphs and the Markdown export. The page is the settings-page code from the
@@ -49,16 +47,12 @@ class HistoryActivity : ComponentActivity() {
             }
         }
 
-        // Opens the Android share sheet with the export attached as a .md file
-        @JavascriptInterface fun share(filename: String, text: String) {
-            val dir = File(cacheDir, "exports").apply { mkdirs(); listFiles()?.forEach { it.delete() } }
-            val file = File(dir, filename).apply { writeText(text) }
-            val uri = FileProvider.getUriForFile(this@HistoryActivity, "$packageName.fileprovider", file)
+        // Opens the Android share sheet with the export as plain text (what Copy puts on the clipboard)
+        @JavascriptInterface fun share(text: String) {
             val send = Intent(Intent.ACTION_SEND).apply {
-                type = "text/markdown"
-                putExtra(Intent.EXTRA_STREAM, uri)
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, text)
                 putExtra(Intent.EXTRA_SUBJECT, "SleepSense export")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             runOnUiThread { startActivity(Intent.createChooser(send, "Share sleep export")) }
         }

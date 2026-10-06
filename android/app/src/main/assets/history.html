@@ -134,7 +134,7 @@
     markExported('Copied.');
   });
   $('shareBtn').addEventListener('click', function () {
-    Android.share('sleepsense-' + report.fmtDate(DATA.now) + '.md', $('exportText').value);
+    Android.share($('exportText').value);
     // The share sheet doesn't say whether anything was sent, so this counts as exported
     markExported('Share sheet opened.');
   });
