@@ -2,3 +2,7 @@ build/
 .lock-waf*
 .claude/settings.local.json
 pebble_screenshot_*.png
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
