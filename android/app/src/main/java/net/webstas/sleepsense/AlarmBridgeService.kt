@@ -90,6 +90,9 @@ class AlarmBridgeService : Service() {
                 if (tracking != null) {
                     val since = Regex("since=(\\d+)").find(request)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
                     WidgetState.note(this, tracking == "1", since)
+                    // Asked to start but the watch checks in still idle (e.g. its app had just been
+                    // restarted and the command was lost): ask again
+                    if (tracking == "0" && WidgetState.startRequestedRecently(this)) Commands.queueStart()
                 }
                 SleepWidgetProvider.refreshAll(this)
                 "200 OK" to PhoneAlarmSync.json(this)
@@ -123,6 +126,7 @@ class AlarmBridgeService : Service() {
         } catch (e: java.io.IOException) {
             // The caller went away: a command it was handed must not be lost
             if (body.contains("\"start\"")) Commands.queueStart()
+            if (body.contains("\"stop\"")) Commands.queueStop()
         }
     }
 

@@ -22,7 +22,7 @@ function fetchPhoneAlarm(callback, status) {
   xhr.send();
 }
 
-// Waits (up to ~25 s, held open by the app) for a command from the phone: {cmd: "start" | "none"}
+// Waits (up to ~25 s, held open by the app) for a command from the phone: "start", "stop" or "none"
 function waitForCommand(callback) {
   var xhr = new XMLHttpRequest();
   xhr.open('GET', 'http://127.0.0.1:8765/command', true);

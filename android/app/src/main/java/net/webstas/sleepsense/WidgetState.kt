@@ -36,6 +36,10 @@ object WidgetState {
     fun tracking(context: Context, now: Long = System.currentTimeMillis()) =
         watchAppOpen(context, now) && prefs(context).getBoolean("tracking", false)
 
+    /** True shortly after a start request: a check-in that still says "not tracking" means it was lost. */
+    fun startRequestedRecently(context: Context, now: Long = System.currentTimeMillis()) =
+        now - prefs(context).getLong("starting", 0) < 45_000L
+
     private fun starting(context: Context, now: Long) = now - prefs(context).getLong("starting", 0) < STARTING_MS
 
     private fun clock(millis: Long) =
@@ -54,33 +58,38 @@ object WidgetState {
     }
 }
 
-/** A "start tracking" request from the widget, handed to the watchapp's JS when it asks. */
+/** A "start" or "stop tracking" request from the phone, handed to the watchapp's JS when it asks. */
 object Commands {
     private val lock = Object()
-    private var pendingStart = false
+    private var pending: String? = null
     private var newestPoll = 0
 
-    fun queueStart() = synchronized(lock) {
-        pendingStart = true
+    fun queueStart() = queue("start")
+
+    fun queueStop() = queue("stop")
+
+    private fun queue(command: String) = synchronized(lock) {
+        pending = command // a newer request replaces an older one
         lock.notifyAll()
     }
 
     /**
-     * Holds the caller up to [timeoutMs] until a command is queued; returns "start" or "none". Only
-     * the newest poll can take a command: an older one (its client gone, e.g. the watch app closed)
-     * gives up as soon as a newer poll arrives, so it can't swallow a command.
+     * Holds the caller up to [timeoutMs] until a command is queued; returns it ("start" or "stop")
+     * or "none". Only the newest poll can take a command: an older one (its client gone, e.g. the
+     * watch app closed) gives up as soon as a newer poll arrives, so it can't swallow a command.
      */
     fun await(timeoutMs: Long): String = synchronized(lock) {
         val mine = ++newestPoll
         lock.notifyAll()
         val deadline = System.currentTimeMillis() + timeoutMs
-        while (!pendingStart) {
+        while (pending == null) {
             val left = deadline - System.currentTimeMillis()
             if (left <= 0 || newestPoll != mine) return "none"
             lock.wait(left)
         }
         if (newestPoll != mine) return "none"
-        pendingStart = false
-        "start"
+        val command = pending!!
+        pending = null
+        command
     }
 }

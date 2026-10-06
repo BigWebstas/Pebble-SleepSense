@@ -123,14 +123,29 @@ function reportStatus() {
   phoneAlarm.fetchPhoneAlarm(function() {}, trackingStatus());
 }
 
+// Sends a start/stop command and repeats it until the watch reflects it: it can be lost when the
+// watch app is being restarted at that moment (the Pebble app relaunches it for a widget tap)
+function trackingCommand(key, wantTracking, attempt) {
+  var dict = {};
+  dict[key] = 1;
+  sendToWatch(dict, function() {}, function(err) {
+    console.log("SleepSense PKJS: Could not send " + key + ": " + JSON.stringify(err));
+  });
+  setTimeout(function() {
+    if (isTracking !== wantTracking && attempt < 3) trackingCommand(key, wantTracking, attempt + 1);
+  }, 6000);
+}
+
 // Held open by the app until the widget is tapped, so a command arrives within a second
 function listenForCommands() {
   phoneAlarm.waitForCommand(function(cmd) {
+    if (cmd === "stop" && isTracking) {
+      console.log("SleepSense PKJS: Stop tracking requested from the phone");
+      trackingCommand("COMMAND_STOP_TRACKING", false, 0);
+    }
     if (cmd === "start" && !isTracking) {
       console.log("SleepSense PKJS: Start tracking requested from the phone");
-      sendToWatch({ COMMAND_START_TRACKING: 1 }, function() {}, function(err) {
-        console.log("SleepSense PKJS: Could not send start command: " + JSON.stringify(err));
-      });
+      trackingCommand("COMMAND_START_TRACKING", true, 0);
     }
     // No app (null) or nothing pending ("none"): ask again, after a pause if the app isn't there
     setTimeout(listenForCommands, cmd === null ? 15000 : 100);
