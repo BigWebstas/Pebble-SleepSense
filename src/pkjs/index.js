@@ -3,6 +3,7 @@ var sleepHistory = require("./lib/history");
 var configPage = require("./lib/config-page");
 var phoneAlarm = require("./lib/phone-alarm");
 var sessionPush = require("./lib/session-push");
+var noiseBridge = require("./lib/noise-bridge");
 
 var APP_VERSION = "1.0.0"; // keep in step with package.json
 
@@ -30,33 +31,28 @@ function sensorDict() {
 var stageNames = ["AWAKE", "LIGHT", "DEEP", "REM"];
 var lightNames = ["Unknown", "Very Dark", "Dark", "Light", "Very Light"];
 
-// Send periodic simulated/sampled ambient sound levels to watch during tracking
+// While tracking, the Android app listens through the phone microphone (and saves a clip on
+// a loud spike). Once a minute its average level goes to the watch as the room noise.
+// Without the app, or with noise monitoring switched off there, no level is sent.
 function startSoundMonitoring() {
   if (soundInterval) return;
-  console.log("SleepSense PKJS: Starting phone sound monitoring");
+  console.log("SleepSense PKJS: Starting phone noise monitoring");
+  noiseBridge.start(function(r) {
+    console.log("SleepSense PKJS: Noise monitor: " + JSON.stringify(r));
+  });
 
-  // Send a sound sample every 60 seconds matching the epoch window
   soundInterval = setInterval(function() {
     if (!isTracking || !sensorEnabled("mic_en")) {
       stopSoundMonitoring();
       return;
     }
-
-    // In a nighttime room, baseline noise is 20-35 dB with occasional snore/movement peaks
-    var baseSound = 25 + Math.floor(Math.random() * 15);
-    // Occasional disturbance / snore simulation (5% chance)
-    if (Math.random() < 0.05) {
-      baseSound += 35;
-    }
-
-    var dict = {
-      PHONE_SOUND_SAMPLE: baseSound
-    };
-
-    Pebble.sendAppMessage(dict, function() {
-      console.log("SleepSense PKJS: Sound sample sent: " + baseSound + " dB");
-    }, function(e) {
-      console.log("SleepSense PKJS: Error sending sound sample: " + JSON.stringify(e));
+    noiseBridge.status(function(n) {
+      if (!n || !n.listening || !n.avg) return;
+      Pebble.sendAppMessage({ PHONE_SOUND_SAMPLE: n.avg }, function() {
+        console.log("SleepSense PKJS: Room noise " + n.avg + " dB sent");
+      }, function(e) {
+        console.log("SleepSense PKJS: Error sending noise level: " + JSON.stringify(e));
+      });
     });
   }, 60000);
 }
@@ -65,6 +61,7 @@ function stopSoundMonitoring() {
   if (soundInterval) {
     clearInterval(soundInterval);
     soundInterval = null;
+    noiseBridge.stop();
     console.log("SleepSense PKJS: Stopped phone sound monitoring");
   }
 }

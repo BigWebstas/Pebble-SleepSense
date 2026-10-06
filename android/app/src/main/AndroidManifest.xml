@@ -5,6 +5,9 @@
     <uses-permission android:name="android.permission.health.WRITE_HEART_RATE" />
     <!-- Alarm bridge: a loopback-only server run as a foreground service -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Noise monitoring: microphone, only while sleep is being tracked and only if switched on -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -34,6 +37,20 @@
             </intent-filter>
         </activity>
 
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <activity
+            android:name=".ClipsActivity"
+            android:exported="false" />
+
         <activity
             android:name=".HistoryActivity"
             android:exported="false" />
@@ -53,7 +70,7 @@
         <service
             android:name=".AlarmBridgeService"
             android:exported="false"
-            android:foregroundServiceType="specialUse">
+            android:foregroundServiceType="specialUse|microphone">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="local_alarm_bridge_for_pebble_watchapp" />

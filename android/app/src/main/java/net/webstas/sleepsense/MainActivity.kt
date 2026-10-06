@@ -1,6 +1,8 @@
 package net.webstas.sleepsense
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.WindowInsets
 import android.widget.Button
@@ -8,6 +10,7 @@ import android.widget.LinearLayout
 import android.widget.Switch
 import android.widget.TextView
 import androidx.activity.ComponentActivity
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.lifecycle.lifecycleScope
 import androidx.health.connect.client.HealthConnectClient
@@ -17,6 +20,10 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     private lateinit var status: TextView
     private lateinit var alarmStatus: TextView
+    private lateinit var noiseStatus: TextView
+
+    private val requestMic =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { refreshNoise() }
 
     private val requestPermission =
         registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { refresh() }
@@ -38,6 +45,16 @@ class MainActivity : ComponentActivity() {
                 refreshAlarm()
             }
         }
+        noiseStatus = TextView(this).apply { textSize = 14f; setPadding(0, 8, 0, 8) }
+        val noiseSwitch = Switch(this).apply {
+            text = "Record clips on noise spikes while tracking"
+            isChecked = NoiseClips.isEnabled(this@MainActivity)
+            setOnCheckedChangeListener { _, on ->
+                NoiseClips.setEnabled(this@MainActivity, on)
+                if (on && !micGranted()) requestMic.launch(Manifest.permission.RECORD_AUDIO)
+                refreshNoise()
+            }
+        }
         setContentView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             // The app draws edge to edge: keep content clear of the status and navigation bars
@@ -50,6 +67,12 @@ class MainActivity : ComponentActivity() {
             addView(grant)
             addView(alarmSwitch)
             addView(alarmStatus)
+            addView(noiseSwitch)
+            addView(noiseStatus)
+            addView(Button(this@MainActivity).apply {
+                text = "Noise clips"
+                setOnClickListener { startActivity(Intent(this@MainActivity, ClipsActivity::class.java)) }
+            })
             addView(Button(this@MainActivity).apply {
                 text = "Sleep history and export"
                 setOnClickListener { startActivity(Intent(this@MainActivity, HistoryActivity::class.java)) }
@@ -61,6 +84,19 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         refresh()
         refreshAlarm()
+        refreshNoise()
+    }
+
+    private fun micGranted() =
+        checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+
+    private fun refreshNoise() {
+        val clips = NoiseClips.list(this).size
+        noiseStatus.text = when {
+            !NoiseClips.isEnabled(this) -> "Noise monitoring is off. It listens through the phone microphone only while the watch is tracking sleep."
+            !micGranted() -> "Microphone permission is needed. Switch this off and on to be asked again."
+            else -> "Listening while you track sleep. $clips clip" + (if (clips == 1) "" else "s") + " saved."
+        }
     }
 
     private fun refreshAlarm() {

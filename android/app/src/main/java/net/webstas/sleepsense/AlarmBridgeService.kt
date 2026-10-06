@@ -4,11 +4,13 @@ import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.Manifest
 import android.app.Service
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.IBinder
 import android.util.Log
@@ -29,6 +31,7 @@ private const val MAX_BODY = 5 * 1024 * 1024 // a month of history is ~150 KB
  */
 class AlarmBridgeService : Service() {
     private var server: ServerSocket? = null
+    private val monitor by lazy { NoiseMonitor(applicationContext) }
 
     // The service is always running, so it sees every change to the next alarm as it happens
     private val alarmChanged = object : BroadcastReceiver() {
@@ -42,13 +45,7 @@ class AlarmBridgeService : Service() {
         super.onCreate()
         val channel = NotificationChannel("bridge", "Alarm bridge", NotificationManager.IMPORTANCE_MIN)
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
-        val notification = Notification.Builder(this, "bridge")
-            .setContentTitle("SleepSense alarm bridge")
-            .setContentText("Shares your next phone alarm with the watch app")
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setOngoing(true)
-            .build()
-        startForeground(1, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        startForeground(1, notification(false), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
 
         ContextCompat.registerReceiver(
             this, alarmChanged, IntentFilter(AlarmManager.ACTION_NEXT_ALARM_CLOCK_CHANGED),
@@ -88,6 +85,9 @@ class AlarmBridgeService : Service() {
                 PhoneAlarmSync.noteRequest(this)
                 "200 OK" to PhoneAlarmSync.json(this)
             }
+            request.startsWith("GET /noise/start") -> "200 OK" to noiseStart()
+            request.startsWith("GET /noise/stop") -> "200 OK" to noiseStop()
+            request.startsWith("GET /noise") -> "200 OK" to noiseStatus()
             request.startsWith("POST /sessions") && contentLength in 1..MAX_BODY -> {
                 val bytes = ByteArray(contentLength)
                 var read = 0
@@ -123,11 +123,52 @@ class AlarmBridgeService : Service() {
         return line.toString(Charsets.UTF_8.name())
     }
 
+    private fun notification(listening: Boolean): Notification =
+        Notification.Builder(this, "bridge")
+            .setContentTitle(if (listening) "SleepSense is listening for noise" else "SleepSense alarm bridge")
+            .setContentText(if (listening) "Recording a clip if the room gets suddenly loud" else "Shares your next phone alarm with the watch app")
+            .setSmallIcon(if (listening) android.R.drawable.ic_btn_speak_now else android.R.drawable.ic_lock_idle_alarm)
+            .setOngoing(true)
+            .build()
+
+    // The microphone type is added only while listening, to the service that is already in the foreground
+    private fun setListening(on: Boolean) {
+        val types = ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or
+            (if (on) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0)
+        startForeground(1, notification(on), types)
+    }
+
+    private fun noiseStart(): String {
+        if (!NoiseClips.isEnabled(this)) return """{"ok":false,"error":"noise monitoring is off in the app"}"""
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            return """{"ok":false,"error":"microphone permission not granted"}"""
+        }
+        return try {
+            setListening(true)
+            monitor.start()
+            """{"ok":true}"""
+        } catch (e: Exception) {
+            Log.w(TAG, "could not start listening: $e")
+            setListening(false)
+            """{"ok":false,"error":"${e.javaClass.simpleName}"}"""
+        }
+    }
+
+    private fun noiseStop(): String {
+        monitor.stop()
+        setListening(false)
+        return """{"ok":true}"""
+    }
+
+    private fun noiseStatus() =
+        """{"listening":${monitor.listening},"db":${monitor.lastDb},"avg":${monitor.avg60},"clips":${NoiseClips.list(this).size}}"""
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int) = START_STICKY
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        monitor.stop()
         unregisterReceiver(alarmChanged)
         server?.close()
         super.onDestroy()
