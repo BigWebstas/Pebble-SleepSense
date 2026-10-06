@@ -38,7 +38,9 @@ class SleepWidgetProvider : AppWidgetProvider() {
         Commands.queueStart()
         WidgetState.markStarting(context)
         refreshAll(context)
-        if (!WidgetState.watchAppOpen(context)) openWatchApp(context)
+        // Always ask the Pebble app to open SleepSense: "the watch app is open" is only inferred from
+        // the last check-in and can be minutes stale (the app may have just been closed)
+        openWatchApp(context)
         Log.i(TAG, "tap: start queued")
     }
 
