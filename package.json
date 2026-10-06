@@ -49,7 +49,10 @@
       "STATUS_HEART_RATE",
       "SENSOR_LIGHT_ENABLED",
       "SENSOR_MIC_ENABLED",
-      "SENSOR_HR_ENABLED"
+      "SENSOR_HR_ENABLED",
+      "STATUS_SNOOZE_COUNT",
+      "STATUS_SNOOZE_SEC",
+      "SNOOZE_MINUTES"
     ],
     "resources": {
       "media": []

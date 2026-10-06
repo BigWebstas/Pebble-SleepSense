@@ -34,6 +34,9 @@ void sleep_engine_set_update_callback(SleepEngineUpdateCallback callback);
 //! Get human readable string for a sleep stage
 const char *sleep_engine_stage_name(SleepStage stage);
 
+//! Count a snooze of the given length against the current session
+void sleep_engine_add_snooze(uint32_t seconds);
+
 //! Enable or disable each sensor; persisted and applied immediately
 void sleep_engine_set_sensors(bool light, bool mic, bool heart_rate);
 

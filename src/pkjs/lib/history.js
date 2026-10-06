@@ -50,6 +50,11 @@ function record(tracking, d, now) {
     current = { start: now, end: 0, samples: [] };
     sessions.push(current);
   }
+  // Cumulative for the session, so the latest message wins
+  if (d.STATUS_SNOOZE_COUNT !== undefined) {
+    current.snoozes = d.STATUS_SNOOZE_COUNT;
+    current.snoozeSec = d.STATUS_SNOOZE_SEC || 0;
+  }
   var last = current.samples[current.samples.length - 1];
   if (d.STATUS_STATE !== undefined && (!last || now - last.t >= SAMPLE_GAP_MS)) {
     current.samples.push({
@@ -105,6 +110,8 @@ function bucket(session) {
     start: session.start,
     end: session.end || lastT,
     open: !session.end,
+    snoozes: session.snoozes || 0,
+    snoozeSec: session.snoozeSec || 0,
     samples: samples
   };
 }

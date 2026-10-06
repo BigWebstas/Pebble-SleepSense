@@ -57,6 +57,11 @@ static void prv_inbox_received(DictionaryIterator *iter, void *context) {
     settings->window_minutes = smart_win->value->uint8;
   }
 
+  Tuple *snooze_min = dict_find(iter, MESSAGE_KEY_SNOOZE_MINUTES);
+  if (snooze_min) {
+    smart_alarm_set_snooze_minutes(snooze_min->value->uint8);
+  }
+
   Tuple *smart_en = dict_find(iter, MESSAGE_KEY_SMART_ALARM_ENABLED);
   if (smart_en) {
     SmartAlarmSettings *settings = smart_alarm_get_settings();
@@ -109,6 +114,8 @@ void comm_send_session_update(const SleepSession *session) {
   dict_write_uint8(out_iter, MESSAGE_KEY_STATUS_CYCLE_COUNT, session->cycle_count);
   dict_write_uint8(out_iter, MESSAGE_KEY_STATUS_SLEEP_SCORE, session->sleep_score);
   dict_write_uint8(out_iter, MESSAGE_KEY_STATUS_HEART_RATE, session->current_hr);
+  dict_write_uint8(out_iter, MESSAGE_KEY_STATUS_SNOOZE_COUNT, session->snooze_count);
+  dict_write_uint32(out_iter, MESSAGE_KEY_STATUS_SNOOZE_SEC, session->snooze_sec);
   dict_write_uint8(out_iter, MESSAGE_KEY_TRACKING_ACTIVE, session->is_tracking ? 1 : 0);
 
   app_message_outbox_send();

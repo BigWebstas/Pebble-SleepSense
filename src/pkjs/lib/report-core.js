@@ -58,8 +58,29 @@ function reportCore() {
       awake: Math.round(mins[0]), light: Math.round(mins[1]),
       deep: Math.round(mins[2]), rem: Math.round(mins[3]),
       avgHr: hrN ? Math.round(hrSum / hrN) : 0,
-      avgNoise: nN ? Math.round(nSum / nN) : 0
+      avgNoise: nN ? Math.round(nSum / nN) : 0,
+      snoozes: s.snoozes || 0,
+      snoozeMin: Math.round((s.snoozeSec || 0) / 60)
     };
+  }
+
+  function snoozeText(m) {
+    return m.snoozes ? m.snoozes + (m.snoozes === 1 ? ' snooze' : ' snoozes') + ' (' + m.snoozeMin + ' min)' : 'none';
+  }
+
+  // Settings-page numbers for one session
+  function sessionStats(s) {
+    var m = summarize(s);
+    var rows = [
+      ['Time in bed', fmtDur(m.duration)],
+      ['Awake / Light / Deep / REM', m.awake + ' / ' + m.light + ' / ' + m.deep + ' / ' + m.rem + ' min'],
+      ['Average heart rate', m.avgHr ? m.avgHr + ' bpm' : '-'],
+      ['Average room noise', m.avgNoise ? m.avgNoise + ' dB' : '-'],
+      ['Snoozed', snoozeText(m)]
+    ];
+    return '<table class="stats">' + rows.map(function (r) {
+      return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td></tr>';
+    }).join('') + '</table>';
   }
 
   // ---- On-page SVG graphs (colors come from the page's CSS variables) ----
@@ -199,13 +220,14 @@ function reportCore() {
       return out.join('\n') + '\n';
     }
     out.push('## Summary', '',
-      '| Date | Time | Duration | Awake | Light | Deep | REM | Avg HR | Avg noise |',
-      '| --- | --- | --- | --- | --- | --- | --- | --- | --- |');
+      '| Date | Time | Duration | Awake | Light | Deep | REM | Avg HR | Avg noise | Snoozes |',
+      '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |');
     sessions.forEach(function (s) {
       var m = summarize(s);
       out.push('| ' + fmtDate(s.start) + ' | ' + fmtTime(s.start) + '–' + fmtTime(s.end) +
         ' | ' + fmtDur(m.duration) + ' | ' + m.awake + 'm | ' + m.light + 'm | ' + m.deep + 'm | ' +
-        m.rem + 'm | ' + (m.avgHr ? m.avgHr + ' bpm' : '-') + ' | ' + (m.avgNoise ? m.avgNoise + ' dB' : '-') + ' |');
+        m.rem + 'm | ' + (m.avgHr ? m.avgHr + ' bpm' : '-') + ' | ' + (m.avgNoise ? m.avgNoise + ' dB' : '-') + ' | ' +
+        (m.snoozes ? m.snoozes + ' (' + m.snoozeMin + ' min)' : '-') + ' |');
     });
     out.push('');
     sessions.slice().reverse().forEach(function (s) {
@@ -223,6 +245,7 @@ function reportCore() {
     fmtDate: fmtDate,
     fmtStamp: fmtStamp,
     sessionLabel: sessionLabel,
+    sessionStats: sessionStats,
     sessionGraphs: sessionGraphs,
     exportMarkdown: exportMarkdown
   };

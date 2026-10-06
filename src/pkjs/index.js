@@ -12,6 +12,11 @@ function sensorEnabled(name) {
   return localStorage.getItem(name) !== "false";
 }
 
+function snoozeMinutes() {
+  var saved = localStorage.getItem("snooze_min");
+  return saved === null ? 9 : parseInt(saved, 10);
+}
+
 function sensorDict() {
   return {
     SENSOR_LIGHT_ENABLED: sensorEnabled("light_en") ? 1 : 0,
@@ -73,6 +78,7 @@ Pebble.addEventListener("ready", function(e) {
 
   // One message: sensor toggles always, alarm settings when saved
   var dict = sensorDict();
+  dict.SNOOZE_MINUTES = snoozeMinutes();
   if (savedAlarmHour !== null && savedAlarmMin !== null) {
     dict.ALARM_TARGET_HOUR = parseInt(savedAlarmHour, 10);
     dict.ALARM_TARGET_MIN = parseInt(savedAlarmMin, 10);
@@ -138,7 +144,8 @@ Pebble.addEventListener("showConfiguration", function() {
       enabled: localStorage.getItem("alarm_en") !== "false",
       hour: parseInt(localStorage.getItem("alarm_hour") || "7", 10),
       min: parseInt(localStorage.getItem("alarm_min") || "0", 10),
-      window: parseInt(localStorage.getItem("smart_win") || "30", 10)
+      window: parseInt(localStorage.getItem("smart_win") || "30", 10),
+      snooze: snoozeMinutes()
     },
     sensors: {
       light: sensorEnabled("light_en"),
@@ -172,6 +179,7 @@ Pebble.addEventListener("webviewclosed", function(e) {
   localStorage.setItem("alarm_hour", config.alarm_hour);
   localStorage.setItem("alarm_min", config.alarm_min);
   localStorage.setItem("smart_win", config.smart_win);
+  localStorage.setItem("snooze_min", config.snooze_min);
   localStorage.setItem("alarm_en", config.alarm_en);
   localStorage.setItem("light_en", config.light_en);
   localStorage.setItem("mic_en", config.mic_en);
@@ -188,7 +196,8 @@ Pebble.addEventListener("webviewclosed", function(e) {
     ALARM_TARGET_HOUR: config.alarm_hour,
     ALARM_TARGET_MIN: config.alarm_min,
     SMART_WINDOW_MIN: config.smart_win,
-    SMART_ALARM_ENABLED: config.alarm_en ? 1 : 0
+    SMART_ALARM_ENABLED: config.alarm_en ? 1 : 0,
+    SNOOZE_MINUTES: config.snooze_min
   };
   var sensors = sensorDict();
   for (var k in sensors) dict[k] = sensors[k];

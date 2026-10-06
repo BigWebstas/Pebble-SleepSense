@@ -151,7 +151,12 @@ void ui_main_update(const SleepSession *session) {
 
   // 5. Smart Alarm bar
   if (is_ringing) {
-    snprintf(s_alarm_buf, sizeof(s_alarm_buf), "Press button to stop");
+    snprintf(s_alarm_buf, sizeof(s_alarm_buf),
+             alarm->snooze_minutes ? "SEL stop | DOWN snooze" : "Press button to stop");
+  } else if (alarm->snooze_until) {
+    struct tm *until = localtime(&alarm->snooze_until);
+    snprintf(s_alarm_buf, sizeof(s_alarm_buf), "Snoozed until %02d:%02d",
+             until->tm_hour, until->tm_min);
   } else if (alarm->enabled) {
     snprintf(s_alarm_buf, sizeof(s_alarm_buf), "Alarm %02d:%02d (%dm smart)",
              alarm->target_hour, alarm->target_min, alarm->window_minutes);
@@ -200,7 +205,9 @@ static void prv_up_click_handler(ClickRecognizerRef recognizer, void *context) {
 
 static void prv_down_click_handler(ClickRecognizerRef recognizer, void *context) {
   if (smart_alarm_is_active()) {
-    smart_alarm_dismiss();
+    if (!smart_alarm_snooze()) {
+      smart_alarm_dismiss();
+    }
     ui_main_update(sleep_engine_get_session());
     return;
   }

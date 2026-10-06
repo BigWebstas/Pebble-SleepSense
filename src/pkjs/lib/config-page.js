@@ -73,6 +73,9 @@ function buildConfigPageUrl(opts) {
 '  p.hint { font-size: 12px; color: var(--hint); }\n' +
 '  p.error { font-size: 13px; color: var(--danger); }\n' +
 '  p.success { font-size: 13px; color: var(--ok); }\n' +
+'  table.stats { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }\n' +
+'  table.stats td { padding: 6px 0; border-bottom: 1px solid var(--field-border); }\n' +
+'  table.stats td:last-child { text-align: right; font-weight: 600; }\n' +
 '  svg .ax { fill: var(--hint); font-size: 11px; }\n' +
 '  svg .plot { fill: var(--field-bg); stroke: var(--field-border); stroke-width: 0.5; }\n' +
 '  textarea { width: 100%; box-sizing: border-box; height: 160px; margin-top: 4px; padding: 10px;\n' +
@@ -95,6 +98,12 @@ checkbox('alarmEn', 'Smart alarm',
 options([[15, '15 minutes before'], [30, '30 minutes before'], [45, '45 minutes before']], alarm.window) + '\n' +
 '  </select>\n' +
 '  <p class="hint">How early the alarm may go off if you are in light sleep.</p>\n' +
+'\n' +
+'  <label for="snoozeMin">Snooze</label>\n' +
+'  <select id="snoozeMin">\n' +
+options([[0, 'Off'], [5, '5 minutes'], [9, '9 minutes'], [10, '10 minutes'], [15, '15 minutes']], alarm.snooze) + '\n' +
+'  </select>\n' +
+'  <p class="hint">While the alarm rings, Select stops it and Down snoozes it for this long. Off makes every button stop it.</p>\n' +
 '\n' +
 '  <h2>Sensors</h2>\n' +
 '  <p class="hint">Turn off anything you do not want used for sleep staging or shown on the watch.</p>\n' +
@@ -159,7 +168,9 @@ checkbox('hrEn', 'Heart rate', 'Samples every minute while tracking. Needs a wat
 '    pick.appendChild(opt);\n' +
 '  });\n' +
 '  function showSession() {\n' +
-'    if (sessions.length) { $(\'graphs\').innerHTML = report.sessionGraphs(sessions[parseInt(pick.value, 10)]); }\n' +
+'    if (!sessions.length) { return; }\n' +
+'    var s = sessions[parseInt(pick.value, 10)];\n' +
+'    $(\'graphs\').innerHTML = report.sessionStats(s) + report.sessionGraphs(s);\n' +
 '  }\n' +
 '  pick.addEventListener(\'change\', showSession);\n' +
 '  showSession();\n' +
@@ -235,6 +246,7 @@ checkbox('hrEn', 'Heart rate', 'Samples every minute while tracking. Needs a wat
 '      alarm_hour: parseInt(t[0], 10),\n' +
 '      alarm_min: parseInt(t[1], 10),\n' +
 '      smart_win: parseInt($(\'smartWin\').value, 10),\n' +
+'      snooze_min: parseInt($(\'snoozeMin\').value, 10),\n' +
 '      light_en: $(\'lightEn\').checked,\n' +
 '      mic_en: $(\'micEn\').checked,\n' +
 '      hr_en: $(\'hrEn\').checked\n' +
