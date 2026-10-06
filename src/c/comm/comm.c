@@ -35,7 +35,16 @@ static void prv_inbox_received(DictionaryIterator *iter, void *context) {
     sleep_engine_update_sound(sound);
   }
 
-  // 2. Alarm configuration
+  // 2. Sensor toggles (always sent together)
+  Tuple *light_en = dict_find(iter, MESSAGE_KEY_SENSOR_LIGHT_ENABLED);
+  Tuple *mic_en = dict_find(iter, MESSAGE_KEY_SENSOR_MIC_ENABLED);
+  Tuple *hr_en = dict_find(iter, MESSAGE_KEY_SENSOR_HR_ENABLED);
+  if (light_en && mic_en && hr_en) {
+    sleep_engine_set_sensors(light_en->value->uint8 != 0, mic_en->value->uint8 != 0,
+                             hr_en->value->uint8 != 0);
+  }
+
+  // 3. Alarm configuration
   Tuple *target_h = dict_find(iter, MESSAGE_KEY_ALARM_TARGET_HOUR);
   Tuple *target_m = dict_find(iter, MESSAGE_KEY_ALARM_TARGET_MIN);
   if (target_h && target_m) {

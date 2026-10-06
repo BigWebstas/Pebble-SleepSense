@@ -34,6 +34,12 @@ void sleep_engine_set_update_callback(SleepEngineUpdateCallback callback);
 //! Get human readable string for a sleep stage
 const char *sleep_engine_stage_name(SleepStage stage);
 
+//! Enable or disable each sensor; persisted and applied immediately
+void sleep_engine_set_sensors(bool light, bool mic, bool heart_rate);
+
+//! Current sensor settings
+const SensorSettings *sleep_engine_get_sensors(void);
+
 //! Get human readable string for light level
 const char *sleep_engine_light_name(AppLightLevel light);
 

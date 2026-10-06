@@ -69,3 +69,10 @@ typedef struct {
   bool triggered;
   time_t trigger_time;
 } SmartAlarmSettings;
+
+//! Which sensors feed the sleep classifier and the display
+typedef struct {
+  bool light;
+  bool mic;
+  bool heart_rate;
+} SensorSettings;

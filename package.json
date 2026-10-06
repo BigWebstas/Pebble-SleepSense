@@ -46,7 +46,10 @@
       "TRACKING_ACTIVE",
       "PHONE_SOUND_SAMPLE",
       "VOICE_NOTE_TRANSCRIPT",
-      "STATUS_HEART_RATE"
+      "STATUS_HEART_RATE",
+      "SENSOR_LIGHT_ENABLED",
+      "SENSOR_MIC_ENABLED",
+      "SENSOR_HR_ENABLED"
     ],
     "resources": {
       "media": []

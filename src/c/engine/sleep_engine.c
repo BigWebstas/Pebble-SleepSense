@@ -2,6 +2,7 @@
 #include "smart_alarm.h"
 
 //! First of consecutive keys holding the session (alarm uses 100)
+#define PERSIST_KEY_SENSORS 102
 #define PERSIST_KEY_SESSION 200
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
@@ -11,20 +12,22 @@
 #define SOUND_THRESHOLD_DISTURBANCE 70
 #define SOUND_THRESHOLD_AWAKE 85
 
-//! Ask the watch for a heart rate reading every minute while tracking (0 restores the default)
-static void prv_set_hr_sampling(bool fast) {
-#if defined(PBL_HEALTH)
-  health_service_set_heart_rate_sample_period(fast ? 60 : 0);
-#endif
-}
-
 static SleepSession s_session;
+static SensorSettings s_sensors = { .light = true, .mic = true, .heart_rate = true };
 static SleepEngineUpdateCallback s_update_cb = NULL;
 static uint32_t s_minute_accel_acc = 0;
 static uint16_t s_minute_accel_samples = 0;
 static bool s_accel_subscribed = false;
 
 //! Session exceeds PERSIST_DATA_MAX_LENGTH, so store it as consecutive chunks
+//! Sample heart rate every minute while tracking (0 restores the watch default)
+static void prv_apply_hr_sampling(void) {
+#if defined(PBL_HEALTH)
+  health_service_set_heart_rate_sample_period(
+      (s_session.is_tracking && s_sensors.heart_rate) ? 60 : 0);
+#endif
+}
+
 static void prv_save_session(void) {
   const uint8_t *bytes = (const uint8_t *)&s_session;
   for (size_t off = 0, key = PERSIST_KEY_SESSION; off < sizeof(s_session);
@@ -238,6 +241,9 @@ static void prv_process_minute(void) {
     }
   }
 
+  if (!s_sensors.light) light = APP_LIGHT_UNKNOWN;
+  if (!s_sensors.heart_rate) heart_rate = 0;
+
   // Reset minute accel accumulator
   s_minute_accel_acc = 0;
   s_minute_accel_samples = 0;
@@ -250,6 +256,9 @@ static void prv_minute_tick_handler(struct tm *tick_time, TimeUnits units_change
 }
 
 void sleep_engine_init(void) {
+  if (persist_exists(PERSIST_KEY_SENSORS)) {
+    persist_read_data(PERSIST_KEY_SENSORS, &s_sensors, sizeof(s_sensors));
+  }
   prv_load_session();
   tick_timer_service_subscribe(MINUTE_UNIT, prv_minute_tick_handler);
 
@@ -258,13 +267,15 @@ void sleep_engine_init(void) {
     accel_service_set_sampling_rate(ACCEL_SAMPLING_10HZ);
     accel_data_service_subscribe(10, prv_accel_handler);
     s_accel_subscribed = true;
-    prv_set_hr_sampling(true);
+    prv_apply_hr_sampling();
   }
 }
 
 void sleep_engine_deinit(void) {
   tick_timer_service_unsubscribe();
-  prv_set_hr_sampling(false);
+#if defined(PBL_HEALTH)
+  health_service_set_heart_rate_sample_period(0);
+#endif
   if (s_accel_subscribed) {
     accel_data_service_unsubscribe();
     s_accel_subscribed = false;
@@ -296,7 +307,7 @@ void sleep_engine_start_session(void) {
     accel_data_service_subscribe(10, prv_accel_handler);
     s_accel_subscribed = true;
   }
-  prv_set_hr_sampling(true);
+  prv_apply_hr_sampling();
 
   prv_save_session();
   if (s_update_cb) {
@@ -308,7 +319,7 @@ void sleep_engine_stop_session(void) {
   s_session.is_tracking = false;
   s_session.session_end = time(NULL);
   s_session.current_hr = 0;
-  prv_set_hr_sampling(false);
+  prv_apply_hr_sampling();
 
   if (s_accel_subscribed) {
     accel_data_service_unsubscribe();
@@ -338,6 +349,9 @@ const SleepSession *sleep_engine_get_session(void) {
 }
 
 void sleep_engine_update_sound(uint8_t sound_level) {
+  if (!s_sensors.mic) {
+    return;
+  }
   s_session.current_sound = sound_level;
   if (s_update_cb) {
     s_update_cb(&s_session);
@@ -346,6 +360,27 @@ void sleep_engine_update_sound(uint8_t sound_level) {
 
 void sleep_engine_set_update_callback(SleepEngineUpdateCallback callback) {
   s_update_cb = callback;
+}
+
+void sleep_engine_set_sensors(bool light, bool mic, bool heart_rate) {
+  s_sensors.light = light;
+  s_sensors.mic = mic;
+  s_sensors.heart_rate = heart_rate;
+  persist_write_data(PERSIST_KEY_SENSORS, &s_sensors, sizeof(s_sensors));
+
+  // Clear readings from sensors that were just turned off
+  if (!light) s_session.current_light = APP_LIGHT_UNKNOWN;
+  if (!mic) s_session.current_sound = 0;
+  if (!heart_rate) s_session.current_hr = 0;
+  prv_apply_hr_sampling();
+
+  if (s_update_cb) {
+    s_update_cb(&s_session);
+  }
+}
+
+const SensorSettings *sleep_engine_get_sensors(void) {
+  return &s_sensors;
 }
 
 const char *sleep_engine_stage_name(SleepStage stage) {

@@ -135,15 +135,18 @@ void ui_main_update(const SleepSession *session) {
   text_layer_set_text(s_duration_layer, s_duration_buf);
 
   // 4. Sensors: Light & Mic
+  const SensorSettings *sensors = sleep_engine_get_sensors();
   const char *sound_desc = "Quiet";
-  if (session->current_sound > 70) {
+  if (!sensors->mic) {
+    sound_desc = "Off";
+  } else if (session->current_sound > 70) {
     sound_desc = "Loud";
   } else if (session->current_sound > 40) {
     sound_desc = "Mod";
   }
 
   snprintf(s_sensors_buf, sizeof(s_sensors_buf), "Light: %s  |  Mic: %s",
-           sleep_engine_light_name(session->current_light), sound_desc);
+           sensors->light ? sleep_engine_light_name(session->current_light) : "Off", sound_desc);
   text_layer_set_text(s_sensors_layer, s_sensors_buf);
 
   // 5. Smart Alarm bar
