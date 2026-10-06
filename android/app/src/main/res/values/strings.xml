@@ -29,7 +29,7 @@
     <string name="noise_clips_button">Noise clips</string>
     <string name="history_button">Sleep history and export</string>
     <string name="version_label">Version %1$s</string>
-    <string name="install_watch_button">Install watch app</string>
+    <string name="install_watch_button">Install on Pebble</string>
     <string name="install_watch_missing">No watch app is bundled in this build. Run pebble build, then rebuild this app.</string>
     <string name="install_watch_no_handler">No app can open a .pbw file. Is the Pebble app installed?</string>
     <string name="check_update_button">Check for updates</string>
