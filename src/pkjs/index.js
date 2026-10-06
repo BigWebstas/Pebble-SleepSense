@@ -1,6 +1,7 @@
 // PebbleKit JS Companion for SleepSense
 var sleepHistory = require("./lib/history");
 var configPage = require("./lib/config-page");
+var phoneAlarm = require("./lib/phone-alarm");
 
 var APP_VERSION = "1.0.0"; // keep in step with package.json
 
@@ -67,8 +68,44 @@ function stopSoundMonitoring() {
   }
 }
 
+// ---- Phone alarm sync (needs the SleepSense Android companion app) ----
+// The phone drives: when its next alarm changes, or the watch shows a different time, the
+// watch is told the new time (or to turn the smart alarm off when the phone has no alarm).
+function syncPhoneAlarm() {
+  phoneAlarm.fetchPhoneAlarm(function(a) {
+    if (!a || !a.sync) return;
+    var key = a.enabled ? (a.hour + ":" + a.min) : "none";
+    var differs = a.enabled &&
+      (parseInt(localStorage.getItem("alarm_hour"), 10) !== a.hour ||
+       parseInt(localStorage.getItem("alarm_min"), 10) !== a.min);
+    if (key === localStorage.getItem("phone_alarm_last") && !differs) return;
+
+    var dict = { SMART_ALARM_ENABLED: a.enabled ? 1 : 0 };
+    if (a.enabled) {
+      dict.ALARM_TARGET_HOUR = a.hour;
+      dict.ALARM_TARGET_MIN = a.min;
+    }
+    Pebble.sendAppMessage(dict, function() {
+      console.log("SleepSense PKJS: Phone alarm " + key + " sent to watch");
+      localStorage.setItem("phone_alarm_last", key);
+      // The watch confirms in its next status message; keep the settings page right meanwhile
+      localStorage.setItem("alarm_en", a.enabled);
+      if (a.enabled) {
+        localStorage.setItem("alarm_hour", a.hour);
+        localStorage.setItem("alarm_min", a.min);
+      }
+    }, function(err) {
+      console.log("SleepSense PKJS: Could not send phone alarm: " + JSON.stringify(err));
+    });
+  });
+}
+
 Pebble.addEventListener("ready", function(e) {
   console.log("SleepSense PKJS: Ready");
+
+  // First check after the startup message above has gone out, then every minute while open
+  setTimeout(syncPhoneAlarm, 4000);
+  setInterval(syncPhoneAlarm, 60000);
 
   // Send saved alarm settings to watch if present
   var savedAlarmHour = localStorage.getItem("alarm_hour");

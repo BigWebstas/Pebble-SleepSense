@@ -1,5 +1,6 @@
 package net.webstas.sleepsense
 
+import android.content.Intent
 import android.os.Bundle
 import android.widget.Button
 import android.widget.LinearLayout
@@ -10,8 +11,6 @@ import androidx.activity.result.contract.ActivityResultContract
 import androidx.lifecycle.lifecycleScope
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
-import io.rebble.pebblekit2.client.DefaultPebbleSender
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -23,6 +22,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        startForegroundService(Intent(this, AlarmBridgeService::class.java))
         status = TextView(this).apply { textSize = 16f }
         val grant = Button(this).apply {
             text = "Grant Health Connect access"
@@ -37,27 +37,6 @@ class MainActivity : ComponentActivity() {
                 refreshAlarm()
             }
         }
-        val syncNow = Button(this).apply {
-            text = "Sync alarm now"
-            setOnClickListener {
-                lifecycleScope.launch {
-                    val sender = DefaultPebbleSender(this@MainActivity)
-                    val result = try {
-                        var r = PhoneAlarmSync.sync(this@MainActivity, sender, null, null, force = true)
-                        if (r == SyncResult.WATCH_APP_CLOSED) {
-                            // You tapped the button, so opening SleepSense on the watch is expected
-                            PhoneAlarmSync.openWatchApp(sender)
-                            delay(4000)
-                            r = PhoneAlarmSync.sync(this@MainActivity, sender, null, null, force = true)
-                        }
-                        r
-                    } finally {
-                        sender.close()
-                    }
-                    alarmStatus.text = PhoneAlarmSync.describe(this@MainActivity) + "\n" + result.message
-                }
-            }
-        }
         setContentView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(48, 96, 48, 48)
@@ -65,7 +44,6 @@ class MainActivity : ComponentActivity() {
             addView(grant)
             addView(alarmSwitch)
             addView(alarmStatus)
-            addView(syncNow)
         })
     }
 
