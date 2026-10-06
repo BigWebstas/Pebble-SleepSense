@@ -20,7 +20,7 @@ sealed class UpdateResult {
  * with the installed version. It only reports; installing is left to you through the release page.
  */
 object UpdateChecker {
-    const val REPO = "BigWebstas/PebbleSleepTracker"
+    const val REPO = "BigWebstas/Pebble-SleepSense"
     private const val PREFS = "update"
     private const val CHECK_EVERY_MS = 12 * 3600_000L
 
