@@ -55,6 +55,12 @@ function record(tracking, d, now) {
     current.snoozes = d.STATUS_SNOOZE_COUNT;
     current.snoozeSec = d.STATUS_SNOOZE_SEC || 0;
   }
+  // Alarm timeline: 1 = rang, 2 = snoozed, 0 = stopped; only changes are logged
+  if (d.STATUS_ALARM_STATE !== undefined && d.STATUS_ALARM_STATE !== (current.alarm || 0)) {
+    current.events = current.events || [];
+    current.events.push({ t: now, a: d.STATUS_ALARM_STATE });
+    current.alarm = d.STATUS_ALARM_STATE;
+  }
   var last = current.samples[current.samples.length - 1];
   if (d.STATUS_STATE !== undefined && (!last || now - last.t >= SAMPLE_GAP_MS)) {
     current.samples.push({
@@ -112,6 +118,7 @@ function bucket(session) {
     open: !session.end,
     snoozes: session.snoozes || 0,
     snoozeSec: session.snoozeSec || 0,
+    events: session.events || [],
     samples: samples
   };
 }

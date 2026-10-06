@@ -212,9 +212,9 @@ bool smart_alarm_snooze(void) {
   }
   uint32_t seconds = s_settings.snooze_minutes * 60;
   s_settings.snooze_until = time(NULL) + seconds;
-  sleep_engine_add_snooze(seconds);
   smart_alarm_dismiss();
   prv_save_settings();
+  sleep_engine_add_snooze(seconds); // notifies, now reporting "snoozed"
   APP_LOG(APP_LOG_LEVEL_INFO, "Alarm snoozed for %d min", s_settings.snooze_minutes);
   return true;
 }

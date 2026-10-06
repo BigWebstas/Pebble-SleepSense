@@ -21,6 +21,11 @@ function reportCore() {
     { name: 'V.Dark', value: 1, color: '#4d4426' }
   ];
   var MIN = 60000;
+  var ALARM_EVENTS = {
+    1: { name: 'Alarm rang', word: 'rang', color: '#ff4d4f' },
+    2: { name: 'Snoozed', word: 'snoozed', color: '#f5a623' },
+    0: { name: 'Alarm stopped', word: 'stopped', color: '#34c759' }
+  };
 
   function pad(n) { return ('0' + n).slice(-2); }
   function fmtDate(ms) {
@@ -68,6 +73,32 @@ function reportCore() {
     return m.snoozes ? m.snoozes + (m.snoozes === 1 ? ' snooze' : ' snoozes') + ' (' + m.snoozeMin + ' min)' : 'none';
   }
 
+  function alarmEvents(s) {
+    return (s.events || []).filter(function (e) { return e.t >= s.start && e.t <= s.end && ALARM_EVENTS[e.a]; });
+  }
+
+  function alarmText(s) {
+    var ev = alarmEvents(s);
+    return ev.length ? ev.map(function (e) { return ALARM_EVENTS[e.a].word + ' ' + fmtTime(e.t); }).join(' \u00b7 ') : 'none';
+  }
+
+  // Vertical lines for alarm events over a plot area
+  function eventMarks(s, left, width, top, height) {
+    var span = Math.max(s.end - s.start, 1);
+    return alarmEvents(s).map(function (e) {
+      var x = (left + (e.t - s.start) / span * width).toFixed(1);
+      return '<line x1="' + x + '" x2="' + x + '" y1="' + top + '" y2="' + (top + height) +
+        '" stroke="' + ALARM_EVENTS[e.a].color + '" stroke-width="2"/>';
+    }).join('');
+  }
+
+  function alarmLegend(s) {
+    if (!alarmEvents(s).length) return '';
+    return '<p class="hint">Alarm: ' + [1, 2, 0].map(function (k) {
+      return '<span style="color:' + ALARM_EVENTS[k].color + '">&#9679;</span> ' + ALARM_EVENTS[k].word;
+    }).join(' &nbsp; ') + '</p>';
+  }
+
   // Settings-page numbers for one session
   function sessionStats(s) {
     var m = summarize(s);
@@ -76,7 +107,8 @@ function reportCore() {
       ['Awake / Light / Deep / REM', m.awake + ' / ' + m.light + ' / ' + m.deep + ' / ' + m.rem + ' min'],
       ['Average heart rate', m.avgHr ? m.avgHr + ' bpm' : '-'],
       ['Average room noise', m.avgNoise ? m.avgNoise + ' dB' : '-'],
-      ['Snoozed', snoozeText(m)]
+      ['Snoozed', snoozeText(m)],
+      ['Alarm', alarmText(s)]
     ];
     return '<table class="stats">' + rows.map(function (r) {
       return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td></tr>';
@@ -102,6 +134,7 @@ function reportCore() {
       svg += '<rect x="' + x.toFixed(1) + '" y="' + (row * ROW + 2) + '" width="' + w.toFixed(1) +
         '" height="' + (ROW - 4) + '" fill="' + rows[row].color + '"/>';
     });
+    svg += eventMarks(s, LEFT, plotW, 2, ROW * rows.length - 4);
     var by = ROW * rows.length + 14;
     return svg + '<text class="ax" x="' + LEFT + '" y="' + by + '">' + fmtTime(s.start) + '</text>' +
       '<text class="ax" x="' + (W - 4) + '" y="' + by + '" text-anchor="end">' + fmtTime(s.end) + '</text></svg>';
@@ -124,6 +157,7 @@ function reportCore() {
       '<text class="ax" x="0" y="' + (H - 18) + '">' + lo + '</text>' +
       '<rect class="plot" x="' + LEFT + '" y="6" width="' + (W - LEFT - 4) + '" height="' + (H - 24) + '"/>' +
       '<polyline points="' + line + '" fill="none" stroke="' + color + '" stroke-width="1.5"/>' +
+      eventMarks(s, LEFT, W - LEFT - 4, 6, H - 24) +
       '<text class="ax" x="' + LEFT + '" y="' + (H - 4) + '">' + fmtTime(s.start) + '</text>' +
       '<text class="ax" x="' + (W - 4) + '" y="' + (H - 4) + '" text-anchor="end">' + fmtTime(s.end) + '</text></svg>' +
       '<p class="hint">min ' + min + ' &middot; avg ' + Math.round(sum / pts.length) + ' &middot; max ' + max + ' ' + unit + '</p>';
@@ -132,7 +166,7 @@ function reportCore() {
   // Settings-page graphs for one session
   function sessionGraphs(s) {
     var hasLight = s.samples.some(function (p) { return p.l > 0; });
-    return '<h3>Sleep stages</h3>' + stepSvg(s, 's', STAGE_ROWS) +
+    return '<h3>Sleep stages</h3>' + stepSvg(s, 's', STAGE_ROWS) + alarmLegend(s) +
       '<h3>Heart rate</h3>' + lineSvg(s, 'hr', '#ff6b6b', 'bpm') +
       '<h3>Ambient light</h3>' + (hasLight ? stepSvg(s, 'l', LIGHT_ROWS) : '<p class="hint">No light data for this session.</p>') +
       '<h3>Room noise</h3>' + lineSvg(s, 'n', '#e0a800', 'dB');
@@ -167,6 +201,13 @@ function reportCore() {
         out.push('    ' + r.name + ' :' + fmtStamp(m.from) + ', ' + fmtStamp(m.to));
       });
     });
+    var ev = alarmEvents(s);
+    if (ev.length) {
+      out.push('    section Alarm');
+      ev.forEach(function (e) {
+        out.push('    ' + ALARM_EVENTS[e.a].name + ' :milestone, ' + fmtStamp(e.t) + ', 0m');
+      });
+    }
     out.push('```');
     return out.join('\n');
   }
@@ -231,7 +272,9 @@ function reportCore() {
     });
     out.push('');
     sessions.slice().reverse().forEach(function (s) {
-      out.push('## ' + sessionLabel(s), '', ganttBlock(s), '');
+      out.push('## ' + sessionLabel(s), '');
+      if (alarmEvents(s).length) out.push('**Alarm:** ' + alarmText(s), '');
+      out.push(ganttBlock(s), '');
       [chartBlock(s, 'hr', 'Heart rate', 'bpm', null, null),
         chartBlock(s, 'l', 'Ambient light level (1 dark to 4 bright)', 'level', 0, 4),
         chartBlock(s, 'n', 'Room noise', 'dB', null, null)].forEach(function (block) {

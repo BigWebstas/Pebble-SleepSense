@@ -193,10 +193,22 @@ void ui_main_alarm_trigger(bool is_smart_wake) {
   ui_main_update(sleep_engine_get_session());
 }
 
-static void prv_select_click_handler(ClickRecognizerRef recognizer, void *context) {
-  if (smart_alarm_is_active()) {
+//! A button press while the alarm rings: Down snoozes (when enabled), everything else stops it.
+//! Returns true if the press was used up by the alarm.
+static bool prv_handle_alarm_press(bool snooze) {
+  if (!smart_alarm_is_active()) {
+    return false;
+  }
+  if (!(snooze && smart_alarm_snooze())) {
     smart_alarm_dismiss();
-    ui_main_update(sleep_engine_get_session());
+  }
+  comm_send_session_update(sleep_engine_get_session()); // phone logs the alarm event
+  ui_main_update(sleep_engine_get_session());
+  return true;
+}
+
+static void prv_select_click_handler(ClickRecognizerRef recognizer, void *context) {
+  if (prv_handle_alarm_press(false)) {
     return;
   }
   sleep_engine_toggle_session();
@@ -205,18 +217,14 @@ static void prv_select_click_handler(ClickRecognizerRef recognizer, void *contex
 }
 
 static void prv_select_long_click_handler(ClickRecognizerRef recognizer, void *context) {
-  if (smart_alarm_is_active()) {
-    smart_alarm_dismiss();
-    ui_main_update(sleep_engine_get_session());
+  if (prv_handle_alarm_press(false)) {
     return;
   }
   comm_start_voice_journal();
 }
 
 static void prv_up_click_handler(ClickRecognizerRef recognizer, void *context) {
-  if (smart_alarm_is_active()) {
-    smart_alarm_dismiss();
-    ui_main_update(sleep_engine_get_session());
+  if (prv_handle_alarm_press(false)) {
     return;
   }
   smart_alarm_toggle();
@@ -224,11 +232,7 @@ static void prv_up_click_handler(ClickRecognizerRef recognizer, void *context) {
 }
 
 static void prv_down_click_handler(ClickRecognizerRef recognizer, void *context) {
-  if (smart_alarm_is_active()) {
-    if (!smart_alarm_snooze()) {
-      smart_alarm_dismiss();
-    }
-    ui_main_update(sleep_engine_get_session());
+  if (prv_handle_alarm_press(true)) {
     return;
   }
   smart_alarm_cycle_window();
