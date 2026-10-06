@@ -35,6 +35,12 @@ static void prv_inbox_received(DictionaryIterator *iter, void *context) {
     sleep_engine_update_sound(sound);
   }
 
+  // Start tracking on request of the phone (the Android widget)
+  Tuple *start_cmd = dict_find(iter, MESSAGE_KEY_COMMAND_START_TRACKING);
+  if (start_cmd && start_cmd->value->uint8 != 0 && !sleep_engine_is_tracking()) {
+    sleep_engine_start_session();
+  }
+
   // 2. Sensor toggles (always sent together)
   Tuple *light_en = dict_find(iter, MESSAGE_KEY_SENSOR_LIGHT_ENABLED);
   Tuple *mic_en = dict_find(iter, MESSAGE_KEY_SENSOR_MIC_ENABLED);

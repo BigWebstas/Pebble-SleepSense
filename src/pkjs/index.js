@@ -81,6 +81,31 @@ function pushHistory(force) {
   });
 }
 
+// ---- Phone widget: status out, "start tracking" command in ----
+
+function trackingStatus() {
+  return { tracking: isTracking, since: sleepHistory.openSessionStart() };
+}
+
+// Tell the Android app right away when tracking starts or stops (the minute poll also carries it)
+function reportStatus() {
+  phoneAlarm.fetchPhoneAlarm(function() {}, trackingStatus());
+}
+
+// Held open by the app until the widget is tapped, so a command arrives within a second
+function listenForCommands() {
+  phoneAlarm.waitForCommand(function(cmd) {
+    if (cmd === "start" && !isTracking) {
+      console.log("SleepSense PKJS: Start tracking requested from the phone");
+      Pebble.sendAppMessage({ COMMAND_START_TRACKING: 1 }, function() {}, function(err) {
+        console.log("SleepSense PKJS: Could not send start command: " + JSON.stringify(err));
+      });
+    }
+    // No app (null) or nothing pending ("none"): ask again, after a pause if the app isn't there
+    setTimeout(listenForCommands, cmd === null ? 15000 : 100);
+  });
+}
+
 // ---- Phone alarm sync (needs the SleepSense Android companion app) ----
 // The phone drives: when its next alarm changes, or the watch shows a different time, the
 // watch is told the new time (or to turn the smart alarm off when the phone has no alarm).
@@ -119,7 +144,7 @@ function syncPhoneAlarm() {
     }, function(err) {
       console.log("SleepSense PKJS: Could not send phone alarm: " + JSON.stringify(err));
     });
-  });
+  }, trackingStatus());
 }
 
 Pebble.addEventListener("ready", function(e) {
@@ -127,6 +152,7 @@ Pebble.addEventListener("ready", function(e) {
 
   // First check after the startup message above has gone out, then every minute while open
   setTimeout(syncPhoneAlarm, 4000);
+  listenForCommands();
   setTimeout(function() { pushHistory(true); }, 8000);
   setInterval(syncPhoneAlarm, 60000);
 
@@ -159,7 +185,9 @@ Pebble.addEventListener("appmessage", function(e) {
   if (dict.TRACKING_ACTIVE !== undefined) {
     sleepHistory.record(dict.TRACKING_ACTIVE === 1, dict, Date.now());
     pushHistory(dict.TRACKING_ACTIVE === 0);
+    var wasTracking = isTracking;
     isTracking = (dict.TRACKING_ACTIVE === 1);
+    if (wasTracking !== isTracking) reportStatus();
     if (isTracking && sensorEnabled("mic_en")) {
       startSoundMonitoring();
     } else {

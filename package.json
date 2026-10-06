@@ -53,7 +53,8 @@
       "STATUS_SNOOZE_COUNT",
       "STATUS_SNOOZE_SEC",
       "SNOOZE_MINUTES",
-      "STATUS_ALARM_STATE"
+      "STATUS_ALARM_STATE",
+      "COMMAND_START_TRACKING"
     ],
     "resources": {
       "media": [

@@ -1,6 +1,8 @@
 package net.webstas.sleepsense
 
 import android.Manifest
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -69,6 +71,15 @@ class MainActivity : ComponentActivity() {
             addView(alarmStatus)
             addView(noiseSwitch)
             addView(noiseStatus)
+            addView(Button(this@MainActivity).apply {
+                text = "Add widget to home screen"
+                setOnClickListener {
+                    val manager = getSystemService(AppWidgetManager::class.java)
+                    if (manager.isRequestPinAppWidgetSupported) {
+                        manager.requestPinAppWidget(ComponentName(this@MainActivity, SleepWidgetProvider::class.java), null, null)
+                    }
+                }
+            })
             addView(Button(this@MainActivity).apply {
                 text = "Noise clips"
                 setOnClickListener { startActivity(Intent(this@MainActivity, ClipsActivity::class.java)) }

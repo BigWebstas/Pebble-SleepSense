@@ -37,6 +37,7 @@ class AlarmBridgeService : Service() {
     private val alarmChanged = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             PhoneAlarmSync.noteAlarmChanged(context)
+            SleepWidgetProvider.refreshAll(context)
             Log.i(TAG, "next alarm changed")
         }
     }
@@ -81,8 +82,16 @@ class AlarmBridgeService : Service() {
         }
 
         val (status, body) = when {
+            request.startsWith("GET /command") -> "200 OK" to """{"cmd":"${Commands.await(25_000)}"}"""
             request.startsWith("GET /alarm") -> {
                 PhoneAlarmSync.noteRequest(this)
+                // The watchapp's JS checks in every minute and says whether the watch is tracking
+                val tracking = Regex("tracking=(\\d)").find(request)?.groupValues?.get(1)
+                if (tracking != null) {
+                    val since = Regex("since=(\\d+)").find(request)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+                    WidgetState.note(this, tracking == "1", since)
+                }
+                SleepWidgetProvider.refreshAll(this)
                 "200 OK" to PhoneAlarmSync.json(this)
             }
             request.startsWith("GET /noise/start") -> "200 OK" to noiseStart()
@@ -106,10 +115,15 @@ class AlarmBridgeService : Service() {
             else -> "404 Not Found" to "not found"
         }
         Log.i(TAG, "$request -> $status")
-        client.getOutputStream().write(
-            ("HTTP/1.1 $status\r\nContent-Type: application/json\r\nContent-Length: ${body.toByteArray().size}\r\n" +
-                "Connection: close\r\n\r\n$body").toByteArray(),
-        )
+        try {
+            client.getOutputStream().write(
+                ("HTTP/1.1 $status\r\nContent-Type: application/json\r\nContent-Length: ${body.toByteArray().size}\r\n" +
+                    "Connection: close\r\n\r\n$body").toByteArray(),
+            )
+        } catch (e: java.io.IOException) {
+            // The caller went away: a command it was handed must not be lost
+            if (body.contains("\"start\"")) Commands.queueStart()
+        }
     }
 
     // One header line without its CRLF (bytes read raw so a body is never swallowed by a text reader)

@@ -128,6 +128,13 @@ function getBucketedSessions() {
   return load().filter(function (s) { return s.samples.length >= 2; }).map(bucket);
 }
 
+// Start time of the session being tracked right now, or 0
+function openSessionStart() {
+  var sessions = load();
+  var current = sessions.length ? sessions[sessions.length - 1] : null;
+  return current && !current.end ? current.start : 0;
+}
+
 function getLastExport() {
   return parseInt(localStorage.getItem(LAST_EXPORT_KEY) || '0', 10) || 0;
 }
@@ -139,6 +146,7 @@ function setLastExport(ts) {
 module.exports = {
   record: record,
   getBucketedSessions: getBucketedSessions,
+  openSessionStart: openSessionStart,
   getLastExport: getLastExport,
   setLastExport: setLastExport
 };
