@@ -95,8 +95,9 @@ void ui_main_refresh_clock(void) {
   if (!s_time_layer) return;
   time_t now = time(NULL);
   struct tm *t = localtime(&now);
-  strftime(s_time_buf, sizeof(s_time_buf), clock_is_24h_style() ? "%H:%M" : "%I:%M %p", t);
-  strftime(s_date_buf, sizeof(s_date_buf), "%a %b %d", t);
+  // Big digits only; AM/PM (12h clocks) goes on the date line
+  strftime(s_time_buf, sizeof(s_time_buf), clock_is_24h_style() ? "%H:%M" : "%I:%M", t);
+  strftime(s_date_buf, sizeof(s_date_buf), clock_is_24h_style() ? "%a %b %d" : "%a %b %d  %p", t);
   text_layer_set_text(s_time_layer, s_time_buf);
   text_layer_set_text(s_date_layer, s_date_buf);
 #endif
@@ -321,17 +322,19 @@ static void prv_window_load(Window *window) {
 
 #if defined(PBL_PLATFORM_EMERY)
   // 7. Date and time under the alarm row
-  y += 26;
-  s_time_layer = text_layer_create(GRect(4, y, w - 8, 36));
-  text_layer_set_font(s_time_layer, fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD));
+  // Largest digits that fit: the time takes all the height left under the alarm row
+  // (the digit glyphs sit low in their frame, so the frame can overlap the alarm row)
+  y += 12;
+  s_time_layer = text_layer_create(GRect(0, y, w, 62));
+  text_layer_set_font(s_time_layer, fonts_get_system_font(FONT_KEY_LECO_60_BOLD_NUMBERS_AM_PM));
   text_layer_set_text_alignment(s_time_layer, GTextAlignmentCenter);
   text_layer_set_background_color(s_time_layer, GColorClear);
   text_layer_set_text_color(s_time_layer, GColorWhite);
   layer_add_child(window_layer, text_layer_get_layer(s_time_layer));
-  y += 34;
+  y += 62;
 
-  s_date_layer = text_layer_create(GRect(4, y, w - 8, 24));
-  text_layer_set_font(s_date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
+  s_date_layer = text_layer_create(GRect(4, y, w - 8, bounds.size.h - y));
+  text_layer_set_font(s_date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
   text_layer_set_text_alignment(s_date_layer, GTextAlignmentCenter);
   text_layer_set_background_color(s_date_layer, GColorClear);
   text_layer_set_text_color(s_date_layer, GColorLightGray);
