@@ -35,7 +35,16 @@ static void prv_inbox_received(DictionaryIterator *iter, void *context) {
     sleep_engine_update_sound(sound);
   }
 
-  // 2. Alarm configuration
+  // 2. Sensor toggles (always sent together)
+  Tuple *light_en = dict_find(iter, MESSAGE_KEY_SENSOR_LIGHT_ENABLED);
+  Tuple *mic_en = dict_find(iter, MESSAGE_KEY_SENSOR_MIC_ENABLED);
+  Tuple *hr_en = dict_find(iter, MESSAGE_KEY_SENSOR_HR_ENABLED);
+  if (light_en && mic_en && hr_en) {
+    sleep_engine_set_sensors(light_en->value->uint8 != 0, mic_en->value->uint8 != 0,
+                             hr_en->value->uint8 != 0);
+  }
+
+  // 3. Alarm configuration
   Tuple *target_h = dict_find(iter, MESSAGE_KEY_ALARM_TARGET_HOUR);
   Tuple *target_m = dict_find(iter, MESSAGE_KEY_ALARM_TARGET_MIN);
   if (target_h && target_m) {
@@ -46,6 +55,11 @@ static void prv_inbox_received(DictionaryIterator *iter, void *context) {
   if (smart_win) {
     SmartAlarmSettings *settings = smart_alarm_get_settings();
     settings->window_minutes = smart_win->value->uint8;
+  }
+
+  Tuple *snooze_min = dict_find(iter, MESSAGE_KEY_SNOOZE_MINUTES);
+  if (snooze_min) {
+    smart_alarm_set_snooze_minutes(snooze_min->value->uint8);
   }
 
   Tuple *smart_en = dict_find(iter, MESSAGE_KEY_SMART_ALARM_ENABLED);
@@ -100,6 +114,19 @@ void comm_send_session_update(const SleepSession *session) {
   dict_write_uint8(out_iter, MESSAGE_KEY_STATUS_CYCLE_COUNT, session->cycle_count);
   dict_write_uint8(out_iter, MESSAGE_KEY_STATUS_SLEEP_SCORE, session->sleep_score);
   dict_write_uint8(out_iter, MESSAGE_KEY_STATUS_HEART_RATE, session->current_hr);
+  dict_write_uint8(out_iter, MESSAGE_KEY_STATUS_SNOOZE_COUNT, session->snooze_count);
+  dict_write_uint32(out_iter, MESSAGE_KEY_STATUS_SNOOZE_SEC, session->snooze_sec);
+  // 0 = quiet, 1 = ringing, 2 = snoozed (the phone turns changes into timeline events)
+  uint8_t alarm_state = smart_alarm_is_active() ? 1 : (smart_alarm_get_settings()->snooze_until ? 2 : 0);
+  dict_write_uint8(out_iter, MESSAGE_KEY_STATUS_ALARM_STATE, alarm_state);
+  // The watch owns the alarm settings; report them so the phone's copy (and any companion app)
+  // always matches. These reuse the keys the phone uses to set them.
+  const SmartAlarmSettings *alarm = smart_alarm_get_settings();
+  dict_write_uint8(out_iter, MESSAGE_KEY_ALARM_TARGET_HOUR, alarm->target_hour);
+  dict_write_uint8(out_iter, MESSAGE_KEY_ALARM_TARGET_MIN, alarm->target_min);
+  dict_write_uint8(out_iter, MESSAGE_KEY_SMART_WINDOW_MIN, alarm->window_minutes);
+  dict_write_uint8(out_iter, MESSAGE_KEY_SMART_ALARM_ENABLED, alarm->enabled ? 1 : 0);
+  dict_write_uint8(out_iter, MESSAGE_KEY_SNOOZE_MINUTES, alarm->snooze_minutes);
   dict_write_uint8(out_iter, MESSAGE_KEY_TRACKING_ACTIVE, session->is_tracking ? 1 : 0);
 
   app_message_outbox_send();

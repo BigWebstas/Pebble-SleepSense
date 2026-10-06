@@ -12,6 +12,7 @@ static void prv_engine_update_handler(const SleepSession *session) {
 
 static void prv_alarm_trigger_handler(bool is_smart_wake) {
   ui_main_alarm_trigger(is_smart_wake);
+  comm_send_session_update(sleep_engine_get_session());
 }
 
 static void prv_init(void) {
@@ -21,6 +22,7 @@ static void prv_init(void) {
   ui_main_init();
 
   sleep_engine_set_update_callback(prv_engine_update_handler);
+  sleep_engine_set_minute_callback(ui_main_refresh_clock);
   smart_alarm_set_trigger_callback(prv_alarm_trigger_handler);
 }
 

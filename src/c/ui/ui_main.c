@@ -9,6 +9,13 @@ static TextLayer *s_stage_layer;
 static TextLayer *s_duration_layer;
 static TextLayer *s_sensors_layer;
 static TextLayer *s_alarm_layer;
+#if defined(PBL_PLATFORM_EMERY)
+// Only the Time 2 screen has room under the alarm row
+static TextLayer *s_time_layer;
+static TextLayer *s_date_layer;
+static char s_time_buf[16];
+static char s_date_buf[24];
+#endif
 static Layer *s_hypnogram_layer;
 
 static char s_header_buf[32];
@@ -83,6 +90,19 @@ static void prv_hypnogram_update_proc(Layer *layer, GContext *ctx) {
   }
 }
 
+void ui_main_refresh_clock(void) {
+#if defined(PBL_PLATFORM_EMERY)
+  if (!s_time_layer) return;
+  time_t now = time(NULL);
+  struct tm *t = localtime(&now);
+  // Big digits only; AM/PM (12h clocks) goes on the date line
+  strftime(s_time_buf, sizeof(s_time_buf), clock_is_24h_style() ? "%H:%M" : "%I:%M", t);
+  strftime(s_date_buf, sizeof(s_date_buf), clock_is_24h_style() ? "%a %b %d" : "%a %b %d  %p", t);
+  text_layer_set_text(s_time_layer, s_time_buf);
+  text_layer_set_text(s_date_layer, s_date_buf);
+#endif
+}
+
 void ui_main_update(const SleepSession *session) {
   if (!s_main_window || !session) return;
 
@@ -135,20 +155,28 @@ void ui_main_update(const SleepSession *session) {
   text_layer_set_text(s_duration_layer, s_duration_buf);
 
   // 4. Sensors: Light & Mic
+  const SensorSettings *sensors = sleep_engine_get_sensors();
   const char *sound_desc = "Quiet";
-  if (session->current_sound > 70) {
+  if (!sensors->mic) {
+    sound_desc = "Off";
+  } else if (session->current_sound > 70) {
     sound_desc = "Loud";
   } else if (session->current_sound > 40) {
     sound_desc = "Mod";
   }
 
   snprintf(s_sensors_buf, sizeof(s_sensors_buf), "Light: %s  |  Mic: %s",
-           sleep_engine_light_name(session->current_light), sound_desc);
+           sensors->light ? sleep_engine_light_name(session->current_light) : "Off", sound_desc);
   text_layer_set_text(s_sensors_layer, s_sensors_buf);
 
   // 5. Smart Alarm bar
   if (is_ringing) {
-    snprintf(s_alarm_buf, sizeof(s_alarm_buf), "Press button to stop");
+    snprintf(s_alarm_buf, sizeof(s_alarm_buf),
+             alarm->snooze_minutes ? "SEL stop | DOWN snooze" : "Press button to stop");
+  } else if (alarm->snooze_until) {
+    struct tm *until = localtime(&alarm->snooze_until);
+    snprintf(s_alarm_buf, sizeof(s_alarm_buf), "Snoozed until %02d:%02d",
+             until->tm_hour, until->tm_min);
   } else if (alarm->enabled) {
     snprintf(s_alarm_buf, sizeof(s_alarm_buf), "Alarm %02d:%02d (%dm smart)",
              alarm->target_hour, alarm->target_min, alarm->window_minutes);
@@ -165,10 +193,22 @@ void ui_main_alarm_trigger(bool is_smart_wake) {
   ui_main_update(sleep_engine_get_session());
 }
 
-static void prv_select_click_handler(ClickRecognizerRef recognizer, void *context) {
-  if (smart_alarm_is_active()) {
+//! A button press while the alarm rings: Down snoozes (when enabled), everything else stops it.
+//! Returns true if the press was used up by the alarm.
+static bool prv_handle_alarm_press(bool snooze) {
+  if (!smart_alarm_is_active()) {
+    return false;
+  }
+  if (!(snooze && smart_alarm_snooze())) {
     smart_alarm_dismiss();
-    ui_main_update(sleep_engine_get_session());
+  }
+  comm_send_session_update(sleep_engine_get_session()); // phone logs the alarm event
+  ui_main_update(sleep_engine_get_session());
+  return true;
+}
+
+static void prv_select_click_handler(ClickRecognizerRef recognizer, void *context) {
+  if (prv_handle_alarm_press(false)) {
     return;
   }
   sleep_engine_toggle_session();
@@ -177,18 +217,14 @@ static void prv_select_click_handler(ClickRecognizerRef recognizer, void *contex
 }
 
 static void prv_select_long_click_handler(ClickRecognizerRef recognizer, void *context) {
-  if (smart_alarm_is_active()) {
-    smart_alarm_dismiss();
-    ui_main_update(sleep_engine_get_session());
+  if (prv_handle_alarm_press(false)) {
     return;
   }
   comm_start_voice_journal();
 }
 
 static void prv_up_click_handler(ClickRecognizerRef recognizer, void *context) {
-  if (smart_alarm_is_active()) {
-    smart_alarm_dismiss();
-    ui_main_update(sleep_engine_get_session());
+  if (prv_handle_alarm_press(false)) {
     return;
   }
   smart_alarm_toggle();
@@ -196,9 +232,7 @@ static void prv_up_click_handler(ClickRecognizerRef recognizer, void *context) {
 }
 
 static void prv_down_click_handler(ClickRecognizerRef recognizer, void *context) {
-  if (smart_alarm_is_active()) {
-    smart_alarm_dismiss();
-    ui_main_update(sleep_engine_get_session());
+  if (prv_handle_alarm_press(true)) {
     return;
   }
   smart_alarm_cycle_window();
@@ -290,8 +324,30 @@ static void prv_window_load(Window *window) {
 #endif
   layer_add_child(window_layer, text_layer_get_layer(s_alarm_layer));
 
+#if defined(PBL_PLATFORM_EMERY)
+  // 7. Date and time under the alarm row
+  // Largest digits that fit: the time takes all the height left under the alarm row
+  // (the digit glyphs sit low in their frame, so the frame can overlap the alarm row)
+  y += 12;
+  s_time_layer = text_layer_create(GRect(0, y, w, 62));
+  text_layer_set_font(s_time_layer, fonts_get_system_font(FONT_KEY_LECO_60_BOLD_NUMBERS_AM_PM));
+  text_layer_set_text_alignment(s_time_layer, GTextAlignmentCenter);
+  text_layer_set_background_color(s_time_layer, GColorClear);
+  text_layer_set_text_color(s_time_layer, GColorWhite);
+  layer_add_child(window_layer, text_layer_get_layer(s_time_layer));
+  y += 62;
+
+  s_date_layer = text_layer_create(GRect(4, y, w - 8, bounds.size.h - y));
+  text_layer_set_font(s_date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
+  text_layer_set_text_alignment(s_date_layer, GTextAlignmentCenter);
+  text_layer_set_background_color(s_date_layer, GColorClear);
+  text_layer_set_text_color(s_date_layer, GColorLightGray);
+  layer_add_child(window_layer, text_layer_get_layer(s_date_layer));
+#endif
+
   // Initial render
   ui_main_update(sleep_engine_get_session());
+  ui_main_refresh_clock();
 }
 
 static void prv_window_unload(Window *window) {
@@ -301,6 +357,12 @@ static void prv_window_unload(Window *window) {
   text_layer_destroy(s_sensors_layer);
   text_layer_destroy(s_alarm_layer);
   layer_destroy(s_hypnogram_layer);
+#if defined(PBL_PLATFORM_EMERY)
+  text_layer_destroy(s_time_layer);
+  text_layer_destroy(s_date_layer);
+  s_time_layer = NULL;
+  s_date_layer = NULL;
+#endif
 }
 
 void ui_main_init(void) {

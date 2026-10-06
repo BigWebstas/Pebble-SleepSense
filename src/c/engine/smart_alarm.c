@@ -1,8 +1,10 @@
 #include "smart_alarm.h"
+#include "sleep_engine.h"
 
 #define PERSIST_KEY_ALARM 100
 #define ALARM_REPEAT_TIMER_MS 2500
 #define ALARM_TIMEOUT_SEC 180
+#define DEFAULT_SNOOZE_MIN 9
 
 static SmartAlarmSettings s_settings;
 static AppTimer *s_vibe_timer = NULL;
@@ -30,7 +32,12 @@ static void prv_save_settings(void) {
 
 static void prv_load_settings(void) {
   if (persist_exists(PERSIST_KEY_ALARM)) {
-    persist_read_data(PERSIST_KEY_ALARM, &s_settings, sizeof(s_settings));
+    int read = persist_read_data(PERSIST_KEY_ALARM, &s_settings, sizeof(s_settings));
+    if (read < (int)sizeof(s_settings)) {
+      // Saved by a version without snooze
+      s_settings.snooze_minutes = DEFAULT_SNOOZE_MIN;
+      s_settings.snooze_until = 0;
+    }
   } else {
     // Defaults: 07:00 AM, 30m window, enabled
     s_settings.enabled = true;
@@ -39,6 +46,8 @@ static void prv_load_settings(void) {
     s_settings.window_minutes = 30;
     s_settings.triggered = false;
     s_settings.trigger_time = 0;
+    s_settings.snooze_minutes = DEFAULT_SNOOZE_MIN;
+    s_settings.snooze_until = 0;
   }
 }
 
@@ -111,6 +120,9 @@ void smart_alarm_set_target(uint8_t hour, uint8_t min) {
 
 void smart_alarm_toggle(void) {
   s_settings.enabled = !s_settings.enabled;
+  if (!s_settings.enabled) {
+    s_settings.snooze_until = 0;
+  }
   if (s_settings.enabled) {
     s_settings.triggered = false; // Reset trigger state when re-enabling
   }
@@ -134,6 +146,18 @@ void smart_alarm_evaluate(SleepStage current_stage) {
   }
 
   time_t now = time(NULL);
+
+  // A snoozed alarm rings again once its time is up (checked each minute, so it survives
+  // the app being relaunched); nothing else is evaluated while snoozing.
+  if (s_settings.snooze_until) {
+    if (now >= s_settings.snooze_until) {
+      s_settings.snooze_until = 0;
+      APP_LOG(APP_LOG_LEVEL_INFO, "Snooze over, ringing again");
+      prv_start_ringing(false);
+    }
+    return;
+  }
+
   struct tm *t = localtime(&now);
   if (!t) return;
 
@@ -180,6 +204,31 @@ void smart_alarm_dismiss(void) {
     vibes_cancel();
     APP_LOG(APP_LOG_LEVEL_INFO, "Alarm dismissed by user");
   }
+}
+
+bool smart_alarm_snooze(void) {
+  if (!s_is_ringing || s_settings.snooze_minutes == 0) {
+    return false;
+  }
+  uint32_t seconds = s_settings.snooze_minutes * 60;
+  s_settings.snooze_until = time(NULL) + seconds;
+  smart_alarm_dismiss();
+  prv_save_settings();
+  sleep_engine_add_snooze(seconds); // notifies, now reporting "snoozed"
+  APP_LOG(APP_LOG_LEVEL_INFO, "Alarm snoozed for %d min", s_settings.snooze_minutes);
+  return true;
+}
+
+void smart_alarm_cancel_snooze(void) {
+  if (s_settings.snooze_until) {
+    s_settings.snooze_until = 0;
+    prv_save_settings();
+  }
+}
+
+void smart_alarm_set_snooze_minutes(uint8_t minutes) {
+  s_settings.snooze_minutes = minutes;
+  prv_save_settings();
 }
 
 bool smart_alarm_is_active(void) {

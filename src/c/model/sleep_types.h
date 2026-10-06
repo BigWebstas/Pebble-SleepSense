@@ -46,6 +46,8 @@ typedef struct {
   uint32_t awake_sec;
 
   uint8_t cycle_count;     //!< Number of ~90 minute sleep cycles completed
+  uint8_t snooze_count;    //!< Times the alarm was snoozed this session
+  uint32_t snooze_sec;     //!< Total time spent snoozed this session
   uint8_t sleep_score;     //!< Sleep efficiency score (0 - 100)
   
   SleepStage current_stage;
@@ -68,4 +70,14 @@ typedef struct {
   uint8_t window_minutes;  //!< e.g. 15, 30, 45 min
   bool triggered;
   time_t trigger_time;
+  // Appended after the original fields so older saved settings still load
+  uint8_t snooze_minutes;  //!< 0 = snooze disabled
+  time_t snooze_until;     //!< 0 = not snoozing
 } SmartAlarmSettings;
+
+//! Which sensors feed the sleep classifier and the display
+typedef struct {
+  bool light;
+  bool mic;
+  bool heart_rate;
+} SensorSettings;

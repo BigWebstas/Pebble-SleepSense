@@ -28,6 +28,16 @@ void smart_alarm_evaluate(SleepStage current_stage);
 //! Dismiss an active ringing alarm
 void smart_alarm_dismiss(void);
 
+//! Silence a ringing alarm and ring again after the snooze length.
+//! Returns false (alarm untouched) if snooze is disabled or nothing is ringing.
+bool smart_alarm_snooze(void);
+
+//! Forget a pending snooze (tracking stopped or alarm turned off)
+void smart_alarm_cancel_snooze(void);
+
+//! Set snooze length in minutes (0 disables snooze)
+void smart_alarm_set_snooze_minutes(uint8_t minutes);
+
 //! Returns true if the alarm is currently ringing
 bool smart_alarm_is_active(void);
 

@@ -1,7 +1,29 @@
 // PebbleKit JS Companion for SleepSense
+var sleepHistory = require("./lib/history");
+var configPage = require("./lib/config-page");
+
+var APP_VERSION = "1.0.0"; // keep in step with package.json
 
 var soundInterval = null;
 var isTracking = false;
+
+// Sensor toggles (default on); stored as "true"/"false" strings
+function sensorEnabled(name) {
+  return localStorage.getItem(name) !== "false";
+}
+
+function snoozeMinutes() {
+  var saved = localStorage.getItem("snooze_min");
+  return saved === null ? 9 : parseInt(saved, 10);
+}
+
+function sensorDict() {
+  return {
+    SENSOR_LIGHT_ENABLED: sensorEnabled("light_en") ? 1 : 0,
+    SENSOR_MIC_ENABLED: sensorEnabled("mic_en") ? 1 : 0,
+    SENSOR_HR_ENABLED: sensorEnabled("hr_en") ? 1 : 0
+  };
+}
 
 var stageNames = ["AWAKE", "LIGHT", "DEEP", "REM"];
 var lightNames = ["Unknown", "Very Dark", "Dark", "Light", "Very Light"];
@@ -13,7 +35,7 @@ function startSoundMonitoring() {
 
   // Send a sound sample every 60 seconds matching the epoch window
   soundInterval = setInterval(function() {
-    if (!isTracking) {
+    if (!isTracking || !sensorEnabled("mic_en")) {
       stopSoundMonitoring();
       return;
     }
@@ -47,26 +69,27 @@ function stopSoundMonitoring() {
 
 Pebble.addEventListener("ready", function(e) {
   console.log("SleepSense PKJS: Ready");
-  
+
   // Send saved alarm settings to watch if present
   var savedAlarmHour = localStorage.getItem("alarm_hour");
   var savedAlarmMin = localStorage.getItem("alarm_min");
   var savedSmartWin = localStorage.getItem("smart_win");
   var savedAlarmEn = localStorage.getItem("alarm_en");
 
+  // One message: sensor toggles always, alarm settings when saved
+  var dict = sensorDict();
+  dict.SNOOZE_MINUTES = snoozeMinutes();
   if (savedAlarmHour !== null && savedAlarmMin !== null) {
-    var dict = {
-      ALARM_TARGET_HOUR: parseInt(savedAlarmHour, 10),
-      ALARM_TARGET_MIN: parseInt(savedAlarmMin, 10),
-      SMART_WINDOW_MIN: savedSmartWin ? parseInt(savedSmartWin, 10) : 30,
-      SMART_ALARM_ENABLED: (savedAlarmEn === "false") ? 0 : 1
-    };
-    Pebble.sendAppMessage(dict, function() {
-      console.log("SleepSense PKJS: Restored saved alarm configuration to watch");
-    }, function(err) {
-      console.log("SleepSense PKJS: Failed to restore alarm config: " + JSON.stringify(err));
-    });
+    dict.ALARM_TARGET_HOUR = parseInt(savedAlarmHour, 10);
+    dict.ALARM_TARGET_MIN = parseInt(savedAlarmMin, 10);
+    dict.SMART_WINDOW_MIN = savedSmartWin ? parseInt(savedSmartWin, 10) : 30;
+    dict.SMART_ALARM_ENABLED = (savedAlarmEn === "false") ? 0 : 1;
   }
+  Pebble.sendAppMessage(dict, function() {
+    console.log("SleepSense PKJS: Restored saved settings to watch");
+  }, function(err) {
+    console.log("SleepSense PKJS: Failed to restore settings: " + JSON.stringify(err));
+  });
 });
 
 Pebble.addEventListener("appmessage", function(e) {
@@ -74,12 +97,23 @@ Pebble.addEventListener("appmessage", function(e) {
   console.log("SleepSense PKJS: Received message: " + JSON.stringify(dict));
 
   if (dict.TRACKING_ACTIVE !== undefined) {
+    sleepHistory.record(dict.TRACKING_ACTIVE === 1, dict, Date.now());
     isTracking = (dict.TRACKING_ACTIVE === 1);
-    if (isTracking) {
+    if (isTracking && sensorEnabled("mic_en")) {
       startSoundMonitoring();
     } else {
       stopSoundMonitoring();
     }
+  }
+
+  // The watch owns the alarm settings (a phone companion app may change them there),
+  // so keep this side's copy, which feeds the settings page and the startup restore, in step.
+  if (dict.ALARM_TARGET_HOUR !== undefined && dict.SMART_ALARM_ENABLED !== undefined) {
+    localStorage.setItem("alarm_hour", dict.ALARM_TARGET_HOUR);
+    localStorage.setItem("alarm_min", dict.ALARM_TARGET_MIN);
+    localStorage.setItem("smart_win", dict.SMART_WINDOW_MIN);
+    localStorage.setItem("alarm_en", dict.SMART_ALARM_ENABLED !== 0);
+    localStorage.setItem("snooze_min", dict.SNOOZE_MINUTES);
   }
 
   if (dict.STATUS_STATE !== undefined) {
@@ -113,72 +147,70 @@ Pebble.addEventListener("appmessage", function(e) {
   }
 });
 
-// Settings configuration UI
+// Settings page: alarm, sensors, session graphs and export
 Pebble.addEventListener("showConfiguration", function() {
-  var alarmHour = localStorage.getItem("alarm_hour") || 7;
-  var alarmMin = localStorage.getItem("alarm_min") || 0;
-  var smartWin = localStorage.getItem("smart_win") || 30;
-  var alarmEn = localStorage.getItem("alarm_en") !== "false";
-
-  // Data URI configuration page
-  var html = '<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1">' +
-    '<title>SleepSense Configuration</title>' +
-    '<style>' +
-    'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; background: #0c1a2d; color: #fff; }' +
-    'h2 { color: #00d2d3; margin-top: 0; }' +
-    '.card { background: #162a45; padding: 15px; border-radius: 8px; margin-bottom: 16px; }' +
-    'label { display: block; margin: 10px 0 5px; font-weight: bold; }' +
-    'input, select { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #32527b; background: #0c1a2d; color: #fff; font-size: 16px; box-sizing: border-box; }' +
-    'button { width: 100%; padding: 12px; background: #00d2d3; color: #0c1a2d; font-size: 18px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin-top: 10px; }' +
-    '</style></head><body>' +
-    '<h2>SleepSense Settings</h2>' +
-    '<div class="card">' +
-    '<h3>Smart Wake Alarm</h3>' +
-    '<label>Enable Smart Alarm</label>' +
-    '<select id="alarm_en"><option value="1"' + (alarmEn ? ' selected' : '') + '>Enabled</option><option value="0"' + (!alarmEn ? ' selected' : '') + '>Disabled</option></select>' +
-    '<label>Target Alarm Time (Hour 0-23)</label>' +
-    '<input type="number" id="alarm_hour" min="0" max="23" value="' + alarmHour + '">' +
-    '<label>Target Alarm Time (Minute 0-59)</label>' +
-    '<input type="number" id="alarm_min" min="0" max="59" value="' + alarmMin + '">' +
-    '<label>Smart Wake Window</label>' +
-    '<select id="smart_win">' +
-    '<option value="15"' + (smartWin == 15 ? ' selected' : '') + '>15 Minutes</option>' +
-    '<option value="30"' + (smartWin == 30 ? ' selected' : '') + '>30 Minutes</option>' +
-    '<option value="45"' + (smartWin == 45 ? ' selected' : '') + '>45 Minutes</option>' +
-    '</select>' +
-    '</div>' +
-    '<button id="save_btn">Save Settings</button>' +
-    '<script>' +
-    'document.getElementById("save_btn").onclick = function() {' +
-    '  var config = {' +
-    '    alarm_hour: parseInt(document.getElementById("alarm_hour").value, 10),' +
-    '    alarm_min: parseInt(document.getElementById("alarm_min").value, 10),' +
-    '    smart_win: parseInt(document.getElementById("smart_win").value, 10),' +
-    '    alarm_en: (document.getElementById("alarm_en").value === "1")' +
-    '  };' +
-    '  location.href = "pebblejs://close#" + encodeURIComponent(JSON.stringify(config));' +
-    '};' +
-    '</script></body></html>';
-
-  Pebble.openURL("data:text/html;base64," + btoa(html));
+  Pebble.openURL(configPage.buildConfigPageUrl({
+    alarm: {
+      enabled: localStorage.getItem("alarm_en") !== "false",
+      hour: parseInt(localStorage.getItem("alarm_hour") || "7", 10),
+      min: parseInt(localStorage.getItem("alarm_min") || "0", 10),
+      window: parseInt(localStorage.getItem("smart_win") || "30", 10),
+      snooze: snoozeMinutes()
+    },
+    sensors: {
+      light: sensorEnabled("light_en"),
+      mic: sensorEnabled("mic_en"),
+      hr: sensorEnabled("hr_en")
+    },
+    sessions: sleepHistory.getBucketedSessions(),
+    lastExport: sleepHistory.getLastExport(),
+    now: Date.now(),
+    appVersion: APP_VERSION
+  }));
 });
 
 Pebble.addEventListener("webviewclosed", function(e) {
   if (!e.response) return;
-  var config = JSON.parse(decodeURIComponent(e.response));
+  var config;
+  try {
+    config = JSON.parse(decodeURIComponent(e.response));
+  } catch (err) {
+    console.log("SleepSense PKJS: Could not parse settings response: " + err.message);
+    return;
+  }
+
+  // Copy/Download marks an export even if the settings themselves are cancelled
+  if (config.exportedAt) {
+    sleepHistory.setLastExport(config.exportedAt);
+  }
+  if (config.cancelled) return;
   console.log("SleepSense PKJS: Configuration received: " + JSON.stringify(config));
 
   localStorage.setItem("alarm_hour", config.alarm_hour);
   localStorage.setItem("alarm_min", config.alarm_min);
   localStorage.setItem("smart_win", config.smart_win);
+  localStorage.setItem("snooze_min", config.snooze_min);
   localStorage.setItem("alarm_en", config.alarm_en);
+  localStorage.setItem("light_en", config.light_en);
+  localStorage.setItem("mic_en", config.mic_en);
+  localStorage.setItem("hr_en", config.hr_en);
+
+  // Mic toggle takes effect immediately for a running session
+  if (isTracking && config.mic_en) {
+    startSoundMonitoring();
+  } else if (!config.mic_en) {
+    stopSoundMonitoring();
+  }
 
   var dict = {
     ALARM_TARGET_HOUR: config.alarm_hour,
     ALARM_TARGET_MIN: config.alarm_min,
     SMART_WINDOW_MIN: config.smart_win,
-    SMART_ALARM_ENABLED: config.alarm_en ? 1 : 0
+    SMART_ALARM_ENABLED: config.alarm_en ? 1 : 0,
+    SNOOZE_MINUTES: config.snooze_min
   };
+  var sensors = sensorDict();
+  for (var k in sensors) dict[k] = sensors[k];
 
   Pebble.sendAppMessage(dict, function() {
     console.log("SleepSense PKJS: Sent configuration to watch");
