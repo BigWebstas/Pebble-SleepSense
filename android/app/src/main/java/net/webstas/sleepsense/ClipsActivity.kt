@@ -1,6 +1,7 @@
 package net.webstas.sleepsense
 
 import android.content.Intent
+import android.graphics.Typeface
 import android.media.MediaPlayer
 import android.os.Bundle
 import android.view.Gravity
@@ -44,6 +45,13 @@ class ClipsActivity : ComponentActivity() {
         super.onPause()
     }
 
+    // The theme's main text colour, so the headline stands out in both light and dark mode
+    private fun primaryColor(): Int {
+        val value = android.util.TypedValue()
+        theme.resolveAttribute(android.R.attr.textColorPrimary, value, true)
+        return getColor(value.resourceId)
+    }
+
     private fun stopPlayback() {
         player?.release()
         player = null
@@ -63,13 +71,25 @@ class ClipsActivity : ComponentActivity() {
     }
 
     // clip_<epochMillis>_<peakDb>.wav
-    private fun describe(file: File): String {
-        val parts = file.nameWithoutExtension.split('_')
-        val whenText = parts.getOrNull(1)?.toLongOrNull()
-            ?.let { SimpleDateFormat("EEE MMM d, HH:mm:ss", Locale.getDefault()).format(Date(it)) } ?: file.name
-        val peak = parts.getOrNull(2)?.let { " · peak $it dB" } ?: ""
+    private fun capturedAt(file: File): Long? = file.nameWithoutExtension.split('_').getOrNull(1)?.toLongOrNull()
+
+    private fun peakDb(file: File): String? = file.nameWithoutExtension.split('_').getOrNull(2)
+
+    /** "Tuesday, Oct 6, 2026, 11:24:50 AM" - when the clip's audio begins */
+    private fun title(file: File): String =
+        capturedAt(file)?.let {
+            SimpleDateFormat("EEEE, MMM d, yyyy, h:mm:ss a", Locale.getDefault()).format(Date(it))
+        } ?: file.name
+
+    private fun details(file: File): String {
         val seconds = (file.length() - 44) / (NoiseMonitor.SAMPLE_RATE * 2)
-        return "$whenText$peak · ${seconds}s"
+        return listOfNotNull(peakDb(file)?.let { "peak $it dB" }, "${seconds}s").joinToString(" · ")
+    }
+
+    // What the file is called when shared: readable, not the internal millisecond name
+    private fun shareName(file: File): String {
+        val stamp = capturedAt(file)?.let { SimpleDateFormat("yyyy-MM-dd HH-mm-ss", Locale.US).format(Date(it)) } ?: file.nameWithoutExtension
+        return "SleepSense noise $stamp" + (peakDb(file)?.let { " ($it dB)" } ?: "") + ".wav"
     }
 
     private fun row(file: File): LinearLayout {
@@ -87,7 +107,13 @@ class ClipsActivity : ComponentActivity() {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(0, 16, 0, 16)
-            addView(TextView(this@ClipsActivity).apply { text = describe(file); textSize = 15f })
+            addView(TextView(this@ClipsActivity).apply {
+                text = title(file)
+                textSize = 17f
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(primaryColor())
+            })
+            addView(TextView(this@ClipsActivity).apply { text = details(file); textSize = 14f })
             addView(buttons)
         }
     }
@@ -103,7 +129,10 @@ class ClipsActivity : ComponentActivity() {
     }
 
     private fun share(file: File) {
-        val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+        // Share a copy under a readable name (the share sheet shows the file's real name)
+        val dir = File(cacheDir, "shared").apply { mkdirs(); listFiles()?.forEach { it.delete() } }
+        val copy = file.copyTo(File(dir, shareName(file)), overwrite = true)
+        val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", copy)
         val send = Intent(Intent.ACTION_SEND).apply {
             type = "audio/wav"
             putExtra(Intent.EXTRA_STREAM, uri)

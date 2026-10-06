@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
     <!-- Only the noise clips can be handed to the share sheet -->
-    <files-path name="clips" path="clips/" />
+    <!-- A copy of the clip under a readable name, made when sharing -->
+    <cache-path name="shared" path="shared/" />
 </paths>
