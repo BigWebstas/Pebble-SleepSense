@@ -1,8 +1,9 @@
 #include "sleep_engine.h"
 #include "smart_alarm.h"
-#include <math.h>
 
-#define PERSIST_KEY_SESSION 101
+//! First of consecutive keys holding the session (alarm uses 100)
+#define PERSIST_KEY_SESSION 200
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
 
 // Thresholds for actigraphy scoring
 #define VMC_THRESHOLD_DEEP 30
@@ -16,14 +17,31 @@ static uint32_t s_minute_accel_acc = 0;
 static uint16_t s_minute_accel_samples = 0;
 static bool s_accel_subscribed = false;
 
+//! Session exceeds PERSIST_DATA_MAX_LENGTH, so store it as consecutive chunks
 static void prv_save_session(void) {
-  persist_write_data(PERSIST_KEY_SESSION, &s_session, sizeof(s_session));
+  const uint8_t *bytes = (const uint8_t *)&s_session;
+  for (size_t off = 0, key = PERSIST_KEY_SESSION; off < sizeof(s_session);
+       off += PERSIST_DATA_MAX_LENGTH, key++) {
+    size_t len = MIN(PERSIST_DATA_MAX_LENGTH, sizeof(s_session) - off);
+    persist_write_data(key, bytes + off, len);
+  }
+}
+
+static bool prv_read_session(void) {
+  uint8_t *bytes = (uint8_t *)&s_session;
+  for (size_t off = 0, key = PERSIST_KEY_SESSION; off < sizeof(s_session);
+       off += PERSIST_DATA_MAX_LENGTH, key++) {
+    size_t len = MIN(PERSIST_DATA_MAX_LENGTH, sizeof(s_session) - off);
+    if (persist_get_size(key) != (int)len ||
+        persist_read_data(key, bytes + off, len) != (int)len) {
+      return false;
+    }
+  }
+  return true;
 }
 
 static void prv_load_session(void) {
-  if (persist_exists(PERSIST_KEY_SESSION)) {
-    persist_read_data(PERSIST_KEY_SESSION, &s_session, sizeof(s_session));
-  } else {
+  if (!prv_read_session()) {
     memset(&s_session, 0, sizeof(s_session));
     s_session.current_stage = SLEEP_STAGE_AWAKE;
     s_session.current_light = APP_LIGHT_UNKNOWN;
@@ -148,13 +166,30 @@ static void prv_record_epoch(uint16_t vmc, AppLightLevel light, uint8_t sound, u
   }
 }
 
+//! Integer square root; libm sqrt faults on watch hardware
+static uint32_t prv_isqrt(uint32_t n) {
+  uint32_t root = 0;
+  uint32_t bit = 1u << 30;
+  while (bit > n) bit >>= 2;
+  while (bit) {
+    if (n >= root + bit) {
+      n -= root + bit;
+      root = (root >> 1) + bit;
+    } else {
+      root >>= 1;
+    }
+    bit >>= 2;
+  }
+  return root;
+}
+
 static void prv_accel_handler(AccelData *data, uint32_t num_samples) {
   for (uint32_t i = 0; i < num_samples; i++) {
     int32_t x = data[i].x;
     int32_t y = data[i].y;
     int32_t z = data[i].z;
     // Calculate 3D magnitude (1G = 1000)
-    int32_t mag = (int32_t)sqrt(x * x + y * y + z * z);
+    int32_t mag = (int32_t)prv_isqrt((uint32_t)(x * x + y * y + z * z));
     int32_t delta = mag - 1000;
     if (delta < 0) delta = -delta;
     s_minute_accel_acc += (uint32_t)delta;
