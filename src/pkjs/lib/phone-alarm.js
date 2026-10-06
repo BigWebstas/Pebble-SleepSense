@@ -21,42 +21,6 @@ function fetchPhoneAlarm(callback) {
   xhr.send();
 }
 
-// Asks the app to turn off the phone's next alarm; calls back with its one-line outcome (or null)
-function disablePhoneAlarm(callback) {
-  var xhr = new XMLHttpRequest();
-  xhr.open('GET', 'http://127.0.0.1:8765/disable', true);
-  xhr.timeout = 4000;
-  xhr.onload = function () {
-    try {
-      callback(JSON.parse(xhr.responseText).result);
-    } catch (err) {
-      callback(null);
-    }
-  };
-  xhr.onerror = function () { callback(null); };
-  xhr.ontimeout = function () { callback(null); };
-  xhr.send();
-}
-
-// Asks the app to make sure the phone has an alarm at hour:min (Pebble alarm turned on)
-function enablePhoneAlarm(hour, min, callback) {
-  var xhr = new XMLHttpRequest();
-  xhr.open('GET', 'http://127.0.0.1:8765/enable?hour=' + hour + '&min=' + min, true);
-  xhr.timeout = 4000;
-  xhr.onload = function () {
-    try {
-      callback(JSON.parse(xhr.responseText).result);
-    } catch (err) {
-      callback(null);
-    }
-  };
-  xhr.onerror = function () { callback(null); };
-  xhr.ontimeout = function () { callback(null); };
-  xhr.send();
-}
-
 module.exports = {
-  fetchPhoneAlarm: fetchPhoneAlarm,
-  disablePhoneAlarm: disablePhoneAlarm,
-  enablePhoneAlarm: enablePhoneAlarm
+  fetchPhoneAlarm: fetchPhoneAlarm
 };

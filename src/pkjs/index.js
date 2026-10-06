@@ -75,9 +75,11 @@ function syncPhoneAlarm() {
   phoneAlarm.fetchPhoneAlarm(function(a) {
     if (!a || !a.sync) return;
     var key = a.enabled ? (a.hour + ":" + a.min) : "none";
-    var differs = a.enabled &&
-      (parseInt(localStorage.getItem("alarm_hour"), 10) !== a.hour ||
-       parseInt(localStorage.getItem("alarm_min"), 10) !== a.min);
+    var watchOn = localStorage.getItem("alarm_en") !== "false";
+    var differs = a.enabled
+      ? (parseInt(localStorage.getItem("alarm_hour"), 10) !== a.hour ||
+         parseInt(localStorage.getItem("alarm_min"), 10) !== a.min)
+      : watchOn; // the phone has no alarm: the watch alarm is turned off to match
     if (key === localStorage.getItem("phone_alarm_last") && !differs) return;
 
     var dict = { SMART_ALARM_ENABLED: a.enabled ? 1 : 0 };
@@ -146,18 +148,6 @@ Pebble.addEventListener("appmessage", function(e) {
   // The watch owns the alarm settings (a phone companion app may change them there),
   // so keep this side's copy, which feeds the settings page and the startup restore, in step.
   if (dict.ALARM_TARGET_HOUR !== undefined && dict.SMART_ALARM_ENABLED !== undefined) {
-    // Turned off on the watch (our own copy still said on): turn off the phone alarm too
-    var wasOn = localStorage.getItem("alarm_en") !== "false";
-    if (wasOn && dict.SMART_ALARM_ENABLED === 0) {
-      phoneAlarm.disablePhoneAlarm(function(result) {
-        console.log("SleepSense PKJS: Pebble alarm turned off, phone alarm: " + result);
-      });
-    } else if (!wasOn && dict.SMART_ALARM_ENABLED !== 0) {
-      // Turned back on: make sure the phone has an alarm at the watch's wake time
-      phoneAlarm.enablePhoneAlarm(dict.ALARM_TARGET_HOUR, dict.ALARM_TARGET_MIN, function(result) {
-        console.log("SleepSense PKJS: Pebble alarm turned on, phone alarm: " + result);
-      });
-    }
     localStorage.setItem("alarm_hour", dict.ALARM_TARGET_HOUR);
     localStorage.setItem("alarm_min", dict.ALARM_TARGET_MIN);
     localStorage.setItem("smart_win", dict.SMART_WINDOW_MIN);
