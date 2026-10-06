@@ -52,8 +52,8 @@ object WidgetState {
         return when {
             tracking(context, now) -> ("Tracking sleep" + if (since > 0) " since ${clock(since)}" else "") to alarm
             starting(context, now) -> "Starting..." to alarm
-            watchAppOpen(context, now) -> "Not tracking" to "Tap to start · $alarm"
-            else -> "Watch app closed" to "Tap to open and start · $alarm"
+            watchAppOpen(context, now) -> "Not tracking" to "$alarm · Tap to start"
+            else -> "Watch app closed" to "$alarm · Tap to open and start"
         }
     }
 }

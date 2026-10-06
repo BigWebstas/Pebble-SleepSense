@@ -8,6 +8,42 @@ The watch app works on its own. Everything marked *(Android app)* needs the comp
 
 ---
 
+## Screenshots
+
+**Watch** (Pebble Time 2): idle, tracking, and the alarm ringing.
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/watch-idle.png" width="200" alt="Idle: hold Select to start"><br><sub>Idle</sub></td>
+    <td align="center"><img src="docs/screenshots/watch-tracking.png" width="200" alt="Tracking sleep"><br><sub>Tracking</sub></td>
+    <td align="center"><img src="docs/screenshots/watch-alarm.png" width="200" alt="Alarm ringing: select stops, down snoozes"><br><sub>Alarm ringing</sub></td>
+  </tr>
+</table>
+
+**Android app** (dark theme shown; it follows the system theme): the main screen, the sleep history for a night, and the export.
+
+<table>
+  <tr>
+    <td align="center" valign="top"><img src="docs/screenshots/android-main.png" width="260" alt="Main screen"><br><sub>Main screen</sub></td>
+    <td align="center" valign="top"><img src="docs/screenshots/android-history.png" width="260" alt="Sleep history with stats and graphs"><br><sub>Sleep history</sub></td>
+    <td align="center" valign="top"><img src="docs/screenshots/android-export.png" width="260" alt="Export with date range, copy, share and save"><br><sub>Export</sub></td>
+  </tr>
+</table>
+
+**Noise clips, the home-screen widget, and the watch app's settings page:**
+
+<table>
+  <tr>
+    <td align="center" valign="top"><img src="docs/screenshots/android-clips.png" width="260" alt="Noise clips list"><br><sub>Noise clips</sub></td>
+    <td align="center" valign="top"><img src="docs/screenshots/android-widget.png" width="260" alt="Home-screen widget"><br><sub>Widget</sub></td>
+    <td align="center" valign="top"><img src="docs/screenshots/settings-page.png" width="260" alt="Settings page in the Pebble app"><br><sub>Settings page</sub></td>
+  </tr>
+</table>
+
+The sleep data in these screenshots is sample data, not a real night.
+
+---
+
 ## Watch app
 
 ### Features
@@ -110,6 +146,7 @@ PebbleSleepTracker/
 ├── package.json                   # App UUID, capabilities, message keys, menu icon
 ├── wscript                        # Pebble build configuration
 ├── resources/images/icon.png      # Watch app menu icon
+├── docs/screenshots/              # Images used in this README
 ├── src/
 │   ├── c/                         # Watch app
 │   │   ├── pebble_sleep_tracker.c # Entry point and wiring

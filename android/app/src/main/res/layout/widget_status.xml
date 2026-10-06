@@ -34,6 +34,7 @@
             android:id="@+id/widget_subtitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:ellipsize="end"
             android:maxLines="1"
             android:textColor="#9FB3CC"
             android:textSize="13sp" />
