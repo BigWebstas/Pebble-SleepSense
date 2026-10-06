@@ -55,7 +55,8 @@
       "SNOOZE_MINUTES",
       "STATUS_ALARM_STATE",
       "COMMAND_START_TRACKING",
-      "COMMAND_STOP_TRACKING"
+      "COMMAND_STOP_TRACKING",
+      "STATUS_VMC"
     ],
     "resources": {
       "media": [

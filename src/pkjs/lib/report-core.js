@@ -28,6 +28,8 @@ function reportCore() {
   };
 
   function pad(n) { return ('0' + n).slice(-2); }
+  // Does the sample have a reading for the field? Zero is a real reading only where keepZero says so
+  function has(p, field, keepZero) { return p[field] !== undefined && (keepZero || p[field] > 0); }
   function fmtDate(ms) {
     var d = new Date(ms);
     return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
@@ -52,11 +54,12 @@ function reportCore() {
 
   function summarize(s) {
     var mins = { 0: 0, 1: 0, 2: 0, 3: 0 };
-    var hrSum = 0, hrN = 0, nSum = 0, nN = 0;
+    var hrSum = 0, hrN = 0, nSum = 0, nN = 0, mSum = 0, mN = 0, mMax = 0;
     spans(s).forEach(function (sp) {
       mins[sp.p.s] = (mins[sp.p.s] || 0) + (sp.to - sp.from) / MIN;
       if (sp.p.hr > 0) { hrSum += sp.p.hr; hrN++; }
       if (sp.p.n > 0) { nSum += sp.p.n; nN++; }
+      if (sp.p.m !== undefined) { mSum += sp.p.m; mN++; mMax = Math.max(mMax, sp.p.m); }
     });
     return {
       duration: s.end - s.start,
@@ -64,6 +67,8 @@ function reportCore() {
       deep: Math.round(mins[2]), rem: Math.round(mins[3]),
       avgHr: hrN ? Math.round(hrSum / hrN) : 0,
       avgNoise: nN ? Math.round(nSum / nN) : 0,
+      avgMove: mN ? Math.round(mSum / mN) : null,
+      peakMove: mN ? mMax : null,
       snoozes: s.snoozes || 0,
       snoozeMin: Math.round((s.snoozeSec || 0) / 60)
     };
@@ -107,6 +112,7 @@ function reportCore() {
       ['Awake / Light / Deep / REM', m.awake + ' / ' + m.light + ' / ' + m.deep + ' / ' + m.rem + ' min'],
       ['Average heart rate', m.avgHr ? m.avgHr + ' bpm' : '-'],
       ['Average room noise', m.avgNoise ? m.avgNoise + ' dB' : '-'],
+      ['Movement (average / peak)', m.avgMove === null ? '-' : m.avgMove + ' / ' + m.peakMove],
       ['Snoozed', snoozeText(m)],
       ['Alarm', alarmText(s)]
     ];
@@ -140,8 +146,8 @@ function reportCore() {
       '<text class="ax" x="' + (W - 4) + '" y="' + by + '" text-anchor="end">' + fmtTime(s.end) + '</text></svg>';
   }
 
-  function lineSvg(s, field, color, unit) {
-    var pts = s.samples.filter(function (p) { return p[field] > 0; });
+  function lineSvg(s, field, color, unit, keepZero) {
+    var pts = s.samples.filter(function (p) { return has(p, field, keepZero); });
     if (pts.length < 2) return '<p class="hint">No ' + unit + ' data for this session.</p>';
     var W = 320, H = 110, LEFT = 30, span = Math.max(s.end - s.start, 1);
     var min = Infinity, max = -Infinity, sum = 0;
@@ -167,6 +173,7 @@ function reportCore() {
   function sessionGraphs(s) {
     var hasLight = s.samples.some(function (p) { return p.l > 0; });
     return '<h3>Sleep stages</h3>' + stepSvg(s, 's', STAGE_ROWS) + alarmLegend(s) +
+      '<h3>Movement</h3>' + lineSvg(s, 'm', '#4dabf7', 'movement', true) +
       '<h3>Heart rate</h3>' + lineSvg(s, 'hr', '#ff6b6b', 'bpm') +
       '<h3>Ambient light</h3>' + (hasLight ? stepSvg(s, 'l', LIGHT_ROWS) : '<p class="hint">No light data for this session.</p>') +
       '<h3>Room noise</h3>' + lineSvg(s, 'n', '#e0a800', 'dB');
@@ -213,34 +220,32 @@ function reportCore() {
   }
 
   // Resample a field to <= ~24 evenly spaced points (15-minute multiples), filling gaps
-  function series(s, field) {
+  function series(s, field, keepZero) {
     var span = s.end - s.start;
     var step = Math.max(15 * MIN, Math.ceil(span / 24 / (15 * MIN)) * 15 * MIN);
     var n = Math.max(Math.ceil(span / step), 1);
     var sums = [], counts = [];
     for (var i = 0; i < n; i++) { sums.push(0); counts.push(0); }
     s.samples.forEach(function (p) {
-      if (p[field] > 0) {
+      if (has(p, field, keepZero)) {
         var i2 = Math.min(Math.floor((p.t - s.start) / step), n - 1);
         sums[i2] += p[field]; counts[i2]++;
       }
     });
-    var values = [], labels = [], prev = 0;
+    var firstData = -1;
+    for (var k = 0; k < n; k++) { if (counts[k]) { firstData = k; break; } }
+    if (firstData < 0) return null;
+    var values = [], labels = [], prev = sums[firstData] / counts[firstData];
     for (var j = 0; j < n; j++) {
-      var v = counts[j] ? Math.round(sums[j] / counts[j]) : prev;
-      if (v) prev = v;
-      values.push(v);
+      if (counts[j]) prev = sums[j] / counts[j]; // gaps carry the last reading; a leading gap takes the first
+      values.push(Math.round(prev));
       labels.push('"' + fmtTime(s.start + j * step) + '"');
     }
-    // Leading gap: back-fill from the first real reading
-    var first = values.filter(function (v) { return v > 0; })[0];
-    if (!first) return null;
-    values = values.map(function (v) { return v || first; });
     return { values: values, labels: labels };
   }
 
-  function chartBlock(s, field, title, axis, lo, hi) {
-    var d = series(s, field);
+  function chartBlock(s, field, title, axis, lo, hi, keepZero) {
+    var d = series(s, field, keepZero);
     if (!d) return '';
     var min = Math.min.apply(null, d.values), max = Math.max.apply(null, d.values);
     // Callers pass fixed bounds (light: 0-4) or null to fit the data to multiples of 5
@@ -275,7 +280,8 @@ function reportCore() {
       out.push('## ' + sessionLabel(s), '');
       if (alarmEvents(s).length) out.push('**Alarm:** ' + alarmText(s), '');
       out.push(ganttBlock(s), '');
-      [chartBlock(s, 'hr', 'Heart rate', 'bpm', null, null),
+      [chartBlock(s, 'm', 'Movement (accelerometer activity)', 'activity', 0, null, true),
+        chartBlock(s, 'hr', 'Heart rate', 'bpm', null, null),
         chartBlock(s, 'l', 'Ambient light level (1 dark to 4 bright)', 'level', 0, 4),
         chartBlock(s, 'n', 'Room noise', 'dB', null, null)].forEach(function (block) {
         if (block) out.push(block, '');

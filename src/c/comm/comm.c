@@ -126,6 +126,7 @@ void comm_send_session_update(const SleepSession *session) {
   dict_write_uint8(out_iter, MESSAGE_KEY_STATUS_CYCLE_COUNT, session->cycle_count);
   dict_write_uint8(out_iter, MESSAGE_KEY_STATUS_SLEEP_SCORE, session->sleep_score);
   dict_write_uint8(out_iter, MESSAGE_KEY_STATUS_HEART_RATE, session->current_hr);
+  dict_write_uint16(out_iter, MESSAGE_KEY_STATUS_VMC, session->current_vmc); // movement (accelerometer)
   dict_write_uint8(out_iter, MESSAGE_KEY_STATUS_SNOOZE_COUNT, session->snooze_count);
   dict_write_uint32(out_iter, MESSAGE_KEY_STATUS_SNOOZE_SEC, session->snooze_sec);
   // 0 = quiet, 1 = ringing, 2 = snoozed (the phone turns changes into timeline events)

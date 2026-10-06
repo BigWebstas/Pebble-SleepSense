@@ -68,6 +68,7 @@ function record(tracking, d, now) {
       s: d.STATUS_STATE,
       l: d.STATUS_LIGHT_LEVEL || 0,
       hr: d.STATUS_HEART_RATE || 0,
+      m: d.STATUS_VMC, // movement; undefined (left out) for watch builds that do not send it
       n: d.STATUS_SOUND_LEVEL || 0
     });
   }
@@ -81,6 +82,13 @@ function mode(values) {
     if (counts[v] > bestCount) { best = v; bestCount = counts[v]; }
   });
   return best;
+}
+
+// Average of the values that exist (zeros count: no movement is a reading), or undefined
+function averageDefined(values) {
+  var v = values.filter(function (x) { return x !== undefined; });
+  if (!v.length) return undefined;
+  return Math.round(v.reduce(function (a, b) { return a + b; }, 0) / v.length);
 }
 
 function averageNonZero(values) {
@@ -108,7 +116,8 @@ function bucket(session) {
       s: items[items.length - 1].s,
       l: mode(items.map(function (p) { return p.l; }).filter(function (v) { return v > 0; })),
       hr: averageNonZero(items.map(function (p) { return p.hr; })),
-      n: averageNonZero(items.map(function (p) { return p.n; }))
+      n: averageNonZero(items.map(function (p) { return p.n; })),
+      m: averageDefined(items.map(function (p) { return p.m; }))
     };
   });
   var lastT = session.samples.length ? session.samples[session.samples.length - 1].t : session.start;
