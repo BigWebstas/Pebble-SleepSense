@@ -7,8 +7,14 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
 // Thresholds for actigraphy scoring
+// Movement is Pebble Health's minute activity count. Measured over a real night it is exactly 0 while
+// still and a few hundred to a few thousand for a turn in bed (daytime medians are 400-1400), so a
+// single busy minute is not waking: judge the average of the last 5 minutes, and let only a very
+// large burst count on its own.
 #define VMC_THRESHOLD_DEEP 30
-#define VMC_THRESHOLD_AWAKE 140
+#define VMC_MEAN_AWAKE 400
+#define VMC_BURST_AWAKE 2500
+#define VMC_WINDOW 5
 #define SOUND_THRESHOLD_DISTURBANCE 70
 #define SOUND_THRESHOLD_AWAKE 85
 
@@ -73,7 +79,8 @@ static AppLightLevel prv_convert_health_light(uint8_t raw_light) {
 
 //! Classify a 1-minute epoch using sensor fusion:
 //! VMC (movement), Ambient Light, Sound level, and Ultradian cycle position (~90 min)
-static SleepStage prv_classify_epoch(uint16_t vmc, AppLightLevel light, uint8_t sound, uint32_t elapsed_sec) {
+static SleepStage prv_classify_epoch(uint16_t vmc, uint32_t mean_vmc, AppLightLevel light, uint8_t sound,
+                                     uint32_t elapsed_sec) {
   // 1. Check for Awakening:
   // Bright lights turned on + moderate movement
   if ((light >= APP_LIGHT_LIGHT) && (vmc > 50)) {
@@ -83,8 +90,8 @@ static SleepStage prv_classify_epoch(uint16_t vmc, AppLightLevel light, uint8_t 
   if ((sound >= SOUND_THRESHOLD_AWAKE) && (vmc > 45)) {
     return SLEEP_STAGE_AWAKE;
   }
-  // High physical actigraphy count
-  if (vmc >= VMC_THRESHOLD_AWAKE) {
+  // Sustained movement, or one very large burst
+  if (mean_vmc >= VMC_MEAN_AWAKE || vmc >= VMC_BURST_AWAKE) {
     return SLEEP_STAGE_AWAKE;
   }
 
@@ -94,7 +101,8 @@ static SleepStage prv_classify_epoch(uint16_t vmc, AppLightLevel light, uint8_t 
   }
 
   // 3. Moderate movement or sound disturbance: Light Sleep (N1 / N2)
-  if (vmc > VMC_THRESHOLD_DEEP || sound >= SOUND_THRESHOLD_DISTURBANCE) {
+  // (a turn in bed stays Light for the next few minutes through the average)
+  if (vmc > VMC_THRESHOLD_DEEP || mean_vmc > VMC_THRESHOLD_DEEP || sound >= SOUND_THRESHOLD_DISTURBANCE) {
     return SLEEP_STAGE_LIGHT;
   }
 
@@ -114,11 +122,23 @@ static SleepStage prv_classify_epoch(uint16_t vmc, AppLightLevel light, uint8_t 
 
 //! Record one minute. `live` epochs also persist, evaluate the alarm and notify the UI;
 //! backfilled epochs (minutes missed while the app was closed) skip all three.
+//! Average movement of this minute and the (up to) four before it
+static uint32_t prv_recent_mean_vmc(uint16_t current) {
+  uint32_t sum = current;
+  uint32_t count = 1;
+  for (uint16_t i = 1; i < VMC_WINDOW && i <= s_session.epoch_count; i++) {
+    uint16_t idx = (s_session.epoch_head + SLEEP_EPOCH_HISTORY_MAX - i) % SLEEP_EPOCH_HISTORY_MAX;
+    sum += s_session.epochs[idx].vmc;
+    count++;
+  }
+  return sum / count;
+}
+
 static void prv_record_epoch(time_t now, uint16_t vmc, AppLightLevel light, uint8_t sound,
                              uint8_t orientation, uint8_t heart_rate, bool live) {
   uint32_t elapsed_sec = (s_session.session_start > 0) ? (now - s_session.session_start) : 0;
 
-  SleepStage stage = prv_classify_epoch(vmc, light, sound, elapsed_sec);
+  SleepStage stage = prv_classify_epoch(vmc, prv_recent_mean_vmc(vmc), light, sound, elapsed_sec);
 
   s_session.current_stage = stage;
   s_session.current_light = light;
@@ -290,7 +310,9 @@ static void prv_process_minute(void) {
   {
     // Fallback using raw accelerometer accumulator
     if (s_minute_accel_samples > 0) {
-      vmc = (uint16_t)(s_minute_accel_acc / s_minute_accel_samples);
+      // Raw accelerometer fallback: milli-g, which runs about 10x smaller than Health's count
+      uint32_t scaled = (s_minute_accel_acc / s_minute_accel_samples) * 10;
+      vmc = (uint16_t)(scaled > 65535 ? 65535 : scaled);
     }
   }
 
