@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A sleeping little robot: dome head, closed eyes, antennae, and a trail of z's.
+     Drawn inside the 66dp adaptive-icon safe zone (21..87 of 108). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- antennae -->
+    <path
+        android:strokeColor="#3DDC84"
+        android:strokeWidth="2.6"
+        android:strokeLineCap="round"
+        android:pathData="M44,40 L38,30 M64,40 L70,30" />
+    <!-- head -->
+    <path
+        android:fillColor="#3DDC84"
+        android:pathData="M28,66 A26,26 0 0 1 80,66 Z" />
+    <!-- closed eyes -->
+    <path
+        android:strokeColor="#0C1A2D"
+        android:strokeWidth="2.6"
+        android:strokeLineCap="round"
+        android:pathData="M40,56 Q44,60 48,56 M60,56 Q64,60 68,56" />
+    <!-- z z -->
+    <path
+        android:strokeColor="#CFE3FF"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M72,36 h9 l-9,10 h9 M84,22 h6 l-6,7 h6" />
+</vector>
