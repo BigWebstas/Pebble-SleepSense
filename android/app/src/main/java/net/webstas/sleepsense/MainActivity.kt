@@ -1,6 +1,8 @@
 package net.webstas.sleepsense
 
 import android.Manifest
+import android.app.AlertDialog
+import android.app.TimePickerDialog
 import android.appwidget.AppWidgetManager
 import android.content.ActivityNotFoundException
 import android.content.ComponentName
@@ -11,6 +13,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.AlarmClock
+import android.text.format.DateFormat
 import android.view.WindowInsets
 import android.widget.Button
 import android.widget.Switch
@@ -63,6 +66,7 @@ class MainActivity : ComponentActivity() {
         id<Button>(R.id.clock_button).setIcon(R.drawable.ic_alarm)
         id<Button>(R.id.clips_button).setIcon(R.drawable.ic_mic)
         id<Button>(R.id.history_button).setIcon(R.drawable.ic_history)
+        id<Button>(R.id.home_assistant_button).setIcon(R.drawable.ic_home)
         id<Button>(R.id.grant_hc_button).setIcon(R.drawable.ic_favorite)
         id<Button>(R.id.widget_button).setIcon(R.drawable.ic_widgets)
         id<Button>(R.id.tracking_button).setOnClickListener {
@@ -78,6 +82,8 @@ class MainActivity : ComponentActivity() {
                 refreshTracking()
             }
         }
+        id<Button>(R.id.alarm_time_button).setOnClickListener { chooseAlarmTime() }
+        id<Button>(R.id.snooze_button).setOnClickListener { chooseSnooze() }
         id<Switch>(R.id.noise_switch).apply {
             isChecked = NoiseClips.isEnabled(this@MainActivity)
             setOnCheckedChangeListener { _, on ->
@@ -88,6 +94,7 @@ class MainActivity : ComponentActivity() {
         }
         id<Button>(R.id.clips_button).setOnClickListener { startActivity(Intent(this, ClipsActivity::class.java)) }
         id<Button>(R.id.history_button).setOnClickListener { startActivity(Intent(this, HistoryActivity::class.java)) }
+        id<Button>(R.id.home_assistant_button).setOnClickListener { startActivity(Intent(this, HomeAssistantActivity::class.java)) }
         id<Button>(R.id.grant_hc_button).setOnClickListener { requestHealth.launch(setOf(WRITE_SLEEP, WRITE_HEART_RATE)) }
         id<Button>(R.id.widget_button).setOnClickListener {
             val manager = getSystemService(AppWidgetManager::class.java)
@@ -136,6 +143,48 @@ class MainActivity : ComponentActivity() {
             setText(if (tracking) R.string.stop_tracking_button else R.string.start_tracking_button)
             setIcon(if (tracking) R.drawable.ic_stop else R.drawable.ic_play_arrow)
         }
+        refreshAlarmSettings()
+    }
+
+    // The alarm time can be set here only while the phone's own alarm isn't being followed
+    private fun refreshAlarmSettings() {
+        id<Button>(R.id.alarm_time_button).apply {
+            val synced = PhoneAlarmSync.isEnabled(this@MainActivity)
+            isEnabled = !synced
+            text = if (synced) getString(R.string.alarm_time_synced) else getString(
+                R.string.alarm_time_button,
+                PhoneAlarmSync.customAlarm(this@MainActivity)?.let { "%02d:%02d".format(it.first, it.second) }
+                    ?: getString(R.string.alarm_time_none),
+            )
+        }
+        val snooze = PhoneAlarmSync.snoozeMinutes(this)
+        id<Button>(R.id.snooze_button).text = getString(
+            R.string.snooze_button,
+            when (snooze) {
+                null -> getString(R.string.snooze_unset)
+                0 -> getString(R.string.snooze_off)
+                else -> getString(R.string.snooze_minutes, snooze)
+            },
+        )
+    }
+
+    private fun chooseAlarmTime() {
+        val (hour, minute) = PhoneAlarmSync.customAlarm(this) ?: (7 to 0)
+        TimePickerDialog(this, { _, h, m ->
+            PhoneAlarmSync.setCustomAlarm(this, h, m)
+            refreshAlarmSettings()
+        }, hour, minute, DateFormat.is24HourFormat(this)).show()
+    }
+
+    private fun chooseSnooze() {
+        val lengths = intArrayOf(0, 5, 9, 10, 15, 20)
+        val labels = lengths.map { if (it == 0) getString(R.string.snooze_off) else getString(R.string.snooze_minutes, it) }
+        AlertDialog.Builder(this)
+            .setItems(labels.toTypedArray()) { _, which ->
+                PhoneAlarmSync.setSnoozeMinutes(this, lengths[which])
+                refreshAlarmSettings()
+            }
+            .show()
     }
 
     // Opens the Clock app's alarm list: the standard Clock app if there are several that can

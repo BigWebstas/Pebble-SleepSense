@@ -14,6 +14,13 @@
     <string name="open_clock_button">Open Clock app</string>
     <string name="open_clock_missing">No Clock app found</string>
 
+    <string name="alarm_time_button">Watch alarm time: %1$s</string>
+    <string name="alarm_time_none">not set</string>
+    <string name="alarm_time_synced">Watch alarm time: follows the phone alarm</string>
+    <string name="snooze_button">Snooze: %1$s</string>
+    <string name="snooze_unset">as set on the watch</string>
+    <string name="snooze_off">off</string>
+    <string name="snooze_minutes">%1$d min</string>
     <string name="alarm_sync_label">Sync phone alarm to Pebble</string>
     <string name="noise_label">Record clips on noise spikes while tracking</string>
     <string name="noise_off">Noise monitoring is off. It listens through the phone microphone only while the watch is tracking sleep.</string>
@@ -27,6 +34,20 @@
 
     <string name="add_widget_button">Add widget to home screen</string>
     <string name="noise_clips_button">Noise clips</string>
+    <string name="home_assistant_button">Home Assistant (MQTT)</string>
+    <string name="ha_intro">Publishes sleep tracking, sleep stage and heart rate to your MQTT broker. Home Assistant finds them on its own (MQTT discovery), and its switch can start and stop tracking. Port 8883 uses TLS.</string>
+    <string name="ha_enable">Send to MQTT broker</string>
+    <string name="ha_host">Broker host</string>
+    <string name="ha_port">Port</string>
+    <string name="ha_user">User name (optional)</string>
+    <string name="ha_password">Password (optional)</string>
+    <string name="ha_save">Save</string>
+    <string name="ha_off">Off</string>
+    <string name="ha_connected">Connected</string>
+    <string name="ha_disconnected">Not connected (retrying every 30 s)</string>
+    <string name="delete_session_title">Delete this session?</string>
+    <string name="delete_session_message">%1$s will be removed from the history here and in the watchapp\'s settings page. This can\'t be undone.</string>
+    <string name="delete_session_confirm">Delete</string>
     <string name="history_button">Sleep history and export</string>
     <string name="version_label">Version %1$s</string>
     <string name="install_watch_button">Install on Pebble</string>

@@ -53,6 +53,8 @@ class AlarmBridgeService : Service() {
             ContextCompat.RECEIVER_NOT_EXPORTED,
         )
 
+        HomeAssistant.start(this)
+
         thread(name = "alarm-bridge", isDaemon = true) {
             try {
                 val s = ServerSocket(ALARM_BRIDGE_PORT, 8, InetAddress.getByName("127.0.0.1"))

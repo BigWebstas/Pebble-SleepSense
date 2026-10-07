@@ -69,6 +69,10 @@
             android:name=".HistoryActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".HomeAssistantActivity"
+            android:exported="false" />
+
         <!-- Health Connect permission rationale (Android 14+) -->
         <activity-alias
             android:name="ViewPermissionUsageActivity"

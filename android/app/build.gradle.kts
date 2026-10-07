@@ -38,4 +38,5 @@ dependencies {
     implementation(libs.androidx.health.connect)
     implementation(libs.pebblekit.client)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.paho.mqtt)
 }

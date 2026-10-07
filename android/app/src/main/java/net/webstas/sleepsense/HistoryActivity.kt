@@ -1,6 +1,7 @@
 package net.webstas.sleepsense
 
 import android.annotation.SuppressLint
+import android.app.AlertDialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
@@ -39,6 +40,21 @@ class HistoryActivity : ComponentActivity() {
         @JavascriptInterface fun lastExport(): Long = SessionStore.lastExport(this@HistoryActivity)
 
         @JavascriptInterface fun markExported(at: Long) = SessionStore.markExported(this@HistoryActivity, at)
+
+        // Asks first; the page hears the answer through window.onDeleted
+        @JavascriptInterface fun deleteSession(start: Long, label: String) {
+            runOnUiThread {
+                AlertDialog.Builder(this@HistoryActivity)
+                    .setTitle(R.string.delete_session_title)
+                    .setMessage(getString(R.string.delete_session_message, label))
+                    .setPositiveButton(R.string.delete_session_confirm) { _, _ ->
+                        SessionStore.delete(this@HistoryActivity, start)
+                        web.evaluateJavascript("window.onDeleted($start)", null)
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
+            }
+        }
 
         @JavascriptInterface fun copy(text: String) {
             runOnUiThread {
