@@ -7,8 +7,8 @@ static Window *s_main_window;
 static TextLayer *s_header_layer;
 static TextLayer *s_stage_layer;
 static TextLayer *s_duration_layer;
-static TextLayer *s_sensors_layer;
 static TextLayer *s_alarm_layer;
+static TextLayer *s_countdown_layer;
 #if defined(PBL_PLATFORM_EMERY)
 // Only the Time 2 screen has room under the alarm row
 static TextLayer *s_time_layer;
@@ -17,12 +17,20 @@ static char s_time_buf[16];
 static char s_date_buf[24];
 #endif
 static Layer *s_hypnogram_layer;
+static Layer *s_bell_layer;
+static GPath *s_bell_path;
+static AppTimer *s_bell_timer;
+static int32_t s_bell_phase;
+static int16_t s_bell_pivot_y;
+static int16_t s_bell_clapper_len;
+static int16_t s_bell_clapper_r;
+static bool s_bell_on;
 
 static char s_header_buf[32];
 static char s_stage_buf[32];
 static char s_duration_buf[48];
-static char s_sensors_buf[48];
 static char s_alarm_buf[48];
+static char s_countdown_buf[32];
 
 //! Custom hypnogram rendering procedure
 static void prv_hypnogram_update_proc(Layer *layer, GContext *ctx) {
@@ -90,7 +98,184 @@ static void prv_hypnogram_update_proc(Layer *layer, GContext *ctx) {
   }
 }
 
+// --- Ringing alarm: a tower bell swinging in its frame, with the backlight held on ---
+
+#define BELL_FRAME_MS 40
+#define BELL_PHASE_STEP (TRIG_MAX_ANGLE / 15)   // one swing every 600 ms
+#define BELL_SWING (TRIG_MAX_ANGLE * 28 / 360)  // 28 degrees either way
+#define BELL_UNITS 110                          // the bell below is drawn on a 110-unit-tall grid
+#define BELL_CLAPPER_LEN 108
+#define BELL_CLAPPER_R 8
+
+//! The bell outline, hanging from (0, 0): a rounded crown and shoulders flaring out to the lip
+static const GPoint s_bell_points[] = {
+  {6, 0}, {7, 1}, {9, 3}, {12, 6}, {16, 9}, {19, 13},
+  {22, 17}, {25, 22}, {27, 27}, {29, 33}, {30, 39}, {31, 45},
+  {33, 51}, {35, 56}, {37, 61}, {39, 66}, {42, 71}, {44, 75},
+  {47, 79}, {50, 83}, {52, 86}, {54, 89}, {55, 91}, {56, 93},
+  {57, 95}, {58, 97}, {58, 98}, {-58, 98}, {-58, 97}, {-57, 95},
+  {-56, 93}, {-55, 91}, {-54, 89}, {-52, 86}, {-50, 83}, {-47, 79},
+  {-44, 75}, {-42, 71}, {-39, 66}, {-37, 61}, {-35, 56}, {-33, 51},
+  {-31, 45}, {-30, 39}, {-29, 33}, {-27, 27}, {-25, 22}, {-22, 17},
+  {-19, 13}, {-16, 9}, {-12, 6}, {-9, 3}, {-7, 1}, {-6, 0},
+};
+
+static void prv_bell_update_proc(Layer *layer, GContext *ctx) {
+  GRect bounds = layer_get_bounds(layer);
+  graphics_context_set_fill_color(ctx, GColorBlack);
+  graphics_fill_rect(ctx, bounds, 0, GCornerNone);
+
+  GPoint pivot = GPoint(bounds.size.w / 2, s_bell_pivot_y);
+
+  // The tower: two stone posts and the timber beam the bell hangs from
+  int16_t post = bounds.size.w / 24 + 2;
+  graphics_context_set_fill_color(ctx, PBL_IF_COLOR_ELSE(GColorDarkGray, GColorWhite));
+  graphics_fill_rect(ctx, GRect(0, pivot.y - 10, post, bounds.size.h - pivot.y + 10), 0, GCornerNone);
+  graphics_fill_rect(ctx, GRect(bounds.size.w - post, pivot.y - 10, post, bounds.size.h - pivot.y + 10), 0, GCornerNone);
+  graphics_context_set_fill_color(ctx, PBL_IF_COLOR_ELSE(GColorWindsorTan, GColorWhite));
+  graphics_fill_rect(ctx, GRect(0, pivot.y - 10, bounds.size.w, 10), 0, GCornerNone);
+
+  int32_t swing = sin_lookup(s_bell_phase) * BELL_SWING / TRIG_MAX_RATIO;
+  gpath_rotate_to(s_bell_path, swing);
+  gpath_move_to(s_bell_path, pivot);
+  graphics_context_set_fill_color(ctx, PBL_IF_COLOR_ELSE(GColorYellow, GColorWhite));
+  gpath_draw_filled(ctx, s_bell_path);
+  graphics_context_set_stroke_color(ctx, PBL_IF_COLOR_ELSE(GColorChromeYellow, GColorBlack));
+  graphics_context_set_stroke_width(ctx, 2);
+  gpath_draw_outline(ctx, s_bell_path);
+  graphics_context_set_fill_color(ctx, PBL_IF_COLOR_ELSE(GColorDarkGray, GColorWhite));
+  graphics_fill_circle(ctx, pivot, 5); // the axle
+
+  // The clapper swings a little further, and a little behind
+  int32_t lag = (s_bell_phase + TRIG_MAX_ANGLE - TRIG_MAX_ANGLE / 12) % TRIG_MAX_ANGLE;
+  int32_t clap = sin_lookup(lag) * BELL_SWING * 3 / 2 / TRIG_MAX_RATIO;
+  GPoint clapper = GPoint(pivot.x - s_bell_clapper_len * sin_lookup(clap) / TRIG_MAX_RATIO,
+                          pivot.y + s_bell_clapper_len * cos_lookup(clap) / TRIG_MAX_RATIO);
+  graphics_context_set_fill_color(ctx, PBL_IF_COLOR_ELSE(GColorOrange, GColorWhite));
+  graphics_fill_circle(ctx, clapper, s_bell_clapper_r);
+
+  // Ring marks beside the bell at the ends of each swing
+  if (abs(swing) > BELL_SWING / 2) {
+    int16_t mid = pivot.y + s_bell_clapper_len / 2;
+    int16_t near = s_bell_clapper_len * 60 / 100;
+    int16_t far = s_bell_clapper_len * 80 / 100;
+    graphics_context_set_stroke_color(ctx, PBL_IF_COLOR_ELSE(GColorOrange, GColorWhite));
+    graphics_context_set_stroke_width(ctx, 3);
+    for (int side = -1; side <= 1; side += 2) {
+      graphics_draw_line(ctx, GPoint(pivot.x + side * near, mid - 12), GPoint(pivot.x + side * far, mid - 24));
+      graphics_draw_line(ctx, GPoint(pivot.x + side * near, mid + 12), GPoint(pivot.x + side * far, mid + 24));
+    }
+  }
+
+  // Two short lines on a round screen, where one long one would be cut off at both ends
+  bool can_snooze = smart_alarm_get_settings()->snooze_minutes != 0;
+  const char *hint = can_snooze ? PBL_IF_ROUND_ELSE("SEL stop\nUP/DOWN snooze", "SEL stop  UP/DOWN snooze")
+                                : "Press to stop";
+  int16_t hint_h = PBL_IF_ROUND_ELSE(can_snooze ? 34 : 18, 18);
+  graphics_context_set_text_color(ctx, GColorWhite);
+  graphics_draw_text(ctx, hint, fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD),
+                     GRect(0, bounds.size.h - hint_h - PBL_IF_ROUND_ELSE(14, 4), bounds.size.w, hint_h),
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+}
+
+static bool prv_handle_alarm_press(bool snooze);
+
+// Touch screens (Pebble Time 2): a tap snoozes, like Up and Down; elsewhere this is never called
+static void prv_bell_touch_handler(const TouchEvent *event, void *context) {
+  if (event->type == TouchEvent_Touchdown) {
+    prv_handle_alarm_press(true);
+  }
+}
+
+static void prv_bell_hide(void) {
+  s_bell_on = false;
+  touch_service_unsubscribe();
+  if (s_bell_timer) {
+    app_timer_cancel(s_bell_timer);
+    s_bell_timer = NULL;
+  }
+  layer_set_hidden(s_bell_layer, true);
+  light_enable(false); // back to the normal backlight behaviour
+}
+
+static void prv_bell_tick(void *context) {
+  s_bell_timer = NULL;
+  if (!smart_alarm_is_active()) { // stopped, snoozed or timed out
+    prv_bell_hide();
+    return;
+  }
+  s_bell_phase = (s_bell_phase + BELL_PHASE_STEP) % TRIG_MAX_ANGLE;
+  layer_mark_dirty(s_bell_layer);
+  s_bell_timer = app_timer_register(BELL_FRAME_MS, prv_bell_tick, NULL);
+}
+
+static void prv_bell_show(void) {
+  if (s_bell_on) return;
+  s_bell_on = true;
+  s_bell_phase = 0;
+  layer_set_hidden(s_bell_layer, false);
+  light_enable(true);
+  touch_service_subscribe(prv_bell_touch_handler, NULL); // only while ringing: the sensor costs power
+  s_bell_timer = app_timer_register(BELL_FRAME_MS, prv_bell_tick, NULL);
+}
+
+static void prv_bell_create(Layer *window_layer, GRect bounds) {
+  int16_t size = (bounds.size.w < bounds.size.h ? bounds.size.w : bounds.size.h) * 54 / 100;
+  // The path keeps pointing at these, so they must outlive this function
+  static GPoint s_scaled[ARRAY_LENGTH(s_bell_points)];
+  static GPathInfo s_info = { .num_points = ARRAY_LENGTH(s_bell_points), .points = s_scaled };
+  for (uint32_t i = 0; i < ARRAY_LENGTH(s_bell_points); i++) {
+    s_scaled[i] = GPoint(s_bell_points[i].x * size / BELL_UNITS, s_bell_points[i].y * size / BELL_UNITS);
+  }
+  s_bell_path = gpath_create(&s_info);
+  s_bell_clapper_len = BELL_CLAPPER_LEN * size / BELL_UNITS;
+  s_bell_clapper_r = BELL_CLAPPER_R * size / BELL_UNITS;
+  // Centre the bell and its clapper above the hint line
+  int16_t total = (BELL_CLAPPER_LEN + BELL_CLAPPER_R) * size / BELL_UNITS;
+  s_bell_pivot_y = (bounds.size.h - total - 20) / 2 + 10; // the beam sits just above
+  if (s_bell_pivot_y < 14) s_bell_pivot_y = 14;
+
+  s_bell_layer = layer_create(bounds);
+  layer_set_update_proc(s_bell_layer, prv_bell_update_proc);
+  layer_set_hidden(s_bell_layer, true);
+  layer_add_child(window_layer, s_bell_layer);
+}
+
+static void prv_bell_destroy(void) {
+  if (s_bell_on) prv_bell_hide();
+  layer_destroy(s_bell_layer);
+  gpath_destroy(s_bell_path);
+  s_bell_layer = NULL;
+  s_bell_path = NULL;
+}
+
+//! "Next alarm in 4h32m" under the alarm row: blank while the alarm is off or ringing
+static void prv_refresh_countdown(void) {
+  if (!s_countdown_layer) return;
+  SmartAlarmSettings *alarm = smart_alarm_get_settings();
+  time_t now = time(NULL);
+  int32_t mins = -1;
+  if (alarm->enabled && !smart_alarm_is_active()) {
+    if (alarm->snooze_until) {
+      mins = alarm->snooze_until > now ? (alarm->snooze_until - now + 59) / 60 : 0;
+    } else {
+      struct tm *t = localtime(&now);
+      mins = (alarm->target_hour * 60 + alarm->target_min - (t->tm_hour * 60 + t->tm_min) + 1440) % 1440;
+      if (mins == 0 && alarm->triggered) mins = 1440; // already rang this minute: the next one is tomorrow
+    }
+  }
+  if (mins < 0) {
+    s_countdown_buf[0] = '\0';
+  } else if (mins >= 60) {
+    snprintf(s_countdown_buf, sizeof(s_countdown_buf), "Next alarm in %ldh%02ldm", (long)(mins / 60), (long)(mins % 60));
+  } else {
+    snprintf(s_countdown_buf, sizeof(s_countdown_buf), "Next alarm in %ldm", (long)mins);
+  }
+  text_layer_set_text(s_countdown_layer, s_countdown_buf);
+}
+
 void ui_main_refresh_clock(void) {
+  prv_refresh_countdown();
 #if defined(PBL_PLATFORM_EMERY)
   if (!s_time_layer) return;
   time_t now = time(NULL);
@@ -154,25 +339,10 @@ void ui_main_update(const SleepSession *session) {
   }
   text_layer_set_text(s_duration_layer, s_duration_buf);
 
-  // 4. Sensors: Light & Mic
-  const SensorSettings *sensors = sleep_engine_get_sensors();
-  const char *sound_desc = "Quiet";
-  if (!sensors->mic) {
-    sound_desc = "Off";
-  } else if (session->current_sound > 70) {
-    sound_desc = "Loud";
-  } else if (session->current_sound > 40) {
-    sound_desc = "Mod";
-  }
-
-  snprintf(s_sensors_buf, sizeof(s_sensors_buf), "Light: %s  |  Mic: %s",
-           sensors->light ? sleep_engine_light_name(session->current_light) : "Off", sound_desc);
-  text_layer_set_text(s_sensors_layer, s_sensors_buf);
-
-  // 5. Smart Alarm bar
+  // 4. Smart Alarm bar
   if (is_ringing) {
     snprintf(s_alarm_buf, sizeof(s_alarm_buf),
-             alarm->snooze_minutes ? "SEL stop | DOWN snooze" : "Press button to stop");
+             alarm->snooze_minutes ? "SEL stop | UP/DOWN snooze" : "Press button to stop");
   } else if (alarm->snooze_until) {
     struct tm *until = localtime(&alarm->snooze_until);
     snprintf(s_alarm_buf, sizeof(s_alarm_buf), "Snoozed until %02d:%02d",
@@ -184,16 +354,23 @@ void ui_main_update(const SleepSession *session) {
     snprintf(s_alarm_buf, sizeof(s_alarm_buf), "Alarm: OFF (hold UP)");
   }
   text_layer_set_text(s_alarm_layer, s_alarm_buf);
+  prv_refresh_countdown();
 
   // Redraw hypnogram layer
   layer_mark_dirty(s_hypnogram_layer);
+
+  if (is_ringing) {
+    prv_bell_show();
+  } else if (s_bell_on) {
+    prv_bell_hide();
+  }
 }
 
 void ui_main_alarm_trigger(bool is_smart_wake) {
   ui_main_update(sleep_engine_get_session());
 }
 
-//! A button press while the alarm rings: Down snoozes (when enabled), everything else stops it.
+//! A button press while the alarm rings: Up and Down snooze (when enabled), Select stops it.
 //! Returns true if the press was used up by the alarm.
 static bool prv_handle_alarm_press(bool snooze) {
   if (!smart_alarm_is_active()) {
@@ -208,15 +385,21 @@ static bool prv_handle_alarm_press(bool snooze) {
 }
 
 // Changing anything needs a deliberate hold, so a stray press while asleep does nothing. The one
-// exception is a ringing alarm: any press stops it (Down snoozes), as it must be easy half asleep.
+// exception is a ringing alarm: any press stops it (Up and Down snooze), as it must be easy half asleep.
 #define HOLD_MS 800
 
 static void prv_confirm_buzz(void) {
   vibes_short_pulse(); // tells a half-asleep wearer the hold was taken
 }
 
+// A tap refreshes: the screen from the watch's own state, and the phone's side (alarm, history)
 static void prv_select_click_handler(ClickRecognizerRef recognizer, void *context) {
-  prv_handle_alarm_press(false);
+  if (prv_handle_alarm_press(false)) {
+    return;
+  }
+  ui_main_update(sleep_engine_get_session());
+  ui_main_refresh_clock();
+  comm_request_refresh();
 }
 
 static void prv_select_long_click_handler(ClickRecognizerRef recognizer, void *context) {
@@ -238,11 +421,11 @@ static void prv_select_double_click_handler(ClickRecognizerRef recognizer, void 
 }
 
 static void prv_up_click_handler(ClickRecognizerRef recognizer, void *context) {
-  prv_handle_alarm_press(false);
+  prv_handle_alarm_press(true);
 }
 
 static void prv_up_long_click_handler(ClickRecognizerRef recognizer, void *context) {
-  if (prv_handle_alarm_press(false)) {
+  if (prv_handle_alarm_press(true)) {
     return;
   }
   prv_confirm_buzz();
@@ -328,20 +511,7 @@ static void prv_window_load(Window *window) {
   layer_add_child(window_layer, text_layer_get_layer(s_duration_layer));
   y += 22;
 
-  // 5. Sensors Info Layer (Light & Mic)
-  s_sensors_layer = text_layer_create(GRect(4, y, w - 8, 18));
-  text_layer_set_font(s_sensors_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
-  text_layer_set_text_alignment(s_sensors_layer, GTextAlignmentCenter);
-  text_layer_set_background_color(s_sensors_layer, GColorClear);
-#if defined(PBL_COLOR)
-  text_layer_set_text_color(s_sensors_layer, GColorCeleste);
-#else
-  text_layer_set_text_color(s_sensors_layer, GColorBlack);
-#endif
-  layer_add_child(window_layer, text_layer_get_layer(s_sensors_layer));
-  y += 20;
-
-  // 6. Smart Alarm Bottom Status Layer
+  // 5. Smart Alarm Bottom Status Layer
   s_alarm_layer = text_layer_create(GRect(4, y, w - 8, 18));
   text_layer_set_font(s_alarm_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD));
   text_layer_set_text_alignment(s_alarm_layer, GTextAlignmentCenter);
@@ -352,12 +522,21 @@ static void prv_window_load(Window *window) {
   text_layer_set_text_color(s_alarm_layer, GColorBlack);
 #endif
   layer_add_child(window_layer, text_layer_get_layer(s_alarm_layer));
+  y += 17;
+
+  // 5b. Time until the alarm
+  s_countdown_layer = text_layer_create(GRect(4, y, w - 8, 22));
+  text_layer_set_font(s_countdown_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
+  text_layer_set_text_alignment(s_countdown_layer, GTextAlignmentCenter);
+  text_layer_set_background_color(s_countdown_layer, GColorClear);
+  text_layer_set_text_color(s_countdown_layer, PBL_IF_COLOR_ELSE(GColorWhite, GColorBlack));
+  layer_add_child(window_layer, text_layer_get_layer(s_countdown_layer));
 
 #if defined(PBL_PLATFORM_EMERY)
-  // 7. Date and time under the alarm row
+  // 6. Date and time under the alarm row
   // Largest digits that fit: the time takes all the height left under the alarm row
   // (the digit glyphs sit low in their frame, so the frame can overlap the alarm row)
-  y += 12;
+  y += 14; // the countdown row above takes 17 of the 31 px between the alarm row and the digits
   s_time_layer = text_layer_create(GRect(0, y, w, 62));
   text_layer_set_font(s_time_layer, fonts_get_system_font(FONT_KEY_LECO_60_BOLD_NUMBERS_AM_PM));
   text_layer_set_text_alignment(s_time_layer, GTextAlignmentCenter);
@@ -367,12 +546,15 @@ static void prv_window_load(Window *window) {
   y += 62;
 
   s_date_layer = text_layer_create(GRect(4, y, w - 8, bounds.size.h - y));
-  text_layer_set_font(s_date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14));
+  text_layer_set_font(s_date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
   text_layer_set_text_alignment(s_date_layer, GTextAlignmentCenter);
   text_layer_set_background_color(s_date_layer, GColorClear);
-  text_layer_set_text_color(s_date_layer, GColorLightGray);
+  text_layer_set_text_color(s_date_layer, GColorWhite);
   layer_add_child(window_layer, text_layer_get_layer(s_date_layer));
 #endif
+
+  // Covers everything else while the alarm rings, so it goes on last
+  prv_bell_create(window_layer, bounds);
 
   // Initial render
   ui_main_update(sleep_engine_get_session());
@@ -380,11 +562,13 @@ static void prv_window_load(Window *window) {
 }
 
 static void prv_window_unload(Window *window) {
+  prv_bell_destroy();
   text_layer_destroy(s_header_layer);
   text_layer_destroy(s_stage_layer);
   text_layer_destroy(s_duration_layer);
-  text_layer_destroy(s_sensors_layer);
   text_layer_destroy(s_alarm_layer);
+  text_layer_destroy(s_countdown_layer);
+  s_countdown_layer = NULL;
   layer_destroy(s_hypnogram_layer);
 #if defined(PBL_PLATFORM_EMERY)
   text_layer_destroy(s_time_layer);

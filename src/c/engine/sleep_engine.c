@@ -228,10 +228,15 @@ static uint32_t prv_isqrt(uint32_t n) {
 #define WAKEUP_DELAY_SEC (5 * 60)
 #define WAKEUP_COOKIE 1
 
+static WakeupId s_wakeup_id = -1;
+
 static void prv_schedule_wakeup(void) {
-  wakeup_cancel_all();
+  if (s_wakeup_id >= 0) {
+    wakeup_cancel(s_wakeup_id); // only ours: the alarm has its own wakeup
+    s_wakeup_id = -1;
+  }
   if (s_session.is_tracking) {
-    wakeup_schedule(time(NULL) + WAKEUP_DELAY_SEC, WAKEUP_COOKIE, false);
+    s_wakeup_id = wakeup_schedule(time(NULL) + WAKEUP_DELAY_SEC, WAKEUP_COOKIE, false);
   }
 }
 
@@ -329,12 +334,17 @@ static void prv_process_minute(void) {
 
 static void prv_minute_tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   prv_process_minute();
+  if (!s_session.is_tracking) {
+    smart_alarm_evaluate(SLEEP_STAGE_AWAKE); // tracking does this itself; the alarm rings either way
+  }
+  smart_alarm_sync_wakeup();
   if (s_minute_cb) {
     s_minute_cb();
   }
 }
 
 void sleep_engine_init(void) {
+  wakeup_cancel_all(); // anything left from an earlier run; the ones still needed are scheduled again below
   if (persist_exists(PERSIST_KEY_SENSORS)) {
     persist_read_data(PERSIST_KEY_SENSORS, &s_sensors, sizeof(s_sensors));
   }
@@ -455,9 +465,11 @@ void sleep_engine_set_update_callback(SleepEngineUpdateCallback callback) {
 }
 
 void sleep_engine_add_snooze(uint32_t seconds) {
-  s_session.snooze_count++;
-  s_session.snooze_sec += seconds;
-  prv_save_session();
+  if (s_session.is_tracking) { // an alarm snoozed outside a session isn't part of any night
+    s_session.snooze_count++;
+    s_session.snooze_sec += seconds;
+    prv_save_session();
+  }
   if (s_update_cb) {
     s_update_cb(&s_session);
   }

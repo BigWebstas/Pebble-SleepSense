@@ -33,6 +33,13 @@ function save(sessions) {
   }
 }
 
+// Drops finished sessions by start time (deleted in the Android app); the open one is never touched.
+function removeSessions(starts) {
+  var sessions = load();
+  var kept = sessions.filter(function (s) { return !(s.end && starts.indexOf(s.start) !== -1); });
+  if (kept.length !== sessions.length) save(kept);
+}
+
 // Called for every watch status message. Opens a session when tracking starts,
 // appends at most one sample a minute, and closes the session when it stops.
 function record(tracking, d, now) {
@@ -154,6 +161,7 @@ function setLastExport(ts) {
 
 module.exports = {
   record: record,
+  removeSessions: removeSessions,
   getBucketedSessions: getBucketedSessions,
   openSessionStart: openSessionStart,
   getLastExport: getLastExport,

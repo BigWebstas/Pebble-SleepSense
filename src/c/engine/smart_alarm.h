@@ -10,6 +10,10 @@ void smart_alarm_init(void);
 //! Tear down smart alarm module
 void smart_alarm_deinit(void);
 
+//! Makes sure the watch will launch the app for the next alarm even if it is closed by then.
+//! Cheap to call often; only touches the wakeup when the time it should fire has changed.
+void smart_alarm_sync_wakeup(void);
+
 //! Get reference to alarm settings
 SmartAlarmSettings *smart_alarm_get_settings(void);
 

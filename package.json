@@ -56,7 +56,8 @@
       "STATUS_ALARM_STATE",
       "COMMAND_START_TRACKING",
       "COMMAND_STOP_TRACKING",
-      "STATUS_VMC"
+      "STATUS_VMC",
+      "REFRESH_REQUEST"
     ],
     "resources": {
       "media": [

@@ -157,6 +157,15 @@ function listenForCommands() {
 // watch is told the new time (or to turn the smart alarm off when the phone has no alarm).
 function syncPhoneAlarm() {
   phoneAlarm.fetchPhoneAlarm(function(a) {
+    if (a && a.snooze !== undefined && a.snooze !== parseInt(localStorage.getItem("snooze_min"), 10)) {
+      // A snooze length chosen in the Android app wins over the watch's
+      sendToWatch({ SNOOZE_MINUTES: a.snooze }, function() {
+        localStorage.setItem("snooze_min", a.snooze);
+      }, function(err) {
+        console.log("SleepSense PKJS: Could not send snooze length: " + JSON.stringify(err));
+      });
+    }
+    if (a && a.deleted) sleepHistory.removeSessions(a.deleted);
     if (!a || !a.sync) return;
     var key = a.enabled ? (a.hour + ":" + a.min) : "none";
     // The Android app counts every alarm change, so even a quick off/on (or re-enabling at the
@@ -227,6 +236,12 @@ Pebble.addEventListener("ready", function(e) {
 Pebble.addEventListener("appmessage", function(e) {
   var dict = e.payload;
   console.log("SleepSense PKJS: Received message: " + JSON.stringify(dict));
+
+  // A tap on Select on the watch: sync everything with the phone now
+  if (dict.REFRESH_REQUEST !== undefined) {
+    syncPhoneAlarm();
+    pushHistory(true);
+  }
 
   if (dict.TRACKING_ACTIVE !== undefined) {
     sleepHistory.record(dict.TRACKING_ACTIVE === 1, dict, Date.now());

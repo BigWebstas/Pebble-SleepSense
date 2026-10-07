@@ -79,6 +79,8 @@ static void prv_inbox_received(DictionaryIterator *iter, void *context) {
     SmartAlarmSettings *settings = smart_alarm_get_settings();
     settings->enabled = (smart_en->value->uint8 != 0);
   }
+
+  smart_alarm_sync_wakeup(); // the alarm may have changed, and the app may be closed before the next minute
 }
 
 static void prv_inbox_dropped(AppMessageResult reason, void *context) {
@@ -107,6 +109,15 @@ void comm_deinit(void) {
     s_dictation_session = NULL;
   }
 #endif
+}
+
+void comm_request_refresh(void) {
+  DictionaryIterator *out_iter;
+  if (app_message_outbox_begin(&out_iter) != APP_MSG_OK || !out_iter) {
+    return;
+  }
+  dict_write_uint8(out_iter, MESSAGE_KEY_REFRESH_REQUEST, 1);
+  app_message_outbox_send();
 }
 
 void comm_send_session_update(const SleepSession *session) {
