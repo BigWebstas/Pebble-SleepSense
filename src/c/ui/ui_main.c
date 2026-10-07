@@ -98,10 +98,10 @@ static void prv_hypnogram_update_proc(Layer *layer, GContext *ctx) {
   }
 }
 
-// --- Ringing alarm: a tower bell swinging in its frame, with the backlight held on ---
+// --- Ringing alarm: a bell swinging from a beam, with the backlight held on ---
 
-#define BELL_FRAME_MS 40
-#define BELL_PHASE_STEP (TRIG_MAX_ANGLE / 15)   // one swing every 600 ms
+#define BELL_FRAME_MS 33
+#define BELL_PHASE_STEP (TRIG_MAX_ANGLE * BELL_FRAME_MS / 600)   // one swing every 600 ms
 #define BELL_SWING (TRIG_MAX_ANGLE * 28 / 360)  // 28 degrees either way
 #define BELL_UNITS 110                          // the bell below is drawn on a 110-unit-tall grid
 #define BELL_CLAPPER_LEN 108
@@ -127,11 +127,7 @@ static void prv_bell_update_proc(Layer *layer, GContext *ctx) {
 
   GPoint pivot = GPoint(bounds.size.w / 2, s_bell_pivot_y);
 
-  // The tower: two stone posts and the timber beam the bell hangs from
-  int16_t post = bounds.size.w / 24 + 2;
-  graphics_context_set_fill_color(ctx, PBL_IF_COLOR_ELSE(GColorDarkGray, GColorWhite));
-  graphics_fill_rect(ctx, GRect(0, pivot.y - 10, post, bounds.size.h - pivot.y + 10), 0, GCornerNone);
-  graphics_fill_rect(ctx, GRect(bounds.size.w - post, pivot.y - 10, post, bounds.size.h - pivot.y + 10), 0, GCornerNone);
+  // The timber beam the bell hangs from
   graphics_context_set_fill_color(ctx, PBL_IF_COLOR_ELSE(GColorWindsorTan, GColorWhite));
   graphics_fill_rect(ctx, GRect(0, pivot.y - 10, bounds.size.w, 10), 0, GCornerNone);
 
@@ -141,7 +137,7 @@ static void prv_bell_update_proc(Layer *layer, GContext *ctx) {
   graphics_context_set_fill_color(ctx, PBL_IF_COLOR_ELSE(GColorYellow, GColorWhite));
   gpath_draw_filled(ctx, s_bell_path);
   graphics_context_set_stroke_color(ctx, PBL_IF_COLOR_ELSE(GColorChromeYellow, GColorBlack));
-  graphics_context_set_stroke_width(ctx, 2);
+  graphics_context_set_stroke_width(ctx, 1); // thicker strokes are much slower to draw
   gpath_draw_outline(ctx, s_bell_path);
   graphics_context_set_fill_color(ctx, PBL_IF_COLOR_ELSE(GColorDarkGray, GColorWhite));
   graphics_fill_circle(ctx, pivot, 5); // the axle
@@ -230,10 +226,8 @@ static void prv_bell_create(Layer *window_layer, GRect bounds) {
   s_bell_path = gpath_create(&s_info);
   s_bell_clapper_len = BELL_CLAPPER_LEN * size / BELL_UNITS;
   s_bell_clapper_r = BELL_CLAPPER_R * size / BELL_UNITS;
-  // Centre the bell and its clapper above the hint line
-  int16_t total = (BELL_CLAPPER_LEN + BELL_CLAPPER_R) * size / BELL_UNITS;
-  s_bell_pivot_y = (bounds.size.h - total - 20) / 2 + 10; // the beam sits just above
-  if (s_bell_pivot_y < 14) s_bell_pivot_y = 14;
+  // Hung from the top of the screen, under the beam
+  s_bell_pivot_y = PBL_IF_ROUND_ELSE(16, 12);
 
   s_bell_layer = layer_create(bounds);
   layer_set_update_proc(s_bell_layer, prv_bell_update_proc);

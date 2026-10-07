@@ -3,16 +3,19 @@
 
 #define PERSIST_KEY_ALARM 100
 #define ALARM_REPEAT_TIMER_MS 2500
-#define ALARM_SOUND_RAMP_SEC (5 * 60) // the speaker starts at 1% and reaches 100% after this
+#define ALARM_SOUND_DELAY_SEC 30      // the speaker stays silent for this long (the vibration wakes first)...
+#define ALARM_SOUND_RAMP_SEC (5 * 60) // ...then goes from 0% to 100% over this
 #ifdef _PBL_API_EXISTS_speaker_play_notes
 #define HAS_SPEAKER 1
-#define ALARM_TIMEOUT_SEC (ALARM_SOUND_RAMP_SEC + 60) // a minute at full volume, then give up
+#define ALARM_TIMEOUT_SEC (ALARM_SOUND_DELAY_SEC + ALARM_SOUND_RAMP_SEC + 60) // a minute at full volume, then give up
 #else
 #define ALARM_TIMEOUT_SEC 180
 #endif
 #define DEFAULT_SNOOZE_MIN 9
 #define ALARM_WAKEUP_COOKIE 2
 #define ALARM_WAKEUP_LEAD_SEC 60 // launches the app a minute early, so it is up for the minute tick on the alarm time
+#define ALARM_CATCH_UP_SEC 180   // an alarm missed by up to this long still rings when the app comes back
+#define ALARM_RELAUNCH_SEC 20    // ...which is when the app is relaunched, if something pushed it aside at the alarm time
 
 static SmartAlarmSettings s_settings;
 static AppTimer *s_vibe_timer = NULL;
@@ -62,25 +65,57 @@ static void prv_load_settings(void) {
 }
 
 #ifdef HAS_SPEAKER
-//! Three short beeps, repeated with the vibration; each repeat is a little louder than the last
-static const SpeakerNote s_beeps[] = {
+#define ALARM_SOUND_REPEAT_MS 2500
+
+//! Three short beeps; after the silent start each repeat is a little louder than the last
+static const SpeakerNote s_chime[] = {
   { .midi_note = 84, .waveform = SpeakerWaveformSine, .duration_ms = 150 },
   { .midi_note = 0, .duration_ms = 100 },
   { .midi_note = 84, .waveform = SpeakerWaveformSine, .duration_ms = 150 },
   { .midi_note = 0, .duration_ms = 100 },
   { .midi_note = 84, .waveform = SpeakerWaveformSine, .duration_ms = 150 },
 };
-#endif
+static AppTimer *s_sound_timer = NULL;
 
-static void prv_play_alarm_sound(void) {
-#ifdef HAS_SPEAKER
+static void prv_sound_timer_handler(void *context) {
+  s_sound_timer = NULL;
+  if (!s_is_ringing) {
+    return;
+  }
+  s_sound_timer = app_timer_register(ALARM_SOUND_REPEAT_MS, prv_sound_timer_handler, NULL);
   if (speaker_is_muted()) {
     return;
   }
-  time_t elapsed = time(NULL) - s_ringing_start;
+  time_t elapsed = time(NULL) - s_ringing_start - ALARM_SOUND_DELAY_SEC;
+  if (elapsed < 0) {
+    return;
+  }
   if (elapsed > ALARM_SOUND_RAMP_SEC) elapsed = ALARM_SOUND_RAMP_SEC;
-  uint8_t volume = 1 + (99 * elapsed) / ALARM_SOUND_RAMP_SEC;
-  speaker_play_notes(s_beeps, ARRAY_LENGTH(s_beeps), volume);
+  uint8_t volume = (100 * elapsed) / ALARM_SOUND_RAMP_SEC;
+  if (volume > 0) { // 0% is silent: nothing to play yet
+    speaker_play_notes(s_chime, ARRAY_LENGTH(s_chime), volume);
+  }
+}
+#endif
+
+static void prv_start_alarm_sound(void) {
+#ifdef HAS_SPEAKER
+  if (s_sound_timer) {
+    app_timer_cancel(s_sound_timer);
+  }
+  // Half a period after the vibration, so the two take turns instead of overlapping (the vibration
+  // takes 1.1 s of every 2.5 s, the chime 0.65 s)
+  s_sound_timer = app_timer_register(ALARM_SOUND_REPEAT_MS / 2, prv_sound_timer_handler, NULL);
+#endif
+}
+
+static void prv_stop_alarm_sound(void) {
+#ifdef HAS_SPEAKER
+  if (s_sound_timer) {
+    app_timer_cancel(s_sound_timer);
+    s_sound_timer = NULL;
+  }
+  speaker_stop();
 #endif
 }
 
@@ -99,7 +134,6 @@ static void prv_vibe_timer_handler(void *context) {
 
   // Issue pulse
   vibes_enqueue_custom_pattern(s_gentle_vibes);
-  prv_play_alarm_sound();
 
   // Schedule next pulse
   s_vibe_timer = app_timer_register(ALARM_REPEAT_TIMER_MS, prv_vibe_timer_handler, NULL);
@@ -117,7 +151,7 @@ static void prv_start_ringing(bool is_smart_wake) {
   } else {
     vibes_enqueue_custom_pattern(s_hard_vibes);
   }
-  prv_play_alarm_sound();
+  prv_start_alarm_sound();
 
   if (s_trigger_cb) {
     s_trigger_cb(is_smart_wake);
@@ -129,14 +163,8 @@ static void prv_start_ringing(bool is_smart_wake) {
   s_vibe_timer = app_timer_register(ALARM_REPEAT_TIMER_MS, prv_vibe_timer_handler, NULL);
 }
 
-//! When the app has to be running to ring the alarm: its time, or the end of a snooze (0 = never)
-static time_t prv_next_ring_time(time_t now) {
-  if (!s_settings.enabled) {
-    return 0;
-  }
-  if (s_settings.snooze_until) {
-    return s_settings.snooze_until;
-  }
+//! The alarm time today as a timestamp (it may be earlier than now), or 0 if the time can't be read
+static time_t prv_alarm_time_today(time_t now) {
   struct tm *t = localtime(&now);
   if (!t) {
     return 0;
@@ -144,14 +172,42 @@ static time_t prv_next_ring_time(time_t now) {
   t->tm_hour = s_settings.target_hour;
   t->tm_min = s_settings.target_min;
   t->tm_sec = 0;
-  time_t at = mktime(t);
-  return at > now ? at : at + 24 * 3600;
+  return mktime(t);
+}
+
+//! The alarm hasn't rung for this alarm time yet
+static bool prv_not_rung_since(time_t at) {
+  return !(s_settings.triggered && s_settings.trigger_time >= at);
+}
+
+//! When the app has to be running to ring the alarm: its time, or the end of a snooze (0 = never).
+//! A time just passed still counts if the app was waiting for it and it hasn't rung: something
+//! else (another app's alarm at the same moment) can push the app aside right at the alarm time.
+static time_t prv_next_ring_time(time_t now) {
+  if (!s_settings.enabled) {
+    return 0;
+  }
+  if (s_settings.snooze_until) {
+    return s_settings.snooze_until;
+  }
+  time_t at = prv_alarm_time_today(now);
+  if (!at) {
+    return 0;
+  }
+  if (at > now) {
+    return at;
+  }
+  if (at == s_wakeup_for && now - at <= ALARM_CATCH_UP_SEC && prv_not_rung_since(at)) {
+    return at;
+  }
+  return at + 24 * 3600;
 }
 
 void smart_alarm_sync_wakeup(void) {
   time_t now = time(NULL);
   time_t ring = s_is_ringing ? 0 : prv_next_ring_time(now);
-  if (ring == s_wakeup_for) {
+  bool missed = ring && ring <= now; // the app is about to be left without having rung
+  if (ring == s_wakeup_for && !missed) {
     return;
   }
   if (s_wakeup_id >= 0) {
@@ -160,6 +216,17 @@ void smart_alarm_sync_wakeup(void) {
   }
   s_wakeup_for = ring;
   if (!ring) {
+    return;
+  }
+  if (missed) {
+    // Soon, and a minute later each time one is refused, while it can still be caught up
+    for (int wait = ALARM_RELAUNCH_SEC; ring + ALARM_CATCH_UP_SEC > now + wait; wait += ALARM_WAKEUP_LEAD_SEC) {
+      s_wakeup_id = wakeup_schedule(now + wait, ALARM_WAKEUP_COOKIE, false);
+      APP_LOG(APP_LOG_LEVEL_INFO, "Alarm missed, relaunch wakeup in %d s: %d", wait, (int)s_wakeup_id);
+      if (s_wakeup_id >= 0) {
+        return;
+      }
+    }
     return;
   }
   // Wakeups can't sit within a minute of each other (another app's alarm may be at this very
@@ -174,8 +241,32 @@ void smart_alarm_sync_wakeup(void) {
   }
 }
 
+//! Launched by a wakeup: if the alarm time (or the end of a snooze) has just passed without the
+//! alarm ringing, because the app was pushed aside, ring now.
+static void prv_catch_up(time_t now) {
+  if (!s_settings.enabled) {
+    return;
+  }
+  if (s_settings.snooze_until) {
+    if (now >= s_settings.snooze_until && now - s_settings.snooze_until <= ALARM_CATCH_UP_SEC) {
+      s_settings.snooze_until = 0;
+      APP_LOG(APP_LOG_LEVEL_INFO, "Snooze ended while away, ringing now");
+      prv_start_ringing(false);
+    }
+    return;
+  }
+  time_t at = prv_alarm_time_today(now);
+  if (at && at <= now && now - at <= ALARM_CATCH_UP_SEC && prv_not_rung_since(at)) {
+    APP_LOG(APP_LOG_LEVEL_INFO, "Alarm time passed while away, ringing now");
+    prv_start_ringing(false);
+  }
+}
+
 void smart_alarm_init(void) {
   prv_load_settings();
+  if (launch_reason() == APP_LAUNCH_WAKEUP) {
+    prv_catch_up(time(NULL));
+  }
   smart_alarm_sync_wakeup();
 }
 
@@ -185,6 +276,7 @@ void smart_alarm_deinit(void) {
     s_vibe_timer = NULL;
   }
   s_is_ringing = false;
+  prv_stop_alarm_sound();
   prv_save_settings();
   smart_alarm_sync_wakeup(); // the app is closing: make sure the watch brings it back for the alarm
 }
@@ -287,9 +379,7 @@ void smart_alarm_dismiss(void) {
       s_vibe_timer = NULL;
     }
     vibes_cancel();
-#ifdef HAS_SPEAKER
-    speaker_stop();
-#endif
+    prv_stop_alarm_sound();
     APP_LOG(APP_LOG_LEVEL_INFO, "Alarm dismissed by user");
     smart_alarm_sync_wakeup(); // for the next alarm, or the end of a snooze
   }
