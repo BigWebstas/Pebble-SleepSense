@@ -16,7 +16,7 @@ The watch app works on its own. Everything marked *(Android app)* needs the comp
   <tr>
     <td align="center"><img src="docs/screenshots/watch-idle.png" width="200" alt="Idle: hold Select to start"><br><sub>Idle</sub></td>
     <td align="center"><img src="docs/screenshots/watch-tracking.png" width="200" alt="Tracking sleep"><br><sub>Tracking</sub></td>
-    <td align="center"><img src="docs/screenshots/watch-alarm.png" width="200" alt="Alarm ringing: select stops, down snoozes"><br><sub>Alarm ringing</sub></td>
+    <td align="center"><img src="docs/screenshots/watch-alarm.png" width="200" alt="Alarm ringing: select stops, up or down snoozes"><br><sub>Alarm ringing</sub></td>
   </tr>
 </table>
 
@@ -62,12 +62,12 @@ The sleep data in these screenshots is sample data, not a real night.
 
 ### Watch controls
 
-Changes need a deliberate **hold** (about a second; the watch buzzes once to confirm), so a stray press while you sleep does nothing. A ringing alarm is the exception: any press stops it, and Down snoozes it.
+Changes need a deliberate **hold** (about a second; the watch buzzes once to confirm), so a stray press while you sleep does nothing. A ringing alarm is the exception: any press stops it, and Up or Down snoozes it.
 
 | Button | Hold | Press / double-press | While the alarm rings |
 | :--- | :--- | :--- | :--- |
-| **SELECT** | Start / stop sleep tracking | Double-press: voice dream journal | Press: stop the alarm |
-| **UP** | Turn the smart alarm on / off | Nothing | Press: stop the alarm |
+| **SELECT** | Start / stop sleep tracking | Press: refresh from the phone. Double-press: voice dream journal | Press: stop the alarm |
+| **UP** | Turn the smart alarm on / off | Nothing | Press: snooze (when enabled) |
 | **DOWN** | Cycle the smart wake window (15 → 30 → 45 min) | Nothing | Press: snooze (when enabled) |
 
 ### Settings and history (phone)
@@ -105,6 +105,7 @@ Laid out like the other Pebble companion apps: logo, status, buttons, then setti
 - **Noise tracking and clips** (opt-in, uses the microphone): while the watch is tracking, the phone listens and keeps a running average of the room level (this is also the noise reading shown on the watch). If the level stays at least **15 dB above that average and above 45 dB** for 2 seconds, it saves a **30-second WAV clip** (5 seconds before the spike, 25 after), at most one every 30 seconds, keeping the 30 newest. The **Noise clips** screen lists them by capture date and time, with peak level, and lets you play, share or delete each one. Levels are approximate dB: phone microphones are not calibrated. Place the phone near the bed.
 - **Sleep history and export**: the same graphs, stats and export as the settings page (they share one piece of code, `src/pkjs/lib/report-core.js`). Export has **Copy**, **Share** (Android share sheet, as text) and **Save as .md file**. The history is sent from the watchapp's code whenever SleepSense is open on the watch, so open it after a night to refresh the screen.
 - **Health Connect** *(experimental)*: writes finished sleep sessions (with stages) and heart rate to Health Connect when you stop tracking. It depends on the Pebble app delivering watch messages straight to this app, which has not been confirmed to work; use the history export if you need your data out.
+- **Home Assistant (MQTT)** *(experimental)*: the **Home Assistant (MQTT)** screen takes your broker's host, port and optional login. SleepSense then publishes `sleepsense/tracking`, `sleepsense/stage` and `sleepsense/heart_rate` (retained), plus Home Assistant discovery messages, so a *Sleep tracking* switch and *Sleep stage* and *Heart rate* sensors appear by themselves. The switch starts and stops tracking (`sleepsense/tracking/set`). Port 8883 uses TLS. It shares the Health Connect limit: values only arrive when the Pebble app delivers watch messages to this app.
 - Follows the system **dark / light** theme.
 
 ### Permissions
