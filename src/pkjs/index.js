@@ -152,6 +152,49 @@ function listenForCommands() {
   });
 }
 
+// ---- Pebble timeline: a pin for the next alarm ----
+// A local pin (made by the phone's Pebble app, no account needed) shows the alarm in the watch's
+// timeline. It is kept in step with the alarm settings whenever the watchapp is open.
+var ALARM_PIN_ID = "sleepsense-alarm";
+var shownAlarmPin = null;
+
+function updateAlarmPin() {
+  if (typeof Pebble.insertTimelinePin !== "function") return;
+  var hour = parseInt(localStorage.getItem("alarm_hour"), 10);
+  var min = parseInt(localStorage.getItem("alarm_min"), 10);
+  var on = localStorage.getItem("alarm_en") !== "false" && !isNaN(hour) && !isNaN(min);
+  var pin = null;
+  if (on) {
+    var at = new Date();
+    at.setHours(hour, min, 0, 0);
+    if (at.getTime() <= Date.now()) at.setDate(at.getDate() + 1); // today's has passed: the next is tomorrow's
+    var win = parseInt(localStorage.getItem("smart_win"), 10);
+    pin = {
+      id: ALARM_PIN_ID,
+      time: at.toISOString(),
+      layout: {
+        type: "genericPin",
+        title: "Wake-up alarm",
+        subtitle: win ? "Smart wake up to " + win + " min early" : "SleepSense",
+        tinyIcon: "system://images/ALARM_CLOCK"
+      }
+    };
+  }
+  var key = pin ? pin.time + "/" + pin.layout.subtitle : "none";
+  if (key === shownAlarmPin) return;
+  try {
+    if (pin) {
+      Pebble.insertTimelinePin(pin);
+    } else {
+      Pebble.deleteTimelinePin(ALARM_PIN_ID);
+    }
+    shownAlarmPin = key;
+    console.log("SleepSense PKJS: Timeline alarm pin " + key);
+  } catch (err) {
+    console.log("SleepSense PKJS: Could not update the timeline pin: " + err);
+  }
+}
+
 // ---- Phone alarm sync (needs the SleepSense Android companion app) ----
 // The phone drives: when its next alarm changes, or the watch shows a different time, the
 // watch is told the new time (or to turn the smart alarm off when the phone has no alarm).
@@ -196,6 +239,7 @@ function syncPhoneAlarm() {
         localStorage.setItem("alarm_hour", a.hour);
         localStorage.setItem("alarm_min", a.min);
       }
+      updateAlarmPin();
     }, function(err) {
       console.log("SleepSense PKJS: Could not send phone alarm: " + JSON.stringify(err));
     });
@@ -226,6 +270,7 @@ Pebble.addEventListener("ready", function(e) {
     dict.SMART_WINDOW_MIN = savedSmartWin ? parseInt(savedSmartWin, 10) : 30;
     dict.SMART_ALARM_ENABLED = (savedAlarmEn === "false") ? 0 : 1;
   }
+  updateAlarmPin();
   sendToWatch(dict, function() {
     console.log("SleepSense PKJS: Restored saved settings to watch");
   }, function(err) {
@@ -264,6 +309,7 @@ Pebble.addEventListener("appmessage", function(e) {
     localStorage.setItem("smart_win", dict.SMART_WINDOW_MIN);
     localStorage.setItem("alarm_en", dict.SMART_ALARM_ENABLED !== 0);
     localStorage.setItem("snooze_min", dict.SNOOZE_MINUTES);
+    updateAlarmPin();
   }
 
   if (dict.STATUS_STATE !== undefined) {
