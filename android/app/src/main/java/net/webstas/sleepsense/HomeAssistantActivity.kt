@@ -8,7 +8,10 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.Switch
 import android.widget.TextView
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.activity.ComponentActivity
+import androidx.activity.result.contract.ActivityResultContracts
 
 /** Where the MQTT broker for Home Assistant is set up. */
 class HomeAssistantActivity : ComponentActivity() {
@@ -19,6 +22,16 @@ class HomeAssistantActivity : ComponentActivity() {
             handler.postDelayed(this, 2000)
         }
     }
+
+    // Android 17 only lets an app reach other devices on the home network once this is granted
+    private val requestLocalNetwork =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+            HomeAssistant.start(this)
+            refreshStatus()
+        }
+
+    private fun localNetworkGranted() =
+        checkSelfPermission(Manifest.permission.ACCESS_LOCAL_NETWORK) == PackageManager.PERMISSION_GRANTED
 
     private fun <T : android.view.View> id(res: Int): T = findViewById(res)
 
@@ -47,6 +60,9 @@ class HomeAssistantActivity : ComponentActivity() {
                 password = id<EditText>(R.id.ha_password).text.toString(),
             ).save(this)
             HomeAssistant.start(this)
+            if (id<Switch>(R.id.ha_enable).isChecked && !localNetworkGranted()) {
+                requestLocalNetwork.launch(Manifest.permission.ACCESS_LOCAL_NETWORK)
+            }
             refreshStatus()
         }
     }
@@ -62,12 +78,6 @@ class HomeAssistantActivity : ComponentActivity() {
     }
 
     private fun refreshStatus() {
-        id<TextView>(R.id.ha_status).setText(
-            when {
-                !MqttSettings.load(this).enabled -> R.string.ha_off
-                HomeAssistant.connected -> R.string.ha_connected
-                else -> R.string.ha_disconnected
-            },
-        )
+        id<TextView>(R.id.ha_status).setText(HomeAssistant.statusText(this))
     }
 }

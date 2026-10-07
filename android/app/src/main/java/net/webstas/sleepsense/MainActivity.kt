@@ -144,6 +144,7 @@ class MainActivity : ComponentActivity() {
             setIcon(if (tracking) R.drawable.ic_stop else R.drawable.ic_play_arrow)
         }
         refreshAlarmSettings()
+        id<TextView>(R.id.home_assistant_status_text).setText(HomeAssistant.statusText(this))
     }
 
     // The alarm time can be set here only while the phone's own alarm isn't being followed

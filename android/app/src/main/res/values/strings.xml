@@ -43,8 +43,9 @@
     <string name="ha_password">Password (optional)</string>
     <string name="ha_save">Save</string>
     <string name="ha_off">Off</string>
+    <string name="ha_needs_permission">Needs the Local network permission. Tap Save to be asked.</string>
     <string name="ha_connected">Connected</string>
-    <string name="ha_disconnected">Not connected (retrying every 30 s)</string>
+    <string name="ha_disconnected">Disconnected (retrying every 30 s)</string>
     <string name="delete_session_title">Delete this session?</string>
     <string name="delete_session_message">%1$s will be removed from the history here and in the watchapp\'s settings page. This can\'t be undone.</string>
     <string name="delete_session_confirm">Delete</string>

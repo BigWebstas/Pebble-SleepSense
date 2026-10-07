@@ -1,6 +1,8 @@
 package net.webstas.sleepsense
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.util.Log
 import androidx.core.content.edit
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken
@@ -65,6 +67,15 @@ object HomeAssistant {
     private var heartRate: Int? = null
 
     val connected get() = synchronized(this) { client?.isConnected == true }
+
+    /** The one-line state shown under the settings button and on the settings screen. */
+    fun statusText(context: Context): Int = when {
+        !MqttSettings.load(context).enabled -> R.string.ha_off
+        context.checkSelfPermission(Manifest.permission.ACCESS_LOCAL_NETWORK) != PackageManager.PERMISSION_GRANTED ->
+            R.string.ha_needs_permission
+        connected -> R.string.ha_connected
+        else -> R.string.ha_disconnected
+    }
 
     /** (Re)connects with the saved settings, or just disconnects when the integration is off. */
     @Synchronized

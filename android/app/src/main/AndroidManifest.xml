@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.health.WRITE_HEART_RATE" />
     <!-- Alarm bridge: a loopback-only server run as a foreground service -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Android 17 blocks connections to other devices on the home network without this (the MQTT broker) -->
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
     <!-- Noise monitoring: microphone, only while sleep is being tracked and only if switched on -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />

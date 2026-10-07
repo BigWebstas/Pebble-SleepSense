@@ -113,6 +113,14 @@
             android:text="@string/home_assistant_button" />
 
         <TextView
+            android:id="@+id/home_assistant_status_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:gravity="center"
+            android:textSize="13sp" />
+
+        <TextView
             android:id="@+id/hc_status_text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
