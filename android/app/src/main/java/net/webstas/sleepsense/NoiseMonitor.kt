@@ -52,8 +52,9 @@ class NoiseMonitor(private val context: Context) {
         private const val POST_ROLL_CHUNKS = 250          // 25 s recorded after it
         private const val COOLDOWN_CHUNKS = 300           // 30 s before another clip
         private const val WARMUP_SECONDS = 15
-        private const val SPIKE_OVER_BASELINE_DB = 15     // jump over the room's average
-        private const val SPIKE_MIN_DB = 45               // and loud enough to matter
+        private const val SPIKE_OVER_BASELINE_DB = 8      // jump over the room's average
+        private const val SPIKE_MIN_DB = 35               // and loud enough to matter
+        private const val SPIKE_SECONDS = 1               // for this many seconds in a row
         private const val BASELINE_SECONDS = 300.0        // "average" = about the last 5 minutes
     }
 
@@ -161,8 +162,8 @@ class NoiseMonitor(private val context: Context) {
                     continue
                 }
                 overCount++
-                if (overCount >= 2 && seconds > WARMUP_SECONDS && cooldown == 0) {
-                    // Two seconds in a row above the room's average: record, starting a few seconds earlier
+                if (overCount >= SPIKE_SECONDS && seconds > WARMUP_SECONDS && cooldown == 0) {
+                    // Loud enough for long enough above the room's average: record, starting a few seconds earlier
                     Log.i(TAG, "spike: $db dB over baseline ${baseline.toInt()}")
                     clip = ArrayList(ring)
                     clipLeft = POST_ROLL_CHUNKS
