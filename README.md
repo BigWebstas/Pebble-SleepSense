@@ -102,7 +102,7 @@ Laid out like the other Pebble companion apps: logo, status, buttons, then setti
 ### Features
 
 - **Alarm sync (phone to watch)**: the watch wake time follows your phone's **next alarm**. Change it in the Clock app and the watch follows within a minute. If the phone has no alarm, the watch smart alarm is turned off too. The app only *reads* your alarms; it never changes them. A change you make on the watch (for example turning the alarm off) stays until the phone alarm changes again.
-- **Home-screen widget**: logo, tracking status and next alarm. Tap it to start tracking on the watch; while already tracking, a tap just opens the app, so a stray tap can't touch a running night. The status comes from the watch's once-a-minute check-in, so it can lag a little.
+- **Home-screen widget**: logo, tracking status and next alarm. Tap it to open the app. The status comes from the watch's once-a-minute check-in, so it can lag a little.
 - **Noise tracking and clips** (opt-in, uses the microphone): while the watch is tracking, the phone listens and keeps a running average of the room level (this is also the noise reading shown on the watch). If the level reaches at least **8 dB above that average and above 35 dB** for a second, it saves a **30-second WAV clip** (5 seconds before the spike, 25 after), at most one every 30 seconds, keeping the 30 newest. The **Noise clips** screen lists them by capture date and time, with peak level, and lets you play, share or delete each one. Levels are approximate dB: phone microphones are not calibrated. Place the phone near the bed.
 - **Sleep history and export**: the same graphs, stats and export as the settings page (they share one piece of code, `src/pkjs/lib/report-core.js`). Export has **Copy**, **Share** (Android share sheet, as text) and **Save as .md file**. The history is sent from the watchapp's code whenever SleepSense is open on the watch, so open it after a night to refresh the screen.
 - **Health Connect** *(experimental)*: writes finished sleep sessions (with stages) and heart rate to Health Connect when you stop tracking. It depends on the Pebble app delivering watch messages straight to this app, which has not been confirmed to work; use the history export if you need your data out.
@@ -125,7 +125,7 @@ Laid out like the other Pebble companion apps: logo, status, buttons, then setti
 | Request | What it does |
 | :--- | :--- |
 | `GET /alarm[?tracking=0\|1&since=ms]` | Next phone alarm and a change counter; the optional query is the watch's check-in with its tracking state |
-| `GET /command` | Held open up to 25 s; returns `start`, `stop` or `none` for a button/widget request |
+| `GET /command` | Held open up to 25 s; returns `start`, `stop` or `none` for a button request |
 | `POST /sessions` | The watchapp's sleep history (JSON) |
 | `GET /noise`, `/noise/start`, `/noise/stop` | Noise level, and start/stop listening |
 
@@ -219,7 +219,7 @@ adb forward --remove tcp:9000
 ## Known limits
 
 - **Noise** is real only with the Android app; the dB values are approximate.
-- **Start/stop from the phone** (button and widget) needs the Pebble app connected; stop needs SleepSense open on the watch.
+- **Start/stop from the phone** (button) needs the Pebble app connected; stop needs SleepSense open on the watch.
 - **History** reaches the Android app only while SleepSense is open on the watch.
 - **The alarm sync is one-way** (phone to watch) on purpose: Android has no safe way to switch a Clock-app alarm back on, and turning one off disables the whole repeating alarm.
 - **Health Connect** export is experimental (see above).
