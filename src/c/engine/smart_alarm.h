@@ -3,6 +3,7 @@
 #include "../model/sleep_types.h"
 
 typedef void (*SmartAlarmTriggerCallback)(bool is_smart_wake);
+typedef void (*SmartAlarmDismissCallback)(void);
 
 //! Initialize smart alarm module and read saved preferences
 void smart_alarm_init(void);
@@ -47,3 +48,6 @@ bool smart_alarm_is_active(void);
 
 //! Set trigger callback to update UI when alarm goes off
 void smart_alarm_set_trigger_callback(SmartAlarmTriggerCallback callback);
+
+//! Set dismiss callback to update UI when alarm is dismissed outside tracking
+void smart_alarm_set_dismiss_callback(SmartAlarmDismissCallback callback);

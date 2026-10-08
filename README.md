@@ -63,11 +63,11 @@ The sleep data in these screenshots is sample data, not a real night.
 
 ### Watch controls
 
-Changes need a deliberate **hold** (about a second; the watch buzzes once to confirm), so a stray press while you sleep does nothing. A ringing alarm is the exception: any press stops it, and Up or Down snoozes it.
+Changes need a deliberate **hold** (about a second; the watch buzzes once to confirm), so a stray press while you sleep does nothing. A ringing alarm is the exception: any press stops it (and ends sleep tracking), and Up or Down snoozes it.
 
 | Button | Hold | Press / double-press | While the alarm rings |
 | :--- | :--- | :--- | :--- |
-| **SELECT** | Start / stop sleep tracking | Press: refresh from the phone. Double-press: voice dream journal | Press: stop the alarm |
+| **SELECT** | Start / stop sleep tracking | Press: refresh from the phone. Double-press: voice dream journal | Press: stop the alarm (also stops tracking) |
 | **UP** | Turn the smart alarm on / off | Nothing | Press: snooze (when enabled) |
 | **DOWN** | Cycle the smart wake window (15 → 30 → 45 min) | Nothing | Press: snooze (when enabled) |
 

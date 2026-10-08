@@ -15,6 +15,11 @@ static void prv_alarm_trigger_handler(bool is_smart_wake) {
   comm_send_session_update(sleep_engine_get_session());
 }
 
+static void prv_alarm_dismiss_handler(void) {
+  ui_main_update(sleep_engine_get_session());
+  comm_send_session_update(sleep_engine_get_session());
+}
+
 static void prv_init(void) {
   sleep_engine_init();
   smart_alarm_init();
@@ -24,6 +29,7 @@ static void prv_init(void) {
   sleep_engine_set_update_callback(prv_engine_update_handler);
   sleep_engine_set_minute_callback(ui_main_refresh_clock);
   smart_alarm_set_trigger_callback(prv_alarm_trigger_handler);
+  smart_alarm_set_dismiss_callback(prv_alarm_dismiss_handler);
 }
 
 static void prv_deinit(void) {

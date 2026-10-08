@@ -373,7 +373,6 @@ static bool prv_handle_alarm_press(bool snooze) {
   if (!(snooze && smart_alarm_snooze())) {
     smart_alarm_dismiss();
   }
-  comm_send_session_update(sleep_engine_get_session()); // phone logs the alarm event
   ui_main_update(sleep_engine_get_session());
   return true;
 }

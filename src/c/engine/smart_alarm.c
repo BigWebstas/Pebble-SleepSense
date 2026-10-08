@@ -22,6 +22,7 @@ static AppTimer *s_vibe_timer = NULL;
 static bool s_is_ringing = false;
 static time_t s_ringing_start = 0;
 static SmartAlarmTriggerCallback s_trigger_cb = NULL;
+static SmartAlarmDismissCallback s_dismiss_cb = NULL;
 static WakeupId s_wakeup_id = -1;
 static time_t s_wakeup_for = 0; // the ring time the wakeup was set up for
 
@@ -117,6 +118,18 @@ static void prv_stop_alarm_sound(void) {
   }
   speaker_stop();
 #endif
+}
+
+static void prv_stop_ringing(void) {
+  if (s_is_ringing) {
+    s_is_ringing = false;
+    if (s_vibe_timer) {
+      app_timer_cancel(s_vibe_timer);
+      s_vibe_timer = NULL;
+    }
+    vibes_cancel();
+    prv_stop_alarm_sound();
+  }
 }
 
 static void prv_vibe_timer_handler(void *context) {
@@ -271,12 +284,7 @@ void smart_alarm_init(void) {
 }
 
 void smart_alarm_deinit(void) {
-  if (s_vibe_timer) {
-    app_timer_cancel(s_vibe_timer);
-    s_vibe_timer = NULL;
-  }
-  s_is_ringing = false;
-  prv_stop_alarm_sound();
+  prv_stop_ringing();
   prv_save_settings();
   smart_alarm_sync_wakeup(); // the app is closing: make sure the watch brings it back for the alarm
 }
@@ -373,15 +381,14 @@ void smart_alarm_evaluate(SleepStage current_stage) {
 
 void smart_alarm_dismiss(void) {
   if (s_is_ringing) {
-    s_is_ringing = false;
-    if (s_vibe_timer) {
-      app_timer_cancel(s_vibe_timer);
-      s_vibe_timer = NULL;
-    }
-    vibes_cancel();
-    prv_stop_alarm_sound();
+    prv_stop_ringing();
     APP_LOG(APP_LOG_LEVEL_INFO, "Alarm dismissed by user");
-    smart_alarm_sync_wakeup(); // for the next alarm, or the end of a snooze
+    smart_alarm_sync_wakeup();
+    if (sleep_engine_is_tracking()) {
+      sleep_engine_stop_session();
+    } else if (s_dismiss_cb) {
+      s_dismiss_cb();
+    }
   }
 }
 
@@ -391,8 +398,9 @@ bool smart_alarm_snooze(void) {
   }
   uint32_t seconds = s_settings.snooze_minutes * 60;
   s_settings.snooze_until = time(NULL) + seconds;
-  smart_alarm_dismiss();
+  prv_stop_ringing();
   prv_save_settings();
+  smart_alarm_sync_wakeup();
   sleep_engine_add_snooze(seconds); // notifies, now reporting "snoozed"
   APP_LOG(APP_LOG_LEVEL_INFO, "Alarm snoozed for %d min", s_settings.snooze_minutes);
   return true;
@@ -416,4 +424,8 @@ bool smart_alarm_is_active(void) {
 
 void smart_alarm_set_trigger_callback(SmartAlarmTriggerCallback callback) {
   s_trigger_cb = callback;
+}
+
+void smart_alarm_set_dismiss_callback(SmartAlarmDismissCallback callback) {
+  s_dismiss_cb = callback;
 }

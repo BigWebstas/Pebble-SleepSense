@@ -48,6 +48,11 @@ function record(tracking, d, now) {
 
   if (!tracking) {
     if (current && !current.end) {
+      if (d.STATUS_ALARM_STATE !== undefined && d.STATUS_ALARM_STATE !== (current.alarm || 0)) {
+        current.events = current.events || [];
+        current.events.push({ t: now, a: d.STATUS_ALARM_STATE });
+        current.alarm = d.STATUS_ALARM_STATE;
+      }
       current.end = now;
       save(sessions);
     }
