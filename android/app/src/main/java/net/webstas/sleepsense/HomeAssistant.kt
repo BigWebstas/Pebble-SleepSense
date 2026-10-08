@@ -22,6 +22,7 @@ private const val TRACKING = "$BASE/tracking"
 private const val TRACKING_SET = "$BASE/tracking/set"
 private const val STAGE = "$BASE/stage"
 private const val HEART_RATE = "$BASE/heart_rate"
+private const val SLEEP_DURATION = "$BASE/sleep_duration"
 private const val RETRY_MS = 30_000L
 
 data class MqttSettings(
@@ -52,7 +53,7 @@ data class MqttSettings(
 }
 
 /**
- * Publishes the watch's tracking state, sleep stage and heart rate to an MQTT broker, with Home
+ * Publishes the watch's tracking state, sleep stage, heart rate and time asleep to an MQTT broker, with Home
  * Assistant MQTT discovery so the entities appear on their own, and lets Home Assistant start and
  * stop tracking. Runs inside the always-on [AlarmBridgeService] process. Port 8883 uses TLS.
  */
@@ -65,6 +66,8 @@ object HomeAssistant {
     private var tracking = false
     private var stage = "idle"
     private var heartRate: Int? = null
+    private var asleepMs = 0L // light + deep + REM this session; kept after tracking stops
+    private var lastUpdateAt = 0L
 
     val connected get() = synchronized(this) { client?.isConnected == true }
 
@@ -94,6 +97,10 @@ object HomeAssistant {
     fun publishState(tracking: Boolean, stage: Int?, heartRate: Int?) {
         io.execute {
             synchronized(this) {
+                val now = System.currentTimeMillis()
+                if (this.tracking && this.stage in ASLEEP) asleepMs += now - lastUpdateAt
+                if (tracking && !this.tracking) asleepMs = 0
+                lastUpdateAt = now
                 this.tracking = tracking
                 this.stage = if (tracking) stage?.let(::stageName) ?: this.stage else "idle"
                 this.heartRate = if (tracking) heartRate?.takeIf { it > 0 } ?: this.heartRate else null
@@ -101,6 +108,8 @@ object HomeAssistant {
             }
         }
     }
+
+    private val ASLEEP = setOf("light", "deep", "rem")
 
     private fun stageName(watchStage: Int) = when (watchStage) {
         1 -> "light"
@@ -170,12 +179,13 @@ object HomeAssistant {
             c.publish(TRACKING, retained(if (tracking) "ON" else "OFF"))
             c.publish(STAGE, retained(stage))
             c.publish(HEART_RATE, retained(heartRate?.toString() ?: "None"))
+            c.publish(SLEEP_DURATION, retained((asleepMs / 60_000).toString()))
         } catch (e: Exception) {
             Log.w(TAG, "could not publish: $e")
         }
     }
 
-    // Home Assistant MQTT discovery: one device with a tracking switch and two sensors
+    // Home Assistant MQTT discovery: one device with a tracking switch and three sensors
     private fun publishDiscovery(c: MqttClient) {
         val device = JSONObject().put("identifiers", listOf("sleepsense")).put("name", "SleepSense")
         fun entity(component: String, id: String, name: String, extra: JSONObject.() -> Unit) {
@@ -194,6 +204,11 @@ object HomeAssistant {
             put("unit_of_measurement", "bpm")
             put("state_class", "measurement")
             put("icon", "mdi:heart-pulse")
+        }
+        entity("sensor", "sleep_duration", "Sleep duration") {
+            put("device_class", "duration")
+            put("unit_of_measurement", "min")
+            put("state_class", "measurement")
         }
     }
 
