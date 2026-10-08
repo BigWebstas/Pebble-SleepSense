@@ -34,6 +34,8 @@ tasks.named("preBuild") { dependsOn(syncWatchApp) }
 
 dependencies {
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.google.material)
     implementation(libs.androidx.activity.ktx)
     implementation(libs.androidx.health.connect)
     implementation(libs.pebblekit.client)

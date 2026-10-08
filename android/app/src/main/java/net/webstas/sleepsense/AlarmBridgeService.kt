@@ -91,7 +91,14 @@ class AlarmBridgeService : Service() {
                 val tracking = Regex("tracking=(\\d)").find(request)?.groupValues?.get(1)
                 if (tracking != null) {
                     val since = Regex("since=(\\d+)").find(request)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
-                    WidgetState.note(this, tracking == "1", since)
+                    val isTracking = tracking == "1"
+                    val wasTracking = WidgetState.tracking(this)
+                    WidgetState.note(this, isTracking, since)
+                    if (isTracking && !wasTracking) {
+                        onTrackingStarted()
+                    } else if (!isTracking && wasTracking) {
+                        onTrackingStopped()
+                    }
                     // Asked to start but the watch checks in still idle (e.g. its app had just been
                     // restarted and the command was lost): ask again
                     if (tracking == "0" && WidgetState.startRequestedRecently(this)) Commands.queueStart()
@@ -183,11 +190,26 @@ class AlarmBridgeService : Service() {
     private fun noiseStatus() =
         """{"listening":${monitor.listening},"db":${monitor.lastDb},"avg":${monitor.avg60},"clips":${NoiseClips.list(this).size}}"""
 
+    private fun onTrackingStarted() {
+        if (WhiteNoisePrefs.isPlayWhileTracking(this)) {
+            WhiteNoisePlayer.start(this)
+            monitor.resetBaseline()
+        }
+    }
+
+    private fun onTrackingStopped() {
+        if (WhiteNoisePlayer.isPlaying) {
+            WhiteNoisePlayer.stop()
+            monitor.resetBaseline()
+        }
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int) = START_STICKY
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        WhiteNoisePlayer.stop()
         monitor.stop()
         unregisterReceiver(alarmChanged)
         server?.close()

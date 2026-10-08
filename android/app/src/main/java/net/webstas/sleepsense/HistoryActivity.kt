@@ -1,7 +1,6 @@
 package net.webstas.sleepsense
 
 import android.annotation.SuppressLint
-import android.app.AlertDialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
@@ -11,15 +10,17 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.result.contract.ActivityResultContracts
+import com.google.android.material.color.DynamicColors
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 /**
  * Sleep history graphs and the Markdown export. The page is the settings-page code from the
  * watchapp (report-core.js, copied into assets at build time) running in a WebView, so the graphs
  * and the export are identical in both places.
  */
-class HistoryActivity : ComponentActivity() {
+class HistoryActivity : AppCompatActivity() {
     private lateinit var web: WebView
     private var pendingText: String? = null
 
@@ -44,7 +45,7 @@ class HistoryActivity : ComponentActivity() {
         // Asks first; the page hears the answer through window.onDeleted
         @JavascriptInterface fun deleteSession(start: Long, label: String) {
             runOnUiThread {
-                AlertDialog.Builder(this@HistoryActivity)
+                MaterialAlertDialogBuilder(this@HistoryActivity)
                     .setTitle(R.string.delete_session_title)
                     .setMessage(getString(R.string.delete_session_message, label))
                     .setPositiveButton(R.string.delete_session_confirm) { _, _ ->
@@ -84,6 +85,7 @@ class HistoryActivity : ComponentActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        DynamicColors.applyToActivityIfAvailable(this)
         web = WebView(this).apply {
             settings.javaScriptEnabled = true
             // Only our own bundled page is ever loaded here

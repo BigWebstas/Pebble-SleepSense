@@ -64,4 +64,28 @@
     <string name="update_failed">Couldn\'t check for updates</string>
     <string name="show_advanced_button">Show advanced</string>
     <string name="hide_advanced_button">Hide advanced</string>
+
+    <!-- Noise sensitivity -->
+    <string name="noise_sensitivity_title">Noise sensitivity</string>
+    <string name="noise_sensitivity_button">Sensitivity: %s</string>
+    <string name="noise_sens_low_title">Low</string>
+    <string name="noise_sens_low_desc">Low — loud snoring &amp; events (56 dB)</string>
+    <string name="noise_sens_medium_title">Medium</string>
+    <string name="noise_sens_medium_desc">Medium — balanced (48 dB, recommended)</string>
+    <string name="noise_sens_high_title">High</string>
+    <string name="noise_sens_high_desc">High — lighter sounds (42 dB)</string>
+
+    <!-- White noise -->
+    <string name="white_noise_section">White Noise</string>
+    <string name="white_noise_tracking_label">Play white noise while tracking</string>
+    <string name="white_noise_sound_label">Sound: %s</string>
+    <string name="white_noise_sound_dialog_title">Choose sleep sound</string>
+    <string name="white_noise_brown_title">Brown noise</string>
+    <string name="white_noise_brown_desc">Brown noise (deep &amp; soothing — recommended)</string>
+    <string name="white_noise_pink_title">Pink noise</string>
+    <string name="white_noise_pink_desc">Pink noise (soft rainfall)</string>
+    <string name="white_noise_white_title">White noise</string>
+    <string name="white_noise_white_desc">White noise (crisp static)</string>
+    <string name="white_noise_play_button">Play white noise</string>
+    <string name="white_noise_stop_button">Stop white noise</string>
 </resources>

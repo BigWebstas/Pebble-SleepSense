@@ -6,15 +6,16 @@ import android.os.Looper
 import android.view.WindowInsets
 import android.widget.Button
 import android.widget.EditText
-import android.widget.Switch
 import android.widget.TextView
 import android.Manifest
 import android.content.pm.PackageManager
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.result.contract.ActivityResultContracts
+import com.google.android.material.color.DynamicColors
+import com.google.android.material.materialswitch.MaterialSwitch
 
 /** Where the MQTT broker for Home Assistant is set up. */
-class HomeAssistantActivity : ComponentActivity() {
+class HomeAssistantActivity : AppCompatActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private val statusLoop = object : Runnable {
         override fun run() {
@@ -37,6 +38,7 @@ class HomeAssistantActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        DynamicColors.applyToActivityIfAvailable(this)
         setContentView(R.layout.activity_home_assistant)
         id<android.view.View>(R.id.root).setOnApplyWindowInsetsListener { view, insets ->
             val bars = insets.getInsets(WindowInsets.Type.systemBars())
@@ -45,7 +47,7 @@ class HomeAssistantActivity : ComponentActivity() {
         }
 
         val saved = MqttSettings.load(this)
-        id<Switch>(R.id.ha_enable).isChecked = saved.enabled
+        id<MaterialSwitch>(R.id.ha_enable).isChecked = saved.enabled
         id<EditText>(R.id.ha_host).setText(saved.host)
         id<EditText>(R.id.ha_port).setText(saved.port.toString())
         id<EditText>(R.id.ha_user).setText(saved.user)
@@ -53,14 +55,14 @@ class HomeAssistantActivity : ComponentActivity() {
 
         id<Button>(R.id.ha_save).setOnClickListener {
             MqttSettings(
-                enabled = id<Switch>(R.id.ha_enable).isChecked,
+                enabled = id<MaterialSwitch>(R.id.ha_enable).isChecked,
                 host = id<EditText>(R.id.ha_host).text.toString().trim(),
                 port = id<EditText>(R.id.ha_port).text.toString().toIntOrNull() ?: 1883,
                 user = id<EditText>(R.id.ha_user).text.toString().trim(),
                 password = id<EditText>(R.id.ha_password).text.toString(),
             ).save(this)
             HomeAssistant.start(this)
-            if (id<Switch>(R.id.ha_enable).isChecked && !localNetworkGranted()) {
+            if (id<MaterialSwitch>(R.id.ha_enable).isChecked && !localNetworkGranted()) {
                 requestLocalNetwork.launch(Manifest.permission.ACCESS_LOCAL_NETWORK)
             }
             refreshStatus()

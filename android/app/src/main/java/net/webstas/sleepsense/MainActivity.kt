@@ -1,7 +1,6 @@
 package net.webstas.sleepsense
 
 import android.Manifest
-import android.app.AlertDialog
 import android.app.TimePickerDialog
 import android.appwidget.AppWidgetManager
 import android.content.ActivityNotFoundException
@@ -18,15 +17,18 @@ import android.view.View
 import android.view.WindowInsets
 import android.widget.Button
 import android.widget.LinearLayout
-import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.color.DynamicColors
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.materialswitch.MaterialSwitch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -35,7 +37,7 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private val refreshLoop = object : Runnable {
         override fun run() {
@@ -50,11 +52,15 @@ class MainActivity : ComponentActivity() {
         registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { refreshHealth() }
 
     private var update: UpdateResult? = null
+    private val whiteNoiseListener = { _: Boolean -> runOnUiThread { refreshWhiteNoise() } }
 
     private fun <T : android.view.View> id(res: Int): T = findViewById(res)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+        DynamicColors.applyToActivityIfAvailable(this)
+        DynamicColors.applyToActivitiesIfAvailable(application)
         handleAlarmIntent(intent)
         startForegroundService(Intent(this, AlarmBridgeService::class.java))
         setContentView(R.layout.activity_main)
@@ -78,7 +84,7 @@ class MainActivity : ComponentActivity() {
         }
         id<Button>(R.id.clock_button).setOnClickListener { openClock() }
 
-        id<Switch>(R.id.alarm_sync_switch).apply {
+        id<MaterialSwitch>(R.id.alarm_sync_switch).apply {
             isChecked = PhoneAlarmSync.isEnabled(this@MainActivity)
             setOnCheckedChangeListener { _, on ->
                 PhoneAlarmSync.setEnabled(this@MainActivity, on)
@@ -87,13 +93,17 @@ class MainActivity : ComponentActivity() {
         }
         id<Button>(R.id.alarm_time_button).setOnClickListener { chooseAlarmTime() }
         id<Button>(R.id.snooze_button).setOnClickListener { chooseSnooze() }
-        id<Switch>(R.id.noise_switch).apply {
+        id<MaterialSwitch>(R.id.noise_switch).apply {
             isChecked = NoiseClips.isEnabled(this@MainActivity)
             setOnCheckedChangeListener { _, on ->
                 NoiseClips.setEnabled(this@MainActivity, on)
                 if (on && !micGranted()) requestMic.launch(Manifest.permission.RECORD_AUDIO)
                 refreshNoise()
             }
+        }
+        id<Button>(R.id.noise_sensitivity_button).apply {
+            setIcon(R.drawable.ic_tune)
+            setOnClickListener { chooseNoiseSensitivity() }
         }
         id<Button>(R.id.clips_button).setOnClickListener { startActivity(Intent(this, ClipsActivity::class.java)) }
         id<Button>(R.id.history_button).setOnClickListener { startActivity(Intent(this, HistoryActivity::class.java)) }
@@ -108,6 +118,28 @@ class MainActivity : ComponentActivity() {
                 setIcon(if (show) R.drawable.ic_expand_less else R.drawable.ic_expand_more)
             }
         }
+
+        id<MaterialSwitch>(R.id.white_noise_tracking_switch).apply {
+            isChecked = WhiteNoisePrefs.isPlayWhileTracking(this@MainActivity)
+            setOnCheckedChangeListener { _, on ->
+                WhiteNoisePrefs.setPlayWhileTracking(this@MainActivity, on)
+                if (on && WidgetState.tracking(this@MainActivity) && !WhiteNoisePlayer.isPlaying) {
+                    WhiteNoisePlayer.start(this@MainActivity)
+                }
+            }
+        }
+        id<Button>(R.id.white_noise_sound_button).apply {
+            setIcon(R.drawable.ic_graphic_eq)
+            setOnClickListener { chooseWhiteNoiseSound() }
+        }
+        id<Button>(R.id.white_noise_play_button).setOnClickListener {
+            if (WhiteNoisePlayer.isPlaying) {
+                WhiteNoisePlayer.stop()
+            } else {
+                WhiteNoisePlayer.start(this)
+            }
+        }
+        WhiteNoisePlayer.addListener(whiteNoiseListener)
 
         id<Button>(R.id.home_assistant_button).setOnClickListener { startActivity(Intent(this, HomeAssistantActivity::class.java)) }
         id<Button>(R.id.grant_hc_button).setOnClickListener { requestHealth.launch(setOf(WRITE_SLEEP, WRITE_HEART_RATE)) }
@@ -137,7 +169,14 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         refreshNoise()
         refreshHealth()
+        refreshWhiteNoise()
         handler.post(refreshLoop)
+    }
+
+    override fun onDestroy() {
+        WhiteNoisePlayer.removeListener(whiteNoiseListener)
+        handler.removeCallbacks(refreshLoop)
+        super.onDestroy()
     }
 
     override fun onPause() {
@@ -226,7 +265,7 @@ class MainActivity : ComponentActivity() {
     private fun chooseSnooze() {
         val lengths = intArrayOf(0, 5, 9, 10, 15, 20)
         val labels = lengths.map { if (it == 0) getString(R.string.snooze_off) else getString(R.string.snooze_minutes, it) }
-        AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setItems(labels.toTypedArray()) { _, which ->
                 PhoneAlarmSync.setSnoozeMinutes(this, lengths[which])
                 refreshAlarmSettings()
@@ -314,11 +353,67 @@ class MainActivity : ComponentActivity() {
 
     private fun refreshNoise() {
         val clips = NoiseClips.list(this).size
+        val enabled = NoiseClips.isEnabled(this)
         id<TextView>(R.id.noise_status_text).text = when {
-            !NoiseClips.isEnabled(this) -> getString(R.string.noise_off)
+            !enabled -> getString(R.string.noise_off)
             !micGranted() -> getString(R.string.noise_needs_permission)
             else -> getString(R.string.noise_listening, clips)
         }
+        val sens = NoiseClips.sensitivity(this)
+        id<Button>(R.id.noise_sensitivity_button).apply {
+            visibility = if (enabled) View.VISIBLE else View.GONE
+            text = getString(R.string.noise_sensitivity_button, getString(sens.titleRes))
+        }
+    }
+
+    private fun chooseNoiseSensitivity() {
+        val current = NoiseClips.sensitivity(this)
+        val levels = NoiseSensitivity.entries
+        val labels = levels.map { getString(it.descRes) }.toTypedArray()
+        val checkedIndex = levels.indexOf(current).coerceAtLeast(0)
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.noise_sensitivity_title)
+            .setSingleChoiceItems(labels, checkedIndex) { dialog, which ->
+                NoiseClips.setSensitivity(this, levels[which])
+                refreshNoise()
+                dialog.dismiss()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun refreshWhiteNoise() {
+        val sound = WhiteNoisePrefs.sound(this)
+        id<Button>(R.id.white_noise_sound_button).text =
+            getString(R.string.white_noise_sound_label, getString(sound.titleRes))
+
+        val playing = WhiteNoisePlayer.isPlaying
+        id<Button>(R.id.white_noise_play_button).apply {
+            setText(if (playing) R.string.white_noise_stop_button else R.string.white_noise_play_button)
+            setIcon(if (playing) R.drawable.ic_stop else R.drawable.ic_play_arrow)
+        }
+    }
+
+    private fun chooseWhiteNoiseSound() {
+        val current = WhiteNoisePrefs.sound(this)
+        val sounds = WhiteNoiseSound.entries
+        val labels = sounds.map { getString(it.descRes) }.toTypedArray()
+        val checkedIndex = sounds.indexOf(current).coerceAtLeast(0)
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.white_noise_sound_dialog_title)
+            .setSingleChoiceItems(labels, checkedIndex) { dialog, which ->
+                val chosen = sounds[which]
+                WhiteNoisePrefs.setSound(this, chosen)
+                if (WhiteNoisePlayer.isPlaying) {
+                    WhiteNoisePlayer.setSound(chosen)
+                }
+                refreshWhiteNoise()
+                dialog.dismiss()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun refreshHealth() = lifecycleScope.launch {

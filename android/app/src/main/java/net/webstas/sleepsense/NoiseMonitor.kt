@@ -15,10 +15,25 @@ import kotlin.math.sqrt
 
 private const val TAG = "NoiseMonitor"
 
+/** Configurable sensitivity levels for noise spike detection. */
+enum class NoiseSensitivity(
+    val id: String,
+    val titleRes: Int,
+    val descRes: Int,
+    val overBaselineDb: Int,
+    val minDb: Int,
+    val requiredSeconds: Int,
+) {
+    LOW("low", R.string.noise_sens_low_title, R.string.noise_sens_low_desc, 18, 56, 2),
+    MEDIUM("medium", R.string.noise_sens_medium_title, R.string.noise_sens_medium_desc, 14, 48, 1),
+    HIGH("high", R.string.noise_sens_high_title, R.string.noise_sens_high_desc, 10, 42, 1),
+}
+
 /** Settings and the saved clips. */
 object NoiseClips {
     private const val PREFS = "noise"
     private const val KEY_ENABLED = "enabled"
+    private const val KEY_SENSITIVITY = "sensitivity"
     private const val MAX_CLIPS = 30
 
     // Off until the user switches it on: it uses the microphone
@@ -27,6 +42,16 @@ object NoiseClips {
 
     fun setEnabled(context: Context, on: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean(KEY_ENABLED, on) }
+    }
+
+    fun sensitivity(context: Context): NoiseSensitivity {
+        val id = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_SENSITIVITY, NoiseSensitivity.MEDIUM.id)
+        return NoiseSensitivity.entries.firstOrNull { it.id == id } ?: NoiseSensitivity.MEDIUM
+    }
+
+    fun setSensitivity(context: Context, sens: NoiseSensitivity) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putString(KEY_SENSITIVITY, sens.id) }
     }
 
     fun dir(context: Context) = File(context.filesDir, "clips").apply { mkdirs() }
@@ -50,11 +75,8 @@ class NoiseMonitor(private val context: Context) {
         private const val CHUNK = SAMPLE_RATE / 10        // 0.1 s per read
         private const val PRE_ROLL_CHUNKS = 50            // 5 s kept before a spike
         private const val POST_ROLL_CHUNKS = 250          // 25 s recorded after it
-        private const val COOLDOWN_CHUNKS = 300           // 30 s before another clip
+        private const val COOLDOWN_CHUNKS = 450           // 45 s before another clip
         private const val WARMUP_SECONDS = 15
-        private const val SPIKE_OVER_BASELINE_DB = 8      // jump over the room's average
-        private const val SPIKE_MIN_DB = 35               // and loud enough to matter
-        private const val SPIKE_SECONDS = 1               // for this many seconds in a row
         private const val BASELINE_SECONDS = 300.0        // "average" = about the last 5 minutes
     }
 
@@ -65,11 +87,17 @@ class NoiseMonitor(private val context: Context) {
     @Volatile var avg60 = 0
         private set
     private var thread: Thread? = null
+    @Volatile private var resetBaselineRequested = false
+
+    fun resetBaseline() {
+        resetBaselineRequested = true
+    }
 
     @Synchronized
     fun start() {
         if (listening) return
         listening = true
+        resetBaselineRequested = false
         thread = Thread({ loop() }, "noise-monitor").also { it.isDaemon = true; it.start() }
     }
 
@@ -120,6 +148,12 @@ class NoiseMonitor(private val context: Context) {
 
         try {
             while (listening) {
+                if (resetBaselineRequested) {
+                    baseline = -1.0
+                    cooldown = COOLDOWN_CHUNKS
+                    resetBaselineRequested = false
+                }
+
                 val buf = ShortArray(CHUNK)
                 var read = 0
                 while (read < CHUNK && listening) {
@@ -155,16 +189,17 @@ class NoiseMonitor(private val context: Context) {
                     continue
                 }
                 // The room's average only learns from ordinary seconds, never from the spike itself
-                val isSpike = baseline >= 0 && db >= baseline + SPIKE_OVER_BASELINE_DB && db >= SPIKE_MIN_DB
+                val sens = NoiseClips.sensitivity(context)
+                val isSpike = baseline >= 0 && db >= baseline + sens.overBaselineDb && db >= sens.minDb
                 if (!isSpike) {
                     baseline = if (baseline < 0) db.toDouble() else baseline + (db - baseline) / BASELINE_SECONDS
                     overCount = 0
                     continue
                 }
                 overCount++
-                if (overCount >= SPIKE_SECONDS && seconds > WARMUP_SECONDS && cooldown == 0) {
+                if (overCount >= sens.requiredSeconds && seconds > WARMUP_SECONDS && cooldown == 0) {
                     // Loud enough for long enough above the room's average: record, starting a few seconds earlier
-                    Log.i(TAG, "spike: $db dB over baseline ${baseline.toInt()}")
+                    Log.i(TAG, "spike: $db dB over baseline ${baseline.toInt()} (sens=${sens.id})")
                     clip = ArrayList(ring)
                     clipLeft = POST_ROLL_CHUNKS
                     clipPeak = db

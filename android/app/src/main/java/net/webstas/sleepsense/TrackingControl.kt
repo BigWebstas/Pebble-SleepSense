@@ -25,6 +25,9 @@ object TrackingControl {
         Commands.queueStart()
         WidgetState.markStarting(context)
         SleepWidgetProvider.refreshAll(context)
+        if (WhiteNoisePrefs.isPlayWhileTracking(context)) {
+            WhiteNoisePlayer.start(context)
+        }
         openWatchApp(context, onDone)
     }
 
@@ -32,6 +35,9 @@ object TrackingControl {
     fun stop(context: Context) {
         context.startForegroundService(Intent(context, AlarmBridgeService::class.java))
         Commands.queueStop()
+        if (WhiteNoisePlayer.isPlaying) {
+            WhiteNoisePlayer.stop()
+        }
     }
 
     // A broadcast receiver's own context may not bind to other apps, so use the application's, and

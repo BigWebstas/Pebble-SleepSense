@@ -16,7 +16,7 @@
             android:layout_height="wrap_content"
             android:text="@string/ha_intro" />
 
-        <Switch
+        <com.google.android.material.materialswitch.MaterialSwitch
             android:id="@+id/ha_enable"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

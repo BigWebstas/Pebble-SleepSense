@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -47,6 +48,8 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:minWidth="220dp"
+            app:icon="@drawable/ic_play_arrow"
+            app:iconPadding="8dp"
             android:text="@string/start_tracking_button" />
 
         <Button
@@ -55,9 +58,11 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:minWidth="220dp"
+            app:icon="@drawable/ic_alarm"
+            app:iconPadding="8dp"
             android:text="@string/open_clock_button" />
 
-        <Switch
+        <com.google.android.material.materialswitch.MaterialSwitch
             android:id="@+id/alarm_sync_switch"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -78,7 +83,7 @@
             android:layout_marginTop="8dp"
             android:minWidth="220dp" />
 
-        <Switch
+        <com.google.android.material.materialswitch.MaterialSwitch
             android:id="@+id/noise_switch"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -94,11 +99,22 @@
             android:textSize="13sp" />
 
         <Button
+            android:id="@+id/noise_sensitivity_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:minWidth="220dp"
+            app:icon="@drawable/ic_tune"
+            app:iconPadding="8dp" />
+
+        <Button
             android:id="@+id/clips_button"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="8dp"
             android:minWidth="220dp"
+            app:icon="@drawable/ic_mic"
+            app:iconPadding="8dp"
             android:text="@string/noise_clips_button" />
 
         <Button
@@ -107,6 +123,8 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:minWidth="220dp"
+            app:icon="@drawable/ic_history"
+            app:iconPadding="8dp"
             android:text="@string/history_button" />
 
         <Button
@@ -115,6 +133,8 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
             android:minWidth="220dp"
+            app:icon="@drawable/ic_expand_more"
+            app:iconPadding="8dp"
             android:text="@string/show_advanced_button" />
 
         <LinearLayout
@@ -125,12 +145,48 @@
             android:orientation="vertical"
             android:visibility="gone">
 
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/white_noise_section"
+                android:textStyle="bold" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/white_noise_tracking_switch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/white_noise_tracking_label" />
+
+            <Button
+                android:id="@+id/white_noise_sound_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:minWidth="220dp"
+                app:icon="@drawable/ic_graphic_eq"
+                app:iconPadding="8dp"
+                android:text="@string/white_noise_sound_label" />
+
+            <Button
+                android:id="@+id/white_noise_play_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:minWidth="220dp"
+                app:icon="@drawable/ic_play_arrow"
+                app:iconPadding="8dp"
+                android:text="@string/white_noise_play_button" />
+
             <Button
                 android:id="@+id/home_assistant_button"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:minWidth="220dp"
+                app:icon="@drawable/ic_home"
+                app:iconPadding="8dp"
                 android:text="@string/home_assistant_button" />
 
             <TextView
@@ -147,6 +203,8 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:minWidth="220dp"
+                app:icon="@drawable/ic_favorite"
+                app:iconPadding="8dp"
                 android:text="@string/grant_hc_button" />
 
             <TextView
@@ -162,6 +220,8 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:minWidth="220dp"
+                app:icon="@drawable/ic_widgets"
+                app:iconPadding="8dp"
                 android:text="@string/add_widget_button" />
 
             <Button
@@ -170,6 +230,8 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:minWidth="220dp"
+                app:icon="@drawable/ic_watch"
+                app:iconPadding="8dp"
                 android:text="@string/install_watch_button" />
 
             <Button
@@ -178,6 +240,8 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:minWidth="220dp"
+                app:icon="@drawable/ic_system_update"
+                app:iconPadding="8dp"
                 android:text="@string/check_update_button" />
 
             <TextView

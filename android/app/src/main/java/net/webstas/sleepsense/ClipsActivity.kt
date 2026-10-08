@@ -6,24 +6,26 @@ import android.media.MediaPlayer
 import android.os.Bundle
 import android.view.Gravity
 import android.view.WindowInsets
-import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.color.DynamicColors
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 /** The noise clips the monitor saved: play, share or delete each one. */
-class ClipsActivity : ComponentActivity() {
+class ClipsActivity : AppCompatActivity() {
     private lateinit var list: LinearLayout
     private var player: MediaPlayer? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        DynamicColors.applyToActivityIfAvailable(this)
         list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         setContentView(ScrollView(this).apply {
             addView(list)
@@ -49,7 +51,7 @@ class ClipsActivity : ComponentActivity() {
     private fun primaryColor(): Int {
         val value = android.util.TypedValue()
         theme.resolveAttribute(android.R.attr.textColorPrimary, value, true)
-        return getColor(value.resourceId)
+        return if (value.resourceId != 0) getColor(value.resourceId) else value.data
     }
 
     private fun stopPlayback() {
@@ -97,11 +99,17 @@ class ClipsActivity : ComponentActivity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.START
         }
-        fun add(label: String, icon: Int, action: () -> Unit) = buttons.addView(Button(this).apply {
-            text = label
-            setIcon(icon)
-            setOnClickListener { action() }
-        })
+        val margin = (8 * resources.displayMetrics.density).toInt()
+        fun add(label: String, icon: Int, action: () -> Unit) = buttons.addView(
+            MaterialButton(this).apply {
+                text = label
+                setIcon(icon)
+                setOnClickListener { action() }
+            },
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                marginEnd = margin
+            }
+        )
         add("Play", R.drawable.ic_play_arrow) { play(file) }
         add("Share", R.drawable.ic_share) { share(file) }
         add("Delete", R.drawable.ic_delete) { file.delete(); stopPlayback(); render() }
