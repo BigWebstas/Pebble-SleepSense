@@ -13,6 +13,7 @@
     <string name="stop_tracking_button">Stop tracking</string>
     <string name="open_clock_button">Open Clock app</string>
     <string name="open_clock_missing">No Clock app found</string>
+    <string name="alarm_set_toast">Watch alarm set to %1$s</string>
 
     <string name="alarm_time_button">Watch alarm time: %1$s</string>
     <string name="alarm_time_none">not set</string>
@@ -61,4 +62,6 @@
     <string name="update_available">Update available: %1$s (you have %2$s)</string>
     <string name="update_none_published">No releases published yet</string>
     <string name="update_failed">Couldn\'t check for updates</string>
+    <string name="show_advanced_button">Show advanced</string>
+    <string name="hide_advanced_button">Hide advanced</string>
 </resources>

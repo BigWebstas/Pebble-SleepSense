@@ -14,8 +14,10 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.AlarmClock
 import android.text.format.DateFormat
+import android.view.View
 import android.view.WindowInsets
 import android.widget.Button
+import android.widget.LinearLayout
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
@@ -53,6 +55,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handleAlarmIntent(intent)
         startForegroundService(Intent(this, AlarmBridgeService::class.java))
         setContentView(R.layout.activity_main)
 
@@ -94,6 +97,18 @@ class MainActivity : ComponentActivity() {
         }
         id<Button>(R.id.clips_button).setOnClickListener { startActivity(Intent(this, ClipsActivity::class.java)) }
         id<Button>(R.id.history_button).setOnClickListener { startActivity(Intent(this, HistoryActivity::class.java)) }
+
+        val advancedBox = id<LinearLayout>(R.id.advanced_box)
+        val advancedToggle = id<Button>(R.id.advanced_toggle_button).apply {
+            setIcon(R.drawable.ic_expand_more)
+            setOnClickListener {
+                val show = advancedBox.visibility != View.VISIBLE
+                advancedBox.visibility = if (show) View.VISIBLE else View.GONE
+                setText(if (show) R.string.hide_advanced_button else R.string.show_advanced_button)
+                setIcon(if (show) R.drawable.ic_expand_less else R.drawable.ic_expand_more)
+            }
+        }
+
         id<Button>(R.id.home_assistant_button).setOnClickListener { startActivity(Intent(this, HomeAssistantActivity::class.java)) }
         id<Button>(R.id.grant_hc_button).setOnClickListener { requestHealth.launch(setOf(WRITE_SLEEP, WRITE_HEART_RATE)) }
         id<Button>(R.id.widget_button).setOnClickListener {
@@ -128,6 +143,37 @@ class MainActivity : ComponentActivity() {
     override fun onPause() {
         handler.removeCallbacks(refreshLoop)
         super.onPause()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleAlarmIntent(intent)
+    }
+
+    private fun handleAlarmIntent(intent: Intent?) {
+        if (intent == null) return
+        when (intent.action) {
+            AlarmClock.ACTION_SET_ALARM -> {
+                if (intent.hasExtra(AlarmClock.EXTRA_HOUR)) {
+                    val hour = intent.getIntExtra(AlarmClock.EXTRA_HOUR, 7).coerceIn(0, 23)
+                    val minute = intent.getIntExtra(AlarmClock.EXTRA_MINUTES, 0).coerceIn(0, 59)
+                    PhoneAlarmSync.setEnabled(this, false)
+                    PhoneAlarmSync.setCustomAlarm(this, hour, minute)
+                    Toast.makeText(
+                        this,
+                        getString(R.string.alarm_set_toast, "%02d:%02d".format(hour, minute)),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                    refreshTracking()
+                } else if (!PhoneAlarmSync.isEnabled(this)) {
+                    chooseAlarmTime()
+                }
+            }
+            AlarmClock.ACTION_SHOW_ALARMS -> {
+                // Opened to view/manage alarms; main screen already presents the alarm status and controls.
+            }
+        }
     }
 
     private fun clock(millis: Long) =
@@ -191,9 +237,12 @@ class MainActivity : ComponentActivity() {
     // Opens the Clock app's alarm list: the standard Clock app if there are several that can
     private fun openClock() {
         val show = Intent(AlarmClock.ACTION_SHOW_ALARMS)
-        val handlers = packageManager.queryIntentActivities(show, 0).map { it.activityInfo.packageName }.distinct()
-        val target = handlers.singleOrNull()
-            ?: handlers.firstOrNull { it == "com.google.android.deskclock" || it == "com.android.deskclock" }
+        val handlers = packageManager.queryIntentActivities(show, 0)
+            .map { it.activityInfo.packageName }
+            .filter { it != packageName }
+            .distinct()
+        val target = handlers.firstOrNull { it == "com.google.android.deskclock" || it == "com.android.deskclock" }
+            ?: handlers.firstOrNull()
         target?.let { show.setPackage(it) }
         if (handlers.isEmpty()) {
             Toast.makeText(this, R.string.open_clock_missing, Toast.LENGTH_SHORT).show()
@@ -225,6 +274,17 @@ class MainActivity : ComponentActivity() {
         }
         button.setText(if (found is UpdateResult.Available) R.string.download_update_button else R.string.check_update_button)
         button.setIcon(R.drawable.ic_system_update)
+
+        if (found is UpdateResult.Available) {
+            val advancedBox = id<LinearLayout>(R.id.advanced_box)
+            if (advancedBox.visibility != View.VISIBLE) {
+                advancedBox.visibility = View.VISIBLE
+                id<Button>(R.id.advanced_toggle_button).apply {
+                    setText(R.string.hide_advanced_button)
+                    setIcon(R.drawable.ic_expand_less)
+                }
+            }
+        }
     }
 
     // Hands the bundled watch app to the Pebble app, which offers to install it on the watch
