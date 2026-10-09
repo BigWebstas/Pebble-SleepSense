@@ -40,6 +40,15 @@ function pumpOutbox() {
 
 var soundInterval = null;
 var isTracking = false;
+var currentStage = null;
+var currentHr = null;
+var currentDuration = 0;
+
+function getDictValue(dict, strKey, numKey) {
+  if (dict[strKey] !== undefined) return dict[strKey];
+  if (numKey !== undefined && dict[numKey] !== undefined) return dict[numKey];
+  return undefined;
+}
 
 // Sensor toggles (default on); stored as "true"/"false" strings
 function sensorEnabled(name) {
@@ -115,7 +124,13 @@ function pushHistory(force) {
 // ---- Phone widget: status out, "start tracking" command in ----
 
 function trackingStatus() {
-  return { tracking: isTracking, since: sleepHistory.openSessionStart() };
+  return {
+    tracking: isTracking,
+    since: sleepHistory.openSessionStart(),
+    stage: currentStage,
+    hr: currentHr,
+    duration: currentDuration
+  };
 }
 
 // Tell the Android app right away when tracking starts or stops (the minute poll also carries it)
@@ -146,6 +161,10 @@ function listenForCommands() {
     if (cmd === "start" && !isTracking) {
       console.log("SleepSense PKJS: Start tracking requested from the phone");
       trackingCommand("COMMAND_START_TRACKING", true, 0);
+    }
+    if (cmd === "sync") {
+      console.log("SleepSense PKJS: Phone alarm sync requested from the phone");
+      syncPhoneAlarm();
     }
     // No app (null) or nothing pending ("none"): ask again, after a pause if the app isn't there
     setTimeout(listenForCommands, cmd === null ? 15000 : 100);
@@ -283,45 +302,69 @@ Pebble.addEventListener("appmessage", function(e) {
   console.log("SleepSense PKJS: Received message: " + JSON.stringify(dict));
 
   // A tap on Select on the watch: sync everything with the phone now
-  if (dict.REFRESH_REQUEST !== undefined) {
+  if (getDictValue(dict, "REFRESH_REQUEST", 10025) !== undefined) {
     syncPhoneAlarm();
     pushHistory(true);
   }
 
-  if (dict.TRACKING_ACTIVE !== undefined) {
-    sleepHistory.record(dict.TRACKING_ACTIVE === 1, dict, Date.now());
-    pushHistory(dict.TRACKING_ACTIVE === 0);
+  var stateVal = getDictValue(dict, "STATUS_STATE", 10000);
+  if (stateVal !== undefined) {
+    currentStage = stateVal;
+    var stageStr = stageNames[stateVal] || "UNKNOWN";
+    var lightStr = lightNames[getDictValue(dict, "STATUS_LIGHT_LEVEL", 10003)] || "Unknown";
+    console.log("SleepSense PKJS: Current State=" + stageStr + 
+                " | Duration=" + getDictValue(dict, "STATUS_DURATION", 10001) + "m" +
+                " | Deep=" + getDictValue(dict, "STATUS_DEEP_DURATION", 10002) + "m" +
+                " | Light=" + lightStr + 
+                " | Sound=" + getDictValue(dict, "STATUS_SOUND_LEVEL", 10004) + "dB" +
+                " | Cycles=" + getDictValue(dict, "STATUS_CYCLE_COUNT", 10005) +
+                " | Score=" + getDictValue(dict, "STATUS_SLEEP_SCORE", 10006) + "%");
+  }
+
+  var hrVal = getDictValue(dict, "STATUS_HEART_RATE", 10014);
+  if (hrVal !== undefined) {
+    currentHr = hrVal;
+  }
+
+  var durVal = getDictValue(dict, "STATUS_DURATION", 10001);
+  if (durVal !== undefined) {
+    currentDuration = durVal;
+  }
+
+  var trackingVal = getDictValue(dict, "TRACKING_ACTIVE", 10011);
+  if (trackingVal !== undefined) {
+    sleepHistory.record(trackingVal === 1, dict, Date.now());
+    pushHistory(trackingVal === 0);
     var wasTracking = isTracking;
-    isTracking = (dict.TRACKING_ACTIVE === 1);
-    if (wasTracking !== isTracking) reportStatus();
+    isTracking = (trackingVal === 1);
+    if (!isTracking) {
+      currentStage = null;
+      currentHr = null;
+      currentDuration = 0;
+    }
+    if (wasTracking !== isTracking || isTracking) {
+      reportStatus();
+    }
     if (isTracking && sensorEnabled("mic_en")) {
       startSoundMonitoring();
     } else {
       stopSoundMonitoring();
     }
+  } else if (isTracking) {
+    reportStatus();
   }
 
   // The watch owns the alarm settings (a phone companion app may change them there),
   // so keep this side's copy, which feeds the settings page and the startup restore, in step.
-  if (dict.ALARM_TARGET_HOUR !== undefined && dict.SMART_ALARM_ENABLED !== undefined) {
-    localStorage.setItem("alarm_hour", dict.ALARM_TARGET_HOUR);
-    localStorage.setItem("alarm_min", dict.ALARM_TARGET_MIN);
-    localStorage.setItem("smart_win", dict.SMART_WINDOW_MIN);
-    localStorage.setItem("alarm_en", dict.SMART_ALARM_ENABLED !== 0);
-    localStorage.setItem("snooze_min", dict.SNOOZE_MINUTES);
+  var alarmHourVal = getDictValue(dict, "ALARM_TARGET_HOUR", 10007);
+  var smartAlarmVal = getDictValue(dict, "SMART_ALARM_ENABLED", 10010);
+  if (alarmHourVal !== undefined && smartAlarmVal !== undefined) {
+    localStorage.setItem("alarm_hour", alarmHourVal);
+    localStorage.setItem("alarm_min", getDictValue(dict, "ALARM_TARGET_MIN", 10008));
+    localStorage.setItem("smart_win", getDictValue(dict, "SMART_WINDOW_MIN", 10009));
+    localStorage.setItem("alarm_en", smartAlarmVal !== 0);
+    localStorage.setItem("snooze_min", getDictValue(dict, "SNOOZE_MINUTES", 10020));
     updateAlarmPin();
-  }
-
-  if (dict.STATUS_STATE !== undefined) {
-    var stageStr = stageNames[dict.STATUS_STATE] || "UNKNOWN";
-    var lightStr = lightNames[dict.STATUS_LIGHT_LEVEL] || "Unknown";
-    console.log("SleepSense PKJS: Current State=" + stageStr + 
-                " | Duration=" + dict.STATUS_DURATION + "m" +
-                " | Deep=" + dict.STATUS_DEEP_DURATION + "m" +
-                " | Light=" + lightStr + 
-                " | Sound=" + dict.STATUS_SOUND_LEVEL + "dB" +
-                " | Cycles=" + dict.STATUS_CYCLE_COUNT +
-                " | Score=" + dict.STATUS_SLEEP_SCORE + "%");
   }
 
   // Voice Dream Journal Note transcript received from Pebble microphone

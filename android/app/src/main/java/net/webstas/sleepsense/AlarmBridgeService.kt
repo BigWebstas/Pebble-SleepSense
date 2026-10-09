@@ -15,6 +15,9 @@ import android.content.pm.ServiceInfo
 import android.os.IBinder
 import android.util.Log
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
@@ -91,6 +94,9 @@ class AlarmBridgeService : Service() {
                 val tracking = Regex("tracking=(\\d)").find(request)?.groupValues?.get(1)
                 if (tracking != null) {
                     val since = Regex("since=(\\d+)").find(request)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+                    val stage = Regex("stage=(\\d+)").find(request)?.groupValues?.get(1)?.toIntOrNull()
+                    val hr = Regex("hr=(\\d+)").find(request)?.groupValues?.get(1)?.toIntOrNull()
+                    val duration = Regex("duration=(\\d+)").find(request)?.groupValues?.get(1)?.toIntOrNull()
                     val isTracking = tracking == "1"
                     val wasTracking = WidgetState.tracking(this)
                     WidgetState.note(this, isTracking, since)
@@ -101,7 +107,18 @@ class AlarmBridgeService : Service() {
                     }
                     // Asked to start but the watch checks in still idle (e.g. its app had just been
                     // restarted and the command was lost): ask again
-                    if (tracking == "0" && WidgetState.startRequestedRecently(this)) Commands.queueStart()
+                    if (tracking == "0" && WidgetState.startRequestedRecently(this)) {
+                        Commands.queueStart()
+                    } else {
+                        HomeAssistant.publishState(isTracking, stage, hr, duration)
+                    }
+                    SleepRecorder.onWatchUpdate(this, isTracking, stage, hr)
+                    if (!isTracking && wasTracking) {
+                        CoroutineScope(Dispatchers.IO).launch {
+                            val left = SleepRecorder.flush(this@AlarmBridgeService)
+                            Log.i(TAG, "Session ended; $left queued for Health Connect")
+                        }
+                    }
                 }
                 SleepWidgetProvider.refreshAll(this)
                 "200 OK" to PhoneAlarmSync.json(this)

@@ -76,6 +76,13 @@
             android:layout_marginTop="8dp"
             android:minWidth="220dp" />
 
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/alarm_enabled_switch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/alarm_enabled_label" />
+
         <Button
             android:id="@+id/snooze_button"
             android:layout_width="wrap_content"
@@ -97,15 +104,6 @@
             android:layout_marginTop="4dp"
             android:gravity="center"
             android:textSize="13sp" />
-
-        <Button
-            android:id="@+id/noise_sensitivity_button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:minWidth="220dp"
-            app:icon="@drawable/ic_tune"
-            app:iconPadding="8dp" />
 
         <Button
             android:id="@+id/clips_button"
@@ -146,10 +144,32 @@
             android:visibility="gone">
 
             <TextView
+                android:id="@+id/noise_clip_sensitivity_label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="20dp"
+                android:text="@string/noise_clip_sensitivity_label"
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/noise_sensitivity_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:minWidth="220dp"
+                app:icon="@drawable/ic_tune"
+                app:iconPadding="8dp" />
+
+            <TextView
+                android:id="@+id/white_noise_section_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
                 android:text="@string/white_noise_section"
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:textSize="16sp"
                 android:textStyle="bold" />
 
             <com.google.android.material.materialswitch.MaterialSwitch
@@ -179,11 +199,21 @@
                 app:iconPadding="8dp"
                 android:text="@string/white_noise_play_button" />
 
+            <TextView
+                android:id="@+id/connectivity_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="@string/connectivity_label"
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
             <Button
                 android:id="@+id/home_assistant_button"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="8dp"
                 android:minWidth="220dp"
                 app:icon="@drawable/ic_home"
                 app:iconPadding="8dp"
@@ -214,11 +244,21 @@
                 android:layout_marginTop="4dp"
                 android:gravity="center" />
 
+            <TextView
+                android:id="@+id/interfacing_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="@string/interfacing_label"
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
             <Button
                 android:id="@+id/widget_button"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="8dp"
                 android:minWidth="220dp"
                 app:icon="@drawable/ic_widgets"
                 app:iconPadding="8dp"

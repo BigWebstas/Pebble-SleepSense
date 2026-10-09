@@ -25,6 +25,7 @@ object TrackingControl {
         Commands.queueStart()
         WidgetState.markStarting(context)
         SleepWidgetProvider.refreshAll(context)
+        HomeAssistant.publishState(true)
         if (WhiteNoisePrefs.isPlayWhileTracking(context)) {
             WhiteNoisePlayer.start(context)
         }
@@ -35,6 +36,7 @@ object TrackingControl {
     fun stop(context: Context) {
         context.startForegroundService(Intent(context, AlarmBridgeService::class.java))
         Commands.queueStop()
+        HomeAssistant.publishState(false)
         if (WhiteNoisePlayer.isPlaying) {
             WhiteNoisePlayer.stop()
         }

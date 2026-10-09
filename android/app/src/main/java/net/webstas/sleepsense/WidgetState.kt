@@ -47,7 +47,8 @@ object WidgetState {
 
     /** The two lines the widget shows. */
     fun lines(context: Context, now: Long = System.currentTimeMillis()): Pair<String, String> {
-        val alarm = PhoneAlarmSync.phoneAlarm(context)?.let { "Alarm %02d:%02d".format(it.first, it.second) } ?: "No alarm"
+        val alarm = if (!PhoneAlarmSync.isAlarmEnabled(context)) "Alarm off"
+        else PhoneAlarmSync.phoneAlarm(context)?.let { "Alarm %02d:%02d".format(it.first, it.second) } ?: "No alarm"
         val since = prefs(context).getLong("since", 0)
         return when {
             tracking(context, now) -> ("Tracking sleep" + if (since > 0) " since ${clock(since)}" else "") to alarm
@@ -67,6 +68,8 @@ object Commands {
     fun queueStart() = queue("start")
 
     fun queueStop() = queue("stop")
+
+    fun queueSync() = queue("sync")
 
     private fun queue(command: String) = synchronized(lock) {
         pending = command // a newer request replaces an older one

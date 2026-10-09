@@ -15,6 +15,7 @@ import java.time.ZoneId
 object PhoneAlarmSync {
     private const val PREFS = "alarm_sync"
     private const val KEY_ENABLED = "enabled"
+    private const val KEY_ALARM_ENABLED = "alarm_enabled"
     private const val KEY_LAST_REQUEST = "last_request"
     private const val KEY_REVISION = "revision"
     private const val KEY_CUSTOM = "custom_alarm" // minutes after midnight; unset until chosen
@@ -26,6 +27,15 @@ object PhoneAlarmSync {
     fun setEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean(KEY_ENABLED, enabled) }
         noteAlarmChanged(context) // the alarm the watch should follow may now be a different one
+    }
+
+    fun isAlarmEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_ALARM_ENABLED, true)
+
+    fun setAlarmEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean(KEY_ALARM_ENABLED, enabled) }
+        noteAlarmChanged(context)
+        Commands.queueSync()
     }
 
     /** The alarm for the watch as (hour, minute), or null if none: the phone's next alarm while syncing, else the one chosen in the app. */
@@ -59,6 +69,8 @@ object PhoneAlarmSync {
     fun noteAlarmChanged(context: Context) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         prefs.edit { putLong(KEY_REVISION, prefs.getLong(KEY_REVISION, 0) + 1) }
+        HomeAssistant.publishAlarmTime(context)
+        HomeAssistant.publishAlarmEnabled(context)
     }
 
     /**
@@ -70,10 +82,11 @@ object PhoneAlarmSync {
     fun json(context: Context): String {
         val alarm = phoneAlarm(context)
         val rev = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong(KEY_REVISION, 0)
+        val enabled = isAlarmEnabled(context) && alarm != null
         val sync = isEnabled(context) || alarm != null
         val snooze = snoozeMinutes(context)?.let { ""","snooze":$it""" } ?: ""
         val deleted = SessionStore.deleted(context).takeIf { it.isNotEmpty() }?.let { ""","deleted":[${it.joinToString(",")}]""" } ?: ""
-        return """{"sync":$sync,"rev":$rev,"enabled":${alarm != null},"hour":${alarm?.first ?: 0},"min":${alarm?.second ?: 0}$snooze$deleted}"""
+        return """{"sync":$sync,"rev":$rev,"enabled":$enabled,"hour":${alarm?.first ?: 0},"min":${alarm?.second ?: 0}$snooze$deleted}"""
     }
 
     fun noteRequest(context: Context, now: Long = System.currentTimeMillis()) {
@@ -82,7 +95,12 @@ object PhoneAlarmSync {
 
     /** Text for the app screen. */
     fun describe(context: Context): String {
-        if (!isEnabled(context)) return "Alarm sync is off."
+        if (!isAlarmEnabled(context)) return "Watch alarm is disabled."
+        if (!isEnabled(context)) {
+            val custom = customAlarm(context)
+            return if (custom != null) "Watch alarm: %02d:%02d".format(custom.first, custom.second)
+            else "Alarm sync is off."
+        }
         val a = phoneAlarm(context)
         val phone = if (a != null) "Phone alarm: %02d:%02d".format(a.first, a.second)
         else "Phone alarm: none (the Pebble smart alarm is turned off)"

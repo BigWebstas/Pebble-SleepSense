@@ -92,6 +92,13 @@ class MainActivity : AppCompatActivity() {
             }
         }
         id<Button>(R.id.alarm_time_button).setOnClickListener { chooseAlarmTime() }
+        id<MaterialSwitch>(R.id.alarm_enabled_switch).apply {
+            isChecked = PhoneAlarmSync.isAlarmEnabled(this@MainActivity)
+            setOnCheckedChangeListener { _, on ->
+                PhoneAlarmSync.setAlarmEnabled(this@MainActivity, on)
+                refreshTracking()
+            }
+        }
         id<Button>(R.id.snooze_button).setOnClickListener { chooseSnooze() }
         id<MaterialSwitch>(R.id.noise_switch).apply {
             isChecked = NoiseClips.isEnabled(this@MainActivity)
@@ -252,6 +259,7 @@ class MainActivity : AppCompatActivity() {
                 else -> getString(R.string.snooze_minutes, snooze)
             },
         )
+        id<MaterialSwitch>(R.id.alarm_enabled_switch).isChecked = PhoneAlarmSync.isAlarmEnabled(this)
     }
 
     private fun chooseAlarmTime() {
@@ -361,7 +369,6 @@ class MainActivity : AppCompatActivity() {
         }
         val sens = NoiseClips.sensitivity(this)
         id<Button>(R.id.noise_sensitivity_button).apply {
-            visibility = if (enabled) View.VISIBLE else View.GONE
             text = getString(R.string.noise_sensitivity_button, getString(sens.titleRes))
         }
     }

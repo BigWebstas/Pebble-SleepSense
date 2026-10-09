@@ -23,6 +23,7 @@
     <string name="snooze_off">off</string>
     <string name="snooze_minutes">%1$d min</string>
     <string name="alarm_sync_label">Sync phone alarm to Pebble</string>
+    <string name="alarm_enabled_label">Alarm enabled</string>
     <string name="noise_label">Record clips on noise spikes while tracking</string>
     <string name="noise_off">Noise monitoring is off. It listens through the phone microphone only while the watch is tracking sleep.</string>
     <string name="noise_needs_permission">Microphone permission is needed. Switch this off and on to be asked again.</string>
@@ -33,8 +34,10 @@
     <string name="hc_unavailable">Health Connect is not available on this phone.</string>
     <string name="grant_hc_button">Grant Health Connect access</string>
 
+    <string name="interfacing_label">Interfacing</string>
     <string name="add_widget_button">Add widget to home screen</string>
     <string name="noise_clips_button">Noise clips</string>
+    <string name="connectivity_label">Connectivity</string>
     <string name="home_assistant_button">Home Assistant (MQTT)</string>
     <string name="ha_intro">Publishes sleep tracking, sleep stage and heart rate to your MQTT broker. Home Assistant finds them on its own (MQTT discovery), and its switch can start and stop tracking. Port 8883 uses TLS.</string>
     <string name="ha_enable">Send to MQTT broker</string>
@@ -66,7 +69,8 @@
     <string name="hide_advanced_button">Hide advanced</string>
 
     <!-- Noise sensitivity -->
-    <string name="noise_sensitivity_title">Noise sensitivity</string>
+    <string name="noise_clip_sensitivity_label">Noise Clip Sensitivity</string>
+    <string name="noise_sensitivity_title">Noise clip sensitivity</string>
     <string name="noise_sensitivity_button">Sensitivity: %s</string>
     <string name="noise_sens_low_title">Low</string>
     <string name="noise_sens_low_desc">Low — loud snoring &amp; events (56 dB)</string>

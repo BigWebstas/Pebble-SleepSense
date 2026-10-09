@@ -8,7 +8,20 @@ var URL = 'http://127.0.0.1:8765/alarm';
 function fetchPhoneAlarm(callback, status) {
   var xhr = new XMLHttpRequest();
   // The request doubles as a heartbeat; `status` tells the app whether the watch is tracking
-  xhr.open('GET', status ? URL + '?tracking=' + (status.tracking ? 1 : 0) + '&since=' + status.since : URL, true);
+  var query = '';
+  if (status) {
+    query = '?tracking=' + (status.tracking ? 1 : 0) + '&since=' + (status.since || 0);
+    if (status.stage !== null && status.stage !== undefined) {
+      query += '&stage=' + status.stage;
+    }
+    if (status.hr !== null && status.hr !== undefined && status.hr > 0) {
+      query += '&hr=' + status.hr;
+    }
+    if (status.duration !== null && status.duration !== undefined) {
+      query += '&duration=' + status.duration;
+    }
+  }
+  xhr.open('GET', URL + query, true);
   xhr.timeout = 4000;
   xhr.onload = function () {
     try {
