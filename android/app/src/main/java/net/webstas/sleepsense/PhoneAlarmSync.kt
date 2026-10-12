@@ -38,6 +38,13 @@ object PhoneAlarmSync {
         Commands.queueSync()
     }
 
+    /** The alarm was switched on or off on the watch: follow it, without sending it back. */
+    fun alarmEnabledOnWatch(context: Context, enabled: Boolean) {
+        if (enabled == isAlarmEnabled(context)) return
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean(KEY_ALARM_ENABLED, enabled) }
+        HomeAssistant.publishAlarmEnabled(context)
+    }
+
     /** The alarm for the watch as (hour, minute), or null if none: the phone's next alarm while syncing, else the one chosen in the app. */
     fun phoneAlarm(context: Context): Pair<Int, Int>? {
         if (!isEnabled(context)) return customAlarm(context)
@@ -77,7 +84,8 @@ object PhoneAlarmSync {
      * What the watchapp's JS gets: {"sync":true,"rev":3,"enabled":true,"hour":6,"min":45,"snooze":9}.
      * "sync" is false when there is no alarm to apply (syncing is off and none was chosen here);
      * "snooze" is left out until a length was chosen here. "deleted" lists start times of history
-     * sessions deleted in the app, for the JS to drop from its own copy; it is left out when empty.
+     * sessions deleted in the app, for the JS to drop from its own copy; "ratings" maps session start
+     * times to the stars set in the app, for the JS to take over. Both are left out when empty.
      */
     fun json(context: Context): String {
         val alarm = phoneAlarm(context)
@@ -86,7 +94,9 @@ object PhoneAlarmSync {
         val sync = isEnabled(context) || alarm != null
         val snooze = snoozeMinutes(context)?.let { ""","snooze":$it""" } ?: ""
         val deleted = SessionStore.deleted(context).takeIf { it.isNotEmpty() }?.let { ""","deleted":[${it.joinToString(",")}]""" } ?: ""
-        return """{"sync":$sync,"rev":$rev,"enabled":$enabled,"hour":${alarm?.first ?: 0},"min":${alarm?.second ?: 0}$snooze$deleted}"""
+        val ratings = SessionStore.ratings(context).takeIf { it.isNotEmpty() }
+            ?.let { ""","ratings":{${it.entries.joinToString(",") { (start, stars) -> "\"$start\":$stars" }}}""" } ?: ""
+        return """{"sync":$sync,"rev":$rev,"enabled":$enabled,"hour":${alarm?.first ?: 0},"min":${alarm?.second ?: 0}$snooze$deleted$ratings}"""
     }
 
     fun noteRequest(context: Context, now: Long = System.currentTimeMillis()) {

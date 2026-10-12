@@ -20,6 +20,10 @@ function fetchPhoneAlarm(callback, status) {
     if (status.duration !== null && status.duration !== undefined) {
       query += '&duration=' + status.duration;
     }
+    // Only sent when the alarm was switched on or off on the watch itself
+    if (status.alarm !== undefined) {
+      query += '&alarm=' + (status.alarm ? 1 : 0);
+    }
   }
   xhr.open('GET', URL + query, true);
   xhr.timeout = 4000;

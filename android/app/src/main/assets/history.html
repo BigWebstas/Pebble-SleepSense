@@ -21,6 +21,9 @@
   .ic { width: 18px; height: 18px; vertical-align: -4px; margin-right: 8px; }
   button { width: 100%; padding: 12px; font-size: 15px; margin-top: 8px; border: none; border-radius: 6px; background: var(--btn-2-bg); color: var(--btn-2-fg); }
   button.danger { color: var(--danger); }
+  .stars { display: flex; gap: 4px; margin-top: 4px; }
+  .stars button { width: auto; flex: 1; margin: 0; padding: 8px 0; font-size: 24px; background: none; color: var(--hint); }
+  .stars button.on { color: #f5b301; }
   button:disabled { opacity: 0.5; }
   p.hint { font-size: 12px; color: var(--hint); }
   p.error { font-size: 13px; color: var(--danger); }
@@ -44,6 +47,8 @@
   <div id="historyBox">
     <label for="sessionPick">Session</label>
     <select id="sessionPick"></select>
+    <label>Sleep rating</label>
+    <div id="stars" class="stars"></div>
     <div id="graphs"></div>
     <button id="deleteBtn" class="danger"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6,19c0,1.1 0.9,2 2,2h8c1.1,0 2,-0.9 2,-2V7H6v12zM19,4h-3.5l-1,-1h-5l-1,1H5v2h14V4z"/></svg>Delete this session</button>
   </div>
@@ -95,7 +100,29 @@
     if (!sessions.length) { return; }
     var s = sessions[parseInt(pick.value, 10)];
     $('graphs').innerHTML = report.sessionStats(s) + report.sessionGraphs(s);
+    renderStars(s);
     $('deleteBtn').disabled = !!s.open; // the night being tracked can't be deleted
+  }
+  // Five stars for the session on show; tapping the lit last star clears the rating
+  function renderStars(s) {
+    var box = $('stars');
+    box.innerHTML = '';
+    box.style.display = s.open ? 'none' : 'flex'; // the night being tracked can't be rated yet
+    box.previousElementSibling.style.display = box.style.display;
+    for (var i = 1; i <= 5; i++) {
+      var b = document.createElement('button');
+      b.textContent = '\u2605';
+      b.className = i <= (s.rating || 0) ? 'on' : '';
+      b.setAttribute('aria-label', i + (i === 1 ? ' star' : ' stars'));
+      b.addEventListener('click', (function (n) {
+        return function () {
+          s.rating = n === s.rating ? 0 : n;
+          Android.rateSession(s.start, s.rating);
+          renderStars(s);
+        };
+      })(i));
+      box.appendChild(b);
+    }
   }
   pick.addEventListener('change', showSession);
   $('deleteBtn').addEventListener('click', function () {

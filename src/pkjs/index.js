@@ -228,6 +228,7 @@ function syncPhoneAlarm() {
       });
     }
     if (a && a.deleted) sleepHistory.removeSessions(a.deleted);
+    if (a && a.ratings) sleepHistory.applyRatings(a.ratings);
     if (!a || !a.sync) return;
     var key = a.enabled ? (a.hour + ":" + a.min) : "none";
     // The Android app counts every alarm change, so even a quick off/on (or re-enabling at the
@@ -362,9 +363,24 @@ Pebble.addEventListener("appmessage", function(e) {
     localStorage.setItem("alarm_hour", alarmHourVal);
     localStorage.setItem("alarm_min", getDictValue(dict, "ALARM_TARGET_MIN", 10008));
     localStorage.setItem("smart_win", getDictValue(dict, "SMART_WINDOW_MIN", 10009));
-    localStorage.setItem("alarm_en", smartAlarmVal !== 0);
+    // Switched on or off on the watch (the phone's own changes arrive already stored): tell the app
+    var alarmOn = smartAlarmVal !== 0;
+    var storedAlarmEn = localStorage.getItem("alarm_en");
+    if (storedAlarmEn !== null && (storedAlarmEn !== "false") !== alarmOn) {
+      var status = trackingStatus();
+      status.alarm = alarmOn;
+      phoneAlarm.fetchPhoneAlarm(function() {}, status);
+    }
+    localStorage.setItem("alarm_en", alarmOn);
     localStorage.setItem("snooze_min", getDictValue(dict, "SNOOZE_MINUTES", 10020));
     updateAlarmPin();
+  }
+
+  // Star rating of the night, given on the watch after the alarm is dismissed
+  var ratingVal = getDictValue(dict, "SLEEP_RATING", 10026);
+  if (ratingVal !== undefined && sleepHistory.setRating(ratingVal)) {
+    lastPush = 0; // the push for the end of the night may have been moments ago
+    pushHistory(true);
   }
 
   // Voice Dream Journal Note transcript received from Pebble microphone

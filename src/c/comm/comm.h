@@ -16,3 +16,6 @@ void comm_start_voice_journal(void);
 
 //! Asks the phone to sync now (alarm, history, status) instead of at its next scheduled check
 void comm_request_refresh(void);
+
+//! Sends the 1-5 star rating of the night that just ended
+void comm_send_rating(uint8_t stars);

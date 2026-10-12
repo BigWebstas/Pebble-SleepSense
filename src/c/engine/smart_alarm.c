@@ -384,10 +384,12 @@ void smart_alarm_dismiss(void) {
     prv_stop_ringing();
     APP_LOG(APP_LOG_LEVEL_INFO, "Alarm dismissed by user");
     smart_alarm_sync_wakeup();
-    if (sleep_engine_is_tracking()) {
+    bool was_tracking = sleep_engine_is_tracking();
+    if (was_tracking) {
       sleep_engine_stop_session();
-    } else if (s_dismiss_cb) {
-      s_dismiss_cb();
+    }
+    if (s_dismiss_cb) {
+      s_dismiss_cb(was_tracking);
     }
   }
 }

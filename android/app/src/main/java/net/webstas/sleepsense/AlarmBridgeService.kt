@@ -90,6 +90,7 @@ class AlarmBridgeService : Service() {
             request.startsWith("GET /command") -> "200 OK" to """{"cmd":"${Commands.await(25_000)}"}"""
             request.startsWith("GET /alarm") -> {
                 PhoneAlarmSync.noteRequest(this)
+                Regex("alarm=(\\d)").find(request)?.let { PhoneAlarmSync.alarmEnabledOnWatch(this, it.groupValues[1] == "1") }
                 // The watchapp's JS checks in every minute and says whether the watch is tracking
                 val tracking = Regex("tracking=(\\d)").find(request)?.groupValues?.get(1)
                 if (tracking != null) {
@@ -136,6 +137,7 @@ class AlarmBridgeService : Service() {
                 }
                 if (read == contentLength) {
                     SessionStore.save(this, String(bytes, Charsets.UTF_8))
+                    HomeAssistant.publishRating(this) // a rating given on the watch arrives with the history
                     "200 OK" to """{"ok":true,"bytes":$read}"""
                 } else {
                     "400 Bad Request" to "incomplete body"

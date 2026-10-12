@@ -4,6 +4,7 @@
 #include "engine/smart_alarm.h"
 #include "comm/comm.h"
 #include "ui/ui_main.h"
+#include "ui/ui_rating.h"
 
 static void prv_engine_update_handler(const SleepSession *session) {
   ui_main_update(session);
@@ -15,9 +16,12 @@ static void prv_alarm_trigger_handler(bool is_smart_wake) {
   comm_send_session_update(sleep_engine_get_session());
 }
 
-static void prv_alarm_dismiss_handler(void) {
+static void prv_alarm_dismiss_handler(bool ended_session) {
   ui_main_update(sleep_engine_get_session());
   comm_send_session_update(sleep_engine_get_session());
+  if (ended_session) {
+    ui_rating_show();
+  }
 }
 
 static void prv_init(void) {

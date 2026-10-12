@@ -57,7 +57,8 @@
       "COMMAND_START_TRACKING",
       "COMMAND_STOP_TRACKING",
       "STATUS_VMC",
-      "REFRESH_REQUEST"
+      "REFRESH_REQUEST",
+      "SLEEP_RATING"
     ],
     "resources": {
       "media": [

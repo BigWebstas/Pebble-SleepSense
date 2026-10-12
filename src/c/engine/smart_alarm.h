@@ -3,7 +3,8 @@
 #include "../model/sleep_types.h"
 
 typedef void (*SmartAlarmTriggerCallback)(bool is_smart_wake);
-typedef void (*SmartAlarmDismissCallback)(void);
+//! `ended_session`: the dismissal also ended a tracked night
+typedef void (*SmartAlarmDismissCallback)(bool ended_session);
 
 //! Initialize smart alarm module and read saved preferences
 void smart_alarm_init(void);

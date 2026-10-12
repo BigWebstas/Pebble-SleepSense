@@ -57,6 +57,10 @@ class HistoryActivity : AppCompatActivity() {
             }
         }
 
+        // Stars are saved at once; the page already shows them
+        @JavascriptInterface fun rateSession(start: Long, stars: Int) =
+            SessionStore.setRating(this@HistoryActivity, start, stars.coerceIn(0, 5))
+
         @JavascriptInterface fun copy(text: String) {
             runOnUiThread {
                 getSystemService(ClipboardManager::class.java)

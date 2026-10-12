@@ -156,6 +156,15 @@ void comm_send_session_update(const SleepSession *session) {
   app_message_outbox_send();
 }
 
+void comm_send_rating(uint8_t stars) {
+  DictionaryIterator *out_iter;
+  if (app_message_outbox_begin(&out_iter) != APP_MSG_OK || !out_iter) {
+    return;
+  }
+  dict_write_uint8(out_iter, MESSAGE_KEY_SLEEP_RATING, stars);
+  app_message_outbox_send();
+}
+
 void comm_start_voice_journal(void) {
 #if defined(PBL_MICROPHONE)
   if (s_dictation_session) {

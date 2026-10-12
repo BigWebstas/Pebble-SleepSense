@@ -29,6 +29,8 @@ private const val ALARM_TIME = "$BASE/alarm_time"
 private const val ALARM_TIME_SET = "$BASE/alarm_time/set"
 private const val ALARM_ENABLED = "$BASE/alarm_enabled"
 private const val ALARM_ENABLED_SET = "$BASE/alarm_enabled/set"
+private const val SLEEP_RATING = "$BASE/sleep_rating"
+private const val LAST_NIGHT = "$BASE/last_night"
 private const val RETRY_MS = 30_000L
 
 data class MqttSettings(
@@ -76,6 +78,7 @@ object HomeAssistant {
     private var heartRate: Int? = null
     private var asleepMs = 0L // light + deep + REM this session; kept after tracking stops
     private var lastUpdateAt = 0L
+    private var publishedNight: String? = null // forgotten on every (re)connect, so the broker gets it again
 
     init {
         io.scheduleWithFixedDelay({
@@ -149,6 +152,30 @@ object HomeAssistant {
                         c.publish(ALARM_TIME, retained("%02d:%02d".format(alarm.first, alarm.second)))
                     } catch (e: Exception) {
                         Log.w(TAG, "could not publish alarm time: $e")
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * The star rating of the last finished night, and the whole night (start, end, minutes asleep, stars)
+     * for the Super Productivity plugin. Nothing is sent while that night is still unrated.
+     */
+    fun publishRating(context: Context? = null) {
+        val app = (context ?: appContext)?.applicationContext ?: return
+        io.execute {
+            synchronized(this) {
+                val night = SessionStore.latestRatedNight(app) ?: return@synchronized
+                val payload = night.toString()
+                if (payload == publishedNight) return@synchronized
+                client?.takeIf { it.isConnected }?.let { c ->
+                    try {
+                        c.publish(SLEEP_RATING, retained(night.getInt("rating").toString()))
+                        c.publish(LAST_NIGHT, retained(payload))
+                        publishedNight = payload
+                    } catch (e: Exception) {
+                        Log.w(TAG, "could not publish sleep rating: $e")
                     }
                 }
             }
@@ -281,6 +308,8 @@ object HomeAssistant {
             c.subscribe(ALARM_TIME_SET, 1)
             c.subscribe(ALARM_ENABLED_SET, 1)
             publishDiscovery(c)
+            publishedNight = null
+            publishRating()
             publishCurrent(c)
             c.publish(AVAILABILITY, retained("online"))
         } catch (e: Exception) {
@@ -335,6 +364,11 @@ object HomeAssistant {
             put("device_class", "duration")
             put("unit_of_measurement", "min")
             put("state_class", "measurement")
+        }
+        entity("sensor", "sleep_rating", "Sleep rating") {
+            put("unit_of_measurement", "stars")
+            put("state_class", "measurement")
+            put("icon", "mdi:star")
         }
         // Clear unsupported MQTT 'time' discovery topic if previously retained
         c.publish("homeassistant/time/sleepsense/alarm_time/config", retained(""))

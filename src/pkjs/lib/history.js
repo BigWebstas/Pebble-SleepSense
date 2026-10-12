@@ -40,6 +40,31 @@ function removeSessions(starts) {
   if (kept.length !== sessions.length) save(kept);
 }
 
+// The 1-5 star rating of the night that just ended, given on the watch after the alarm.
+// Returns false when there is no finished night to attach it to.
+function setRating(stars) {
+  var sessions = load();
+  var last = sessions.length ? sessions[sessions.length - 1] : null;
+  if (!last || !last.end) return false;
+  last.rating = stars;
+  save(sessions);
+  return true;
+}
+
+// Ratings set in the Android app, as {start: stars}; 0 clears one. Sessions it doesn't know are skipped.
+function applyRatings(ratings) {
+  var sessions = load();
+  var changed = false;
+  sessions.forEach(function (s) {
+    var stars = ratings[s.start];
+    if (stars !== undefined && (s.rating || 0) !== stars) {
+      s.rating = stars;
+      changed = true;
+    }
+  });
+  if (changed) save(sessions);
+}
+
 // Called for every watch status message. Opens a session when tracking starts,
 // appends at most one sample a minute, and closes the session when it stops.
 function record(tracking, d, now) {
@@ -140,6 +165,7 @@ function bucket(session) {
     snoozes: session.snoozes || 0,
     snoozeSec: session.snoozeSec || 0,
     events: session.events || [],
+    rating: session.rating || 0,
     samples: samples
   };
 }
@@ -167,6 +193,8 @@ function setLastExport(ts) {
 module.exports = {
   record: record,
   removeSessions: removeSessions,
+  setRating: setRating,
+  applyRatings: applyRatings,
   getBucketedSessions: getBucketedSessions,
   openSessionStart: openSessionStart,
   getLastExport: getLastExport,
