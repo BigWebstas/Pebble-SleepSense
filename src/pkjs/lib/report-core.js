@@ -108,7 +108,8 @@ function reportCore() {
   function sessionStats(s) {
     var m = summarize(s);
     var rows = [
-      ['Time in bed', fmtDur(m.duration)],
+      ['Time in bed', fmtTime(s.start) + '–' + fmtTime(s.end) + ' (' + fmtDur(m.duration) + ')'],
+      ['Asleep', fmtDur((m.light + m.deep + m.rem) * MIN)],
       ['Awake / Light / Deep / REM', m.awake + ' / ' + m.light + ' / ' + m.deep + ' / ' + m.rem + ' min'],
       ['Average heart rate', m.avgHr ? m.avgHr + ' bpm' : '-'],
       ['Average room noise', m.avgNoise ? m.avgNoise + ' dB' : '-'],

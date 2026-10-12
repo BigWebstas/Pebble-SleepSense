@@ -5,6 +5,9 @@ import androidx.core.content.edit
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 /**
  * The sleep history the watchapp's phone-side JavaScript pushes to the bridge (a JSON array of
@@ -57,19 +60,38 @@ object SessionStore {
             val session = all.getJSONObject(i)
             if (session.optBoolean("open")) continue
             val rating = session.optInt("rating").takeIf { it in 1..5 } ?: return null
-            val end = session.optLong("end")
-            val samples = session.optJSONArray("samples") ?: JSONArray()
-            var asleepMs = 0L
-            for (j in 0 until samples.length()) {
-                val sample = samples.getJSONObject(j)
-                if (sample.optInt("s") == 0) continue
-                val until = if (j + 1 < samples.length()) samples.getJSONObject(j + 1).optLong("t") else end
-                asleepMs += (until - sample.optLong("t")).coerceIn(0, MAX_SAMPLE_GAP_MS)
-            }
-            return JSONObject().put("start", session.optLong("start")).put("end", end)
-                .put("minutes", asleepMs / 60_000).put("rating", rating)
+            return JSONObject().put("start", session.optLong("start")).put("end", session.optLong("end"))
+                .put("minutes", asleepMinutes(session)).put("rating", rating)
         }
         return null
+    }
+
+    /** Minutes asleep in all finished sessions that ended today (a night and a nap add up). */
+    fun asleepMinutesToday(context: Context): Long {
+        val all = JSONArray(load(context))
+        val today = LocalDate.now()
+        var total = 0L
+        for (i in 0 until all.length()) {
+            val session = all.getJSONObject(i)
+            if (session.optBoolean("open")) continue
+            if (Instant.ofEpochMilli(session.optLong("end")).atZone(ZoneId.systemDefault()).toLocalDate() == today) {
+                total += asleepMinutes(session)
+            }
+        }
+        return total
+    }
+
+    private fun asleepMinutes(session: JSONObject): Long {
+        val end = session.optLong("end")
+        val samples = session.optJSONArray("samples") ?: JSONArray()
+        var asleepMs = 0L
+        for (j in 0 until samples.length()) {
+            val sample = samples.getJSONObject(j)
+            if (sample.optInt("s") == 0) continue
+            val until = if (j + 1 < samples.length()) samples.getJSONObject(j + 1).optLong("t") else end
+            asleepMs += (until - sample.optLong("t")).coerceIn(0, MAX_SAMPLE_GAP_MS)
+        }
+        return asleepMs / 60_000
     }
 
     /** Start times of sessions deleted here, which the JS is still being told to drop. */

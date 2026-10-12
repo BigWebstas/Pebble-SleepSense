@@ -158,6 +158,26 @@ object HomeAssistant {
         }
     }
 
+    /** Total sleep today: finished sessions that ended today, plus the one being tracked right now. */
+    private fun sleepMinutesToday(): Long =
+        (appContext?.let(SessionStore::asleepMinutesToday) ?: 0) + if (tracking) asleepMs / 60_000 else 0
+
+    /** Republishes the sleep total, e.g. once a finished session has reached the history. */
+    fun publishSleepDuration(context: Context? = null) {
+        (context ?: appContext)?.let { appContext = it.applicationContext }
+        io.execute {
+            synchronized(this) {
+                client?.takeIf { it.isConnected }?.let { c ->
+                    try {
+                        c.publish(SLEEP_DURATION, retained(sleepMinutesToday().toString()))
+                    } catch (e: Exception) {
+                        Log.w(TAG, "could not publish sleep duration: $e")
+                    }
+                }
+            }
+        }
+    }
+
     /**
      * The star rating of the last finished night, and the whole night (start, end, minutes asleep, stars)
      * for the Super Productivity plugin. Nothing is sent while that night is still unrated.
@@ -322,7 +342,7 @@ object HomeAssistant {
             c.publish(TRACKING, retained(if (tracking) "ON" else "OFF"))
             c.publish(STAGE, retained(stage))
             c.publish(HEART_RATE, retained(heartRate?.takeIf { it > 0 }?.toString() ?: "0"))
-            c.publish(SLEEP_DURATION, retained((asleepMs / 60_000).toString()))
+            c.publish(SLEEP_DURATION, retained(sleepMinutesToday().toString()))
             appContext?.let { app ->
                 val alarm = PhoneAlarmSync.phoneAlarm(app) ?: PhoneAlarmSync.customAlarm(app) ?: (7 to 0)
                 c.publish(ALARM_TIME, retained("%02d:%02d".format(alarm.first, alarm.second)))
