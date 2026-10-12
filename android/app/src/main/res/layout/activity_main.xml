@@ -227,6 +227,23 @@
                 android:gravity="center"
                 android:textSize="13sp" />
 
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/calendar_sync_switch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/calendar_sync_label" />
+
+            <Button
+                android:id="@+id/calendar_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:minWidth="220dp"
+                app:icon="@drawable/ic_history"
+                app:iconPadding="8dp"
+                android:text="@string/calendar_choose_button" />
+
             <Button
                 android:id="@+id/grant_hc_button"
                 android:layout_width="wrap_content"

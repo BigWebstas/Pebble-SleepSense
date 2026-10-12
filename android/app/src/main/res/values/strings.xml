@@ -39,6 +39,12 @@
     <string name="noise_clips_button">Noise clips</string>
     <string name="connectivity_label">Connectivity</string>
     <string name="home_assistant_button">Home Assistant (MQTT)</string>
+    <string name="calendar_sync_label">Add nights to a calendar</string>
+    <string name="calendar_choose_button">Calendar: %1$s</string>
+    <string name="calendar_none">none chosen</string>
+    <string name="calendar_choose_title">Add nights to</string>
+    <string name="calendar_no_calendars">No calendar on this phone accepts new events.</string>
+    <string name="calendar_permission_denied">Calendar access is needed to add nights.</string>
     <string name="ha_intro">Publishes sleep tracking, sleep stage and heart rate to your MQTT broker. Home Assistant finds them on its own (MQTT discovery), and its switch can start and stop tracking. Port 8883 uses TLS.</string>
     <string name="ha_enable">Send to MQTT broker</string>
     <string name="ha_host">Broker host</string>

@@ -33,6 +33,7 @@ object SessionStore {
         val tmp = File(context.filesDir, "$FILE.tmp")
         tmp.writeText(adjusted(context, json))
         tmp.renameTo(file(context)) // a reader never sees a half-written file
+        CalendarSync.sync(context)
     }
 
     /** Ratings set here (session start to 0-5 stars), which the JS is still being told. */
@@ -81,7 +82,7 @@ object SessionStore {
         return total
     }
 
-    private fun asleepMinutes(session: JSONObject): Long {
+    fun asleepMinutes(session: JSONObject): Long {
         val end = session.optLong("end")
         val samples = session.optJSONArray("samples") ?: JSONArray()
         var asleepMs = 0L

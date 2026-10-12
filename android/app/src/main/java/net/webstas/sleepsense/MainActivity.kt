@@ -51,6 +51,16 @@ class MainActivity : AppCompatActivity() {
     private val requestHealth =
         registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { refreshHealth() }
 
+    private val requestCalendar =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+            if (CalendarSync.hasPermission(this)) {
+                enableCalendarSync()
+            } else {
+                Toast.makeText(this, R.string.calendar_permission_denied, Toast.LENGTH_SHORT).show()
+                id<MaterialSwitch>(R.id.calendar_sync_switch).isChecked = false
+            }
+        }
+
     private var update: UpdateResult? = null
     private val whiteNoiseListener = { _: Boolean -> runOnUiThread { refreshWhiteNoise() } }
 
@@ -149,6 +159,17 @@ class MainActivity : AppCompatActivity() {
         WhiteNoisePlayer.addListener(whiteNoiseListener)
 
         id<Button>(R.id.home_assistant_button).setOnClickListener { startActivity(Intent(this, HomeAssistantActivity::class.java)) }
+        id<MaterialSwitch>(R.id.calendar_sync_switch).apply {
+            isChecked = CalendarSync.isEnabled(this@MainActivity)
+            setOnCheckedChangeListener { _, on ->
+                if (!on) CalendarSync.setEnabled(this@MainActivity, false)
+                else if (CalendarSync.hasPermission(this@MainActivity)) enableCalendarSync()
+                else requestCalendar.launch(CalendarSync.PERMISSIONS)
+            }
+        }
+        id<Button>(R.id.calendar_button).setOnClickListener {
+            if (CalendarSync.hasPermission(this)) chooseCalendar() else requestCalendar.launch(CalendarSync.PERMISSIONS)
+        }
         id<Button>(R.id.grant_hc_button).setOnClickListener { requestHealth.launch(setOf(WRITE_SLEEP, WRITE_HEART_RATE)) }
         id<Button>(R.id.widget_button).setOnClickListener {
             val manager = getSystemService(AppWidgetManager::class.java)
@@ -177,6 +198,7 @@ class MainActivity : AppCompatActivity() {
         refreshNoise()
         refreshHealth()
         refreshWhiteNoise()
+        refreshCalendar()
         handler.post(refreshLoop)
     }
 
@@ -268,6 +290,38 @@ class MainActivity : AppCompatActivity() {
             PhoneAlarmSync.setCustomAlarm(this, h, m)
             refreshAlarmSettings()
         }, hour, minute, DateFormat.is24HourFormat(this)).show()
+    }
+
+    private fun refreshCalendar() {
+        id<Button>(R.id.calendar_button).text = getString(
+            R.string.calendar_choose_button,
+            CalendarSync.calendarName(this) ?: getString(R.string.calendar_none),
+        )
+    }
+
+    private fun enableCalendarSync() {
+        CalendarSync.setEnabled(this, true)
+        if (CalendarSync.calendarName(this) == null) chooseCalendar() else syncCalendar()
+    }
+
+    private fun syncCalendar() {
+        lifecycleScope.launch(Dispatchers.IO) { CalendarSync.sync(applicationContext) }
+    }
+
+    private fun chooseCalendar() {
+        val calendars = CalendarSync.calendars(this)
+        if (calendars.isEmpty()) {
+            Toast.makeText(this, R.string.calendar_no_calendars, Toast.LENGTH_SHORT).show()
+            return
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.calendar_choose_title)
+            .setItems(calendars.map { it.name }.toTypedArray()) { _, which ->
+                CalendarSync.setCalendar(this, calendars[which].id)
+                refreshCalendar()
+                if (CalendarSync.isEnabled(this)) syncCalendar()
+            }
+            .show()
     }
 
     private fun chooseSnooze() {
