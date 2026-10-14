@@ -42,6 +42,7 @@ var soundInterval = null;
 var isTracking = false;
 var currentStage = null;
 var currentHr = null;
+var watchQuietTime = null; // the watch's Quiet Time, as last reported
 var currentDuration = 0;
 
 function getDictValue(dict, strKey, numKey) {
@@ -129,7 +130,8 @@ function trackingStatus() {
     since: sleepHistory.openSessionStart(),
     stage: currentStage,
     hr: currentHr,
-    duration: currentDuration
+    duration: currentDuration,
+    quiet: watchQuietTime
   };
 }
 
@@ -330,6 +332,11 @@ Pebble.addEventListener("appmessage", function(e) {
   var durVal = getDictValue(dict, "STATUS_DURATION", 10001);
   if (durVal !== undefined) {
     currentDuration = durVal;
+  }
+
+  var quietVal = getDictValue(dict, "STATUS_QUIET_TIME", 10029);
+  if (quietVal !== undefined) {
+    watchQuietTime = quietVal !== 0;
   }
 
   var trackingVal = getDictValue(dict, "TRACKING_ACTIVE", 10011);

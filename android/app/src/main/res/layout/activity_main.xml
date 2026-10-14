@@ -14,8 +14,8 @@
         android:padding="24dp">
 
         <ImageView
-            android:layout_width="96dp"
-            android:layout_height="96dp"
+            android:layout_width="144dp"
+            android:layout_height="144dp"
             android:layout_marginBottom="8dp"
             android:contentDescription="@null"
             android:src="@drawable/ic_launcher_foreground" />
@@ -26,11 +26,24 @@
             android:gravity="center"
             android:text="@string/main_status_text" />
 
+        <com.google.android.material.divider.MaterialDivider
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp" />
+
+        <TextView
+            android:id="@+id/tracking_section_label"
+            style="@style/SectionHeader"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/tracking_section" />
+
         <TextView
             android:id="@+id/tracking_status_text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="12dp"
             android:gravity="center"
             android:textSize="18sp"
             android:textStyle="bold" />
@@ -62,11 +75,24 @@
             app:iconPadding="8dp"
             android:text="@string/open_clock_button" />
 
+        <com.google.android.material.divider.MaterialDivider
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp" />
+
+        <TextView
+            android:id="@+id/alarm_section_label"
+            style="@style/SectionHeader"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/alarm_section" />
+
         <com.google.android.material.materialswitch.MaterialSwitch
             android:id="@+id/alarm_sync_switch"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
+            android:layout_marginTop="8dp"
             android:text="@string/alarm_sync_label" />
 
         <Button
@@ -90,11 +116,24 @@
             android:layout_marginTop="8dp"
             android:minWidth="220dp" />
 
+        <com.google.android.material.divider.MaterialDivider
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp" />
+
+        <TextView
+            android:id="@+id/review_section_label"
+            style="@style/SectionHeader"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/review_section" />
+
         <Button
             android:id="@+id/clips_button"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="8dp"
             android:minWidth="220dp"
             app:icon="@drawable/ic_mic"
             app:iconPadding="8dp"
@@ -114,7 +153,7 @@
             android:id="@+id/advanced_toggle_button"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
+            android:layout_marginTop="32dp"
             android:minWidth="220dp"
             app:icon="@drawable/ic_expand_more"
             app:iconPadding="8dp"
@@ -128,15 +167,18 @@
             android:orientation="vertical"
             android:visibility="gone">
 
+            <com.google.android.material.divider.MaterialDivider
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp" />
+
             <TextView
                 android:id="@+id/noise_clips_section_label"
+                style="@style/SectionHeader"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:text="@string/noise_clips_section"
-                android:textAppearance="?attr/textAppearanceTitleMedium"
-                android:textSize="16sp"
-                android:textStyle="bold" />
+                android:layout_marginTop="16dp"
+                android:text="@string/noise_clips_section" />
 
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/noise_switch"
@@ -162,15 +204,18 @@
                 app:icon="@drawable/ic_tune"
                 app:iconPadding="8dp" />
 
+            <com.google.android.material.divider.MaterialDivider
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp" />
+
             <TextView
                 android:id="@+id/bedtime_section_label"
+                style="@style/SectionHeader"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:text="@string/bedtime_section"
-                android:textAppearance="?attr/textAppearanceTitleMedium"
-                android:textSize="16sp"
-                android:textStyle="bold" />
+                android:layout_marginTop="16dp"
+                android:text="@string/bedtime_section" />
 
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/bedtime_switch"
@@ -179,15 +224,18 @@
                 android:layout_marginTop="8dp"
                 android:text="@string/bedtime_label" />
 
+            <com.google.android.material.divider.MaterialDivider
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp" />
+
             <TextView
                 android:id="@+id/white_noise_section_label"
+                style="@style/SectionHeader"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:text="@string/white_noise_section"
-                android:textAppearance="?attr/textAppearanceTitleMedium"
-                android:textSize="16sp"
-                android:textStyle="bold" />
+                android:layout_marginTop="16dp"
+                android:text="@string/white_noise_section" />
 
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/white_noise_tracking_switch"
@@ -216,15 +264,18 @@
                 app:iconPadding="8dp"
                 android:text="@string/white_noise_play_button" />
 
+            <com.google.android.material.divider.MaterialDivider
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp" />
+
             <TextView
                 android:id="@+id/connectivity_label"
+                style="@style/SectionHeader"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:text="@string/connectivity_label"
-                android:textAppearance="?attr/textAppearanceTitleMedium"
-                android:textSize="16sp"
-                android:textStyle="bold" />
+                android:layout_marginTop="16dp"
+                android:text="@string/connectivity_label" />
 
             <Button
                 android:id="@+id/home_assistant_button"
@@ -278,15 +329,18 @@
                 android:layout_marginTop="4dp"
                 android:gravity="center" />
 
+            <com.google.android.material.divider.MaterialDivider
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp" />
+
             <TextView
                 android:id="@+id/interfacing_label"
+                style="@style/SectionHeader"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:text="@string/interfacing_label"
-                android:textAppearance="?attr/textAppearanceTitleMedium"
-                android:textSize="16sp"
-                android:textStyle="bold" />
+                android:layout_marginTop="16dp"
+                android:text="@string/interfacing_label" />
 
             <Button
                 android:id="@+id/widget_button"

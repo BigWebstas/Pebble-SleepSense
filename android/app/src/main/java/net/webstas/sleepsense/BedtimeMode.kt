@@ -52,14 +52,14 @@ object BedtimeMode {
         prefs.edit { putBoolean(KEY_ACTIVE, tracking) }
         if (tracking) {
             if (!isEnabled(context)) return
-            if (hasAccess(context)) apply(context, true)
+            if (hasAccess(context)) applySafely(context, true)
             // The watch can only flip Quiet Time, so only flip it when it isn't already on
             if (quietTime == false) {
                 prefs.edit { putBoolean(KEY_WATCH_QUIET, true) }
                 toggleWatchQuietTime(context, reopenSleepSense = true)
             }
         } else {
-            if (hasAccess(context)) apply(context, false)
+            if (hasAccess(context)) applySafely(context, false)
             if (prefs.getBoolean(KEY_WATCH_QUIET, false)) {
                 prefs.edit { putBoolean(KEY_WATCH_QUIET, false) }
                 if (quietTime != false) toggleWatchQuietTime(context, reopenSleepSense = false)
@@ -90,10 +90,19 @@ object BedtimeMode {
         }
     }
 
+    /** Never lets a Do Not Disturb failure take the bridge service down. */
+    private fun applySafely(context: Context, on: Boolean) {
+        try {
+            apply(context, on)
+        } catch (e: Exception) {
+            Log.w(TAG, "could not turn bedtime mode ${if (on) "on" else "off"}: $e")
+        }
+    }
+
     private fun apply(context: Context, on: Boolean) {
         val nm = manager(context)
         val prefs = prefs(context)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val id = prefs.getString(KEY_RULE_ID, null)?.takeIf { nm.getAutomaticZenRule(it) != null }
                 ?: nm.addAutomaticZenRule(bedtimeRule(context)).also { prefs.edit { putString(KEY_RULE_ID, it) } }
             val state = if (on) Condition.STATE_TRUE else Condition.STATE_FALSE
@@ -108,14 +117,17 @@ object BedtimeMode {
         }
     }
 
-    private fun bedtimeRule(context: Context) = AutomaticZenRule.Builder(
+    // Android reserves its own TYPE_BEDTIME rule for the Wellbeing app, so this is a rule of our own
+    // (alarms only, like Bedtime mode) that shows up in Do Not Disturb as "SleepSense"
+    private fun bedtimeRule(context: Context) = AutomaticZenRule(
         context.getString(R.string.app_name),
+        null,
+        ComponentName(context, MainActivity::class.java),
         RULE_CONDITION,
+        null,
+        NotificationManager.INTERRUPTION_FILTER_ALARMS,
+        true,
     )
-        .setType(AutomaticZenRule.TYPE_BEDTIME)
-        .setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALARMS)
-        .setConfigurationActivity(ComponentName(context, MainActivity::class.java))
-        .build()
 
     private val RULE_CONDITION: Uri = Uri.parse("sleepsense://bedtime")
 

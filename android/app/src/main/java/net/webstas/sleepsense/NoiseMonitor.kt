@@ -1,7 +1,9 @@
 package net.webstas.sleepsense
 
 import android.content.Context
+import android.media.AudioDeviceInfo
 import android.media.AudioFormat
+import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.util.Log
@@ -14,6 +16,16 @@ import kotlin.math.max
 import kotlin.math.sqrt
 
 private const val TAG = "NoiseMonitor"
+
+/** Outputs that sound comes out of away from the phone's microphone. */
+private val EXTERNAL_OUTPUT_TYPES = setOf(
+    AudioDeviceInfo.TYPE_WIRED_HEADSET, AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+    AudioDeviceInfo.TYPE_BLUETOOTH_A2DP, AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+    AudioDeviceInfo.TYPE_USB_HEADSET, AudioDeviceInfo.TYPE_USB_DEVICE, AudioDeviceInfo.TYPE_USB_ACCESSORY,
+    AudioDeviceInfo.TYPE_BLE_HEADSET, AudioDeviceInfo.TYPE_BLE_SPEAKER, AudioDeviceInfo.TYPE_BLE_BROADCAST,
+    AudioDeviceInfo.TYPE_HEARING_AID, AudioDeviceInfo.TYPE_LINE_ANALOG, AudioDeviceInfo.TYPE_LINE_DIGITAL,
+    AudioDeviceInfo.TYPE_HDMI, AudioDeviceInfo.TYPE_AUX_LINE, AudioDeviceInfo.TYPE_DOCK,
+)
 
 /** Configurable sensitivity levels for noise spike detection. */
 enum class NoiseSensitivity(
@@ -198,6 +210,11 @@ class NoiseMonitor(private val context: Context) {
                 }
                 overCount++
                 if (overCount >= sens.requiredSeconds && seconds > WARMUP_SECONDS && cooldown == 0) {
+                    if (hearsOwnWhiteNoise()) {
+                        // The phone's own speaker is next to its microphone; that is not a noise in the room
+                        overCount = 0
+                        continue
+                    }
                     // Loud enough for long enough above the room's average: record, starting a few seconds earlier
                     Log.i(TAG, "spike: $db dB over baseline ${baseline.toInt()} (sens=${sens.id})")
                     clip = ArrayList(ring)
@@ -213,6 +230,13 @@ class NoiseMonitor(private val context: Context) {
             record.release()
             Log.i(TAG, "stopped")
         }
+    }
+
+    /** White noise is playing from the phone's own speaker (no headphones or Bluetooth), right by the microphone. */
+    private fun hearsOwnWhiteNoise(): Boolean {
+        if (!WhiteNoisePlayer.isPlaying) return false
+        val audio = context.getSystemService(AudioManager::class.java)
+        return audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS).none { it.type in EXTERNAL_OUTPUT_TYPES }
     }
 
     private fun save(chunks: List<ShortArray>, startMillis: Long, peakDb: Int) {

@@ -24,6 +24,9 @@
     <string name="snooze_minutes">%1$d min</string>
     <string name="alarm_sync_label">Sync phone alarm to Pebble</string>
     <string name="alarm_enabled_label">Alarm enabled</string>
+    <string name="tracking_section">Tracking</string>
+    <string name="alarm_section">Alarm</string>
+    <string name="review_section">Review</string>
     <string name="bedtime_section">Sleep Mode</string>
     <string name="noise_clips_section">Noise Clips</string>
     <string name="bedtime_label">Quiet time and bedtime mode while tracking</string>
