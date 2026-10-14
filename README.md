@@ -139,7 +139,7 @@ cd android
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-The **Install on Pebble** button needs the watch app to be bundled in the APK: run `pebble build` in the repository root *before* `./gradlew assembleDebug` (the build copies `build/PebbleSleepTracker.pbw` into the app; without it the button explains what to do).
+The **Install on Pebble** button needs the watch app to be bundled in the APK: run `pebble build` in the repository root *before* `./gradlew assembleDebug` (the build copies `build/PebbleSleepSense.pbw` into the app; without it the button explains what to do).
 
 Open the app once so it can start the bridge (it restarts itself after updates and reboots). The history screen bundles `src/pkjs/lib/report-core.js` through a symbolic link in `android/app/src/main/assets/`.
 
@@ -155,7 +155,7 @@ Pebble-SleepSense/
 ├── docs/screenshots/              # Images used in this README
 ├── src/
 │   ├── c/                         # Watch app
-│   │   ├── pebble_sleep_tracker.c # Entry point and wiring
+│   │   ├── pebble_sleep_sense.c # Entry point and wiring
 │   │   ├── model/sleep_types.h    # SleepStage, SleepEpoch, SleepSession, alarm and sensor settings
 │   │   ├── engine/                # Sleep staging, tracking session, smart alarm and snooze
 │   │   ├── comm/                  # AppMessage with the phone, dictation
