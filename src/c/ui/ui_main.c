@@ -106,6 +106,8 @@ static void prv_hypnogram_update_proc(Layer *layer, GContext *ctx) {
 #define BELL_UNITS 110                          // the bell below is drawn on a 110-unit-tall grid
 #define BELL_CLAPPER_LEN 108
 #define BELL_CLAPPER_R 8
+#define BELL_TIME_H 26                          // the clock under the bell
+#define BELL_HINT_RESERVE PBL_IF_ROUND_ELSE(48, 22)  // the button hint at the bottom, at its tallest
 
 //! The bell outline, hanging from (0, 0): a rounded crown and shoulders flaring out to the lip
 static const GPoint s_bell_points[] = {
@@ -163,6 +165,14 @@ static void prv_bell_update_proc(Layer *layer, GContext *ctx) {
     }
   }
 
+  time_t now = time(NULL);
+  char time_buf[8];
+  strftime(time_buf, sizeof(time_buf), clock_is_24h_style() ? "%H:%M" : "%I:%M", localtime(&now));
+  graphics_context_set_text_color(ctx, GColorWhite);
+  graphics_draw_text(ctx, time_buf, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),
+                     GRect(0, bounds.size.h - BELL_HINT_RESERVE - BELL_TIME_H, bounds.size.w, BELL_TIME_H),
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+
   // Two short lines on a round screen, where one long one would be cut off at both ends
   bool can_snooze = smart_alarm_get_settings()->snooze_minutes != 0;
   const char *hint = can_snooze ? PBL_IF_ROUND_ELSE("SEL stop\nUP/DOWN snooze", "SEL stop  UP/DOWN snooze")
@@ -216,7 +226,13 @@ static void prv_bell_show(void) {
 }
 
 static void prv_bell_create(Layer *window_layer, GRect bounds) {
+  // Hung from the top of the screen, under the beam
+  s_bell_pivot_y = PBL_IF_ROUND_ELSE(16, 12);
   int16_t size = (bounds.size.w < bounds.size.h ? bounds.size.w : bounds.size.h) * 54 / 100;
+  // Leave room under the clapper for the time and the hint
+  int16_t room = bounds.size.h - BELL_HINT_RESERVE - BELL_TIME_H - s_bell_pivot_y;
+  int16_t fit = room * BELL_UNITS / (BELL_CLAPPER_LEN + BELL_CLAPPER_R);
+  if (size > fit) size = fit;
   // The path keeps pointing at these, so they must outlive this function
   static GPoint s_scaled[ARRAY_LENGTH(s_bell_points)];
   static GPathInfo s_info = { .num_points = ARRAY_LENGTH(s_bell_points), .points = s_scaled };
@@ -226,8 +242,6 @@ static void prv_bell_create(Layer *window_layer, GRect bounds) {
   s_bell_path = gpath_create(&s_info);
   s_bell_clapper_len = BELL_CLAPPER_LEN * size / BELL_UNITS;
   s_bell_clapper_r = BELL_CLAPPER_R * size / BELL_UNITS;
-  // Hung from the top of the screen, under the beam
-  s_bell_pivot_y = PBL_IF_ROUND_ELSE(16, 12);
 
   s_bell_layer = layer_create(bounds);
   layer_set_update_proc(s_bell_layer, prv_bell_update_proc);
