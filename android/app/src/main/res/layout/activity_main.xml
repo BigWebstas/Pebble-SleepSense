@@ -39,14 +39,36 @@
             android:layout_marginTop="16dp"
             android:text="@string/tracking_section" />
 
-        <TextView
-            android:id="@+id/tracking_status_text"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:gravity="center"
-            android:textSize="18sp"
-            android:textStyle="bold" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <View
+                android:id="@+id/tracking_dot_start"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:background="@drawable/ic_tracking_dot"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tracking_status_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="12dp"
+                android:gravity="center"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <View
+                android:id="@+id/tracking_dot_end"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:background="@drawable/ic_tracking_dot"
+                android:visibility="gone" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/alarm_status_text"
