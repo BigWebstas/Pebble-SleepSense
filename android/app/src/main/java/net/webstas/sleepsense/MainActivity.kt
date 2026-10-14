@@ -12,6 +12,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.AlarmClock
+import android.provider.Settings
 import android.text.format.DateFormat
 import android.view.View
 import android.view.WindowInsets
@@ -109,6 +110,12 @@ class MainActivity : AppCompatActivity() {
                 refreshTracking()
             }
         }
+        id<MaterialSwitch>(R.id.bedtime_switch).setOnCheckedChangeListener { _, on ->
+            BedtimeMode.setEnabled(this, on)
+            if (on && !BedtimeMode.hasAccess(this)) {
+                startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
+            }
+        }
         id<Button>(R.id.snooze_button).setOnClickListener { chooseSnooze() }
         id<MaterialSwitch>(R.id.noise_switch).apply {
             isChecked = NoiseClips.isEnabled(this@MainActivity)
@@ -195,6 +202,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Off again if the user came back from the settings page without granting access
+        id<MaterialSwitch>(R.id.bedtime_switch).isChecked = BedtimeMode.isEnabled(this) && BedtimeMode.hasAccess(this)
         refreshNoise()
         refreshHealth()
         refreshWhiteNoise()

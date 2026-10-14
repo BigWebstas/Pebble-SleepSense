@@ -90,26 +90,11 @@
             android:layout_marginTop="8dp"
             android:minWidth="220dp" />
 
-        <com.google.android.material.materialswitch.MaterialSwitch
-            android:id="@+id/noise_switch"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="@string/noise_label" />
-
-        <TextView
-            android:id="@+id/noise_status_text"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:gravity="center"
-            android:textSize="13sp" />
-
         <Button
             android:id="@+id/clips_button"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="16dp"
             android:minWidth="220dp"
             app:icon="@drawable/ic_mic"
             app:iconPadding="8dp"
@@ -144,14 +129,29 @@
             android:visibility="gone">
 
             <TextView
-                android:id="@+id/noise_clip_sensitivity_label"
+                android:id="@+id/noise_clips_section_label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="20dp"
-                android:text="@string/noise_clip_sensitivity_label"
+                android:text="@string/noise_clips_section"
                 android:textAppearance="?attr/textAppearanceTitleMedium"
                 android:textSize="16sp"
                 android:textStyle="bold" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/noise_switch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/noise_label" />
+
+            <TextView
+                android:id="@+id/noise_status_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center"
+                android:textSize="13sp" />
 
             <Button
                 android:id="@+id/noise_sensitivity_button"
@@ -161,6 +161,23 @@
                 android:minWidth="220dp"
                 app:icon="@drawable/ic_tune"
                 app:iconPadding="8dp" />
+
+            <TextView
+                android:id="@+id/bedtime_section_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="@string/bedtime_section"
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/bedtime_switch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/bedtime_label" />
 
             <TextView
                 android:id="@+id/white_noise_section_label"
