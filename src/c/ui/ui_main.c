@@ -16,7 +16,6 @@ static TextLayer *s_date_layer;
 static char s_time_buf[16];
 static char s_date_buf[24];
 #endif
-static Layer *s_hypnogram_layer;
 static Layer *s_bell_layer;
 static GPath *s_bell_path;
 static AppTimer *s_bell_timer;
@@ -31,72 +30,6 @@ static char s_stage_buf[32];
 static char s_duration_buf[48];
 static char s_alarm_buf[48];
 static char s_countdown_buf[32];
-
-//! Custom hypnogram rendering procedure
-static void prv_hypnogram_update_proc(Layer *layer, GContext *ctx) {
-  GRect bounds = layer_get_bounds(layer);
-  const SleepSession *session = sleep_engine_get_session();
-
-  // Draw background box
-  graphics_context_set_fill_color(ctx, GColorDarkGray);
-  graphics_fill_rect(ctx, bounds, 2, GCornersAll);
-
-  if (!session || session->epoch_count == 0) {
-    // Empty state guideline
-    graphics_context_set_stroke_color(ctx, GColorLightGray);
-    graphics_draw_line(ctx, GPoint(bounds.origin.x + 2, bounds.origin.y + bounds.size.h / 2),
-                            GPoint(bounds.origin.x + bounds.size.w - 3, bounds.origin.y + bounds.size.h / 2));
-    return;
-  }
-
-  uint16_t count = session->epoch_count;
-  int16_t avail_w = bounds.size.w - 4;
-  int16_t step_w = (count > 0 && avail_w > count) ? (avail_w / count) : 1;
-  if (step_w < 1) step_w = 1;
-
-  // Render epochs in chronological order
-  uint16_t start_idx = (session->epoch_head + SLEEP_EPOCH_HISTORY_MAX - count) % SLEEP_EPOCH_HISTORY_MAX;
-
-  for (uint16_t i = 0; i < count; i++) {
-    uint16_t idx = (start_idx + i) % SLEEP_EPOCH_HISTORY_MAX;
-    const SleepEpoch *epoch = &session->epochs[idx];
-
-    int16_t x = bounds.origin.x + 2 + (i * avail_w) / count;
-    int16_t w = step_w;
-    if (x + w > bounds.origin.x + bounds.size.w - 2) {
-      w = (bounds.origin.x + bounds.size.w - 2) - x;
-    }
-    if (w <= 0) break;
-
-    // Y position and height by stage
-    // Top = Awake, Upper-Mid = REM, Lower-Mid = Light, Bottom = Deep
-    int16_t h = bounds.size.h;
-    int16_t bar_y = bounds.origin.y;
-    int16_t bar_h = h / 4;
-
-    switch (epoch->stage) {
-      case SLEEP_STAGE_AWAKE:
-        bar_y = bounds.origin.y + 1;
-        bar_h = h / 4;
-        break;
-      case SLEEP_STAGE_REM:
-        bar_y = bounds.origin.y + h / 4;
-        bar_h = h / 4;
-        break;
-      case SLEEP_STAGE_LIGHT:
-        bar_y = bounds.origin.y + (h * 2) / 4;
-        bar_h = h / 4;
-        break;
-      case SLEEP_STAGE_DEEP:
-        bar_y = bounds.origin.y + (h * 3) / 4;
-        bar_h = h / 4 - 1;
-        break;
-    }
-
-    graphics_context_set_fill_color(ctx, sleep_engine_stage_color(epoch->stage));
-    graphics_fill_rect(ctx, GRect(x, bar_y, w, bar_h), 0, GCornerNone);
-  }
-}
 
 // --- Ringing alarm: a bell swinging from a beam, with the backlight held on ---
 
@@ -343,7 +276,7 @@ void ui_main_update(const SleepSession *session) {
     snprintf(s_duration_buf, sizeof(s_duration_buf), "%02luh %02lum  |  %d Cycles",
              hours, mins, session->cycle_count);
   } else {
-    snprintf(s_duration_buf, sizeof(s_duration_buf), "Ready to track sleep");
+    snprintf(s_duration_buf, sizeof(s_duration_buf), "Ready to track");
   }
   text_layer_set_text(s_duration_layer, s_duration_buf);
 
@@ -363,9 +296,6 @@ void ui_main_update(const SleepSession *session) {
   }
   text_layer_set_text(s_alarm_layer, s_alarm_buf);
   prv_refresh_countdown();
-
-  // Redraw hypnogram layer
-  layer_mark_dirty(s_hypnogram_layer);
 
   if (is_ringing) {
     prv_bell_show();
@@ -465,6 +395,19 @@ static void prv_click_config_provider(void *context) {
   window_long_click_subscribe(BUTTON_ID_DOWN, HOLD_MS, prv_down_long_click_handler, NULL);
 }
 
+// Emery is wide enough for bigger type on the two rows that carry the most text
+#if defined(PBL_PLATFORM_EMERY)
+#define STAGE_FONT FONT_KEY_GOTHIC_28_BOLD
+#define DURATION_FONT FONT_KEY_GOTHIC_24_BOLD
+#define DURATION_H 28
+#define ALARM_FONT FONT_KEY_GOTHIC_18_BOLD
+#else
+#define STAGE_FONT FONT_KEY_GOTHIC_24_BOLD
+#define DURATION_FONT FONT_KEY_GOTHIC_18_BOLD
+#define DURATION_H 22
+#define ALARM_FONT FONT_KEY_GOTHIC_14_BOLD
+#endif
+
 static void prv_window_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(window_layer);
@@ -476,11 +419,11 @@ static void prv_window_load(Window *window) {
 #endif
 
   int16_t w = bounds.size.w;
-  int16_t y = PBL_IF_ROUND_ELSE(10, 4);
+  int16_t y = PBL_IF_ROUND_ELSE(16, 4);
 
   // 1. Header Layer
-  s_header_layer = text_layer_create(GRect(0, y, w, 18));
-  text_layer_set_font(s_header_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD));
+  s_header_layer = text_layer_create(GRect(0, y, w, 24));
+  text_layer_set_font(s_header_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD));
   text_layer_set_text_alignment(s_header_layer, GTextAlignmentCenter);
   text_layer_set_background_color(s_header_layer, GColorClear);
 #if defined(PBL_COLOR)
@@ -489,25 +432,18 @@ static void prv_window_load(Window *window) {
   text_layer_set_text_color(s_header_layer, GColorBlack);
 #endif
   layer_add_child(window_layer, text_layer_get_layer(s_header_layer));
-  y += 20;
+  y += 24;
 
   // 2. Stage Hero Layer
-  s_stage_layer = text_layer_create(GRect(8, y, w - 16, 32));
-  text_layer_set_font(s_stage_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
+  s_stage_layer = text_layer_create(GRect(8, y, w - 16, 36));
+  text_layer_set_font(s_stage_layer, fonts_get_system_font(STAGE_FONT));
   text_layer_set_text_alignment(s_stage_layer, GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(s_stage_layer));
-  y += 36;
-
-  // 3. Hypnogram Graph Layer (height 28 px)
-  int16_t graph_margin = PBL_IF_ROUND_ELSE(20, 8);
-  s_hypnogram_layer = layer_create(GRect(graph_margin, y, w - (graph_margin * 2), 26));
-  layer_set_update_proc(s_hypnogram_layer, prv_hypnogram_update_proc);
-  layer_add_child(window_layer, s_hypnogram_layer);
-  y += 30;
+  y += 40;
 
   // 4. Duration & Cycles Layer
-  s_duration_layer = text_layer_create(GRect(4, y, w - 8, 20));
-  text_layer_set_font(s_duration_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD));
+  s_duration_layer = text_layer_create(GRect(4, y, w - 8, DURATION_H));
+  text_layer_set_font(s_duration_layer, fonts_get_system_font(DURATION_FONT));
   text_layer_set_text_alignment(s_duration_layer, GTextAlignmentCenter);
   text_layer_set_background_color(s_duration_layer, GColorClear);
 #if defined(PBL_COLOR)
@@ -516,11 +452,11 @@ static void prv_window_load(Window *window) {
   text_layer_set_text_color(s_duration_layer, GColorBlack);
 #endif
   layer_add_child(window_layer, text_layer_get_layer(s_duration_layer));
-  y += 22;
+  y += DURATION_H + 2;
 
   // 5. Smart Alarm Bottom Status Layer
-  s_alarm_layer = text_layer_create(GRect(4, y, w - 8, 18));
-  text_layer_set_font(s_alarm_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD));
+  s_alarm_layer = text_layer_create(GRect(4, y, w - 8, 24));
+  text_layer_set_font(s_alarm_layer, fonts_get_system_font(ALARM_FONT));
   text_layer_set_text_alignment(s_alarm_layer, GTextAlignmentCenter);
   text_layer_set_background_color(s_alarm_layer, GColorClear);
 #if defined(PBL_COLOR)
@@ -529,7 +465,7 @@ static void prv_window_load(Window *window) {
   text_layer_set_text_color(s_alarm_layer, GColorBlack);
 #endif
   layer_add_child(window_layer, text_layer_get_layer(s_alarm_layer));
-  y += 17;
+  y += 22;
 
   // 5b. Time until the alarm
   s_countdown_layer = text_layer_create(GRect(4, y, w - 8, 22));
@@ -576,7 +512,6 @@ static void prv_window_unload(Window *window) {
   text_layer_destroy(s_alarm_layer);
   text_layer_destroy(s_countdown_layer);
   s_countdown_layer = NULL;
-  layer_destroy(s_hypnogram_layer);
 #if defined(PBL_PLATFORM_EMERY)
   text_layer_destroy(s_time_layer);
   text_layer_destroy(s_date_layer);

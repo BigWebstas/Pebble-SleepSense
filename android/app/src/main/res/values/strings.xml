@@ -24,6 +24,12 @@
     <string name="snooze_minutes">%1$d min</string>
     <string name="alarm_sync_label">Sync phone alarm to Pebble</string>
     <string name="alarm_enabled_label">Alarm enabled</string>
+    <string name="tracking_section">Tracking</string>
+    <string name="alarm_section">Alarm</string>
+    <string name="review_section">Review</string>
+    <string name="bedtime_section">Sleep Mode</string>
+    <string name="noise_clips_section">Noise Clips</string>
+    <string name="bedtime_label">Quiet time and bedtime mode while tracking</string>
     <string name="noise_label">Record clips on noise spikes while tracking</string>
     <string name="noise_off">Noise monitoring is off. It listens through the phone microphone only while the watch is tracking sleep.</string>
     <string name="noise_needs_permission">Microphone permission is needed. Switch this off and on to be asked again.</string>
@@ -75,7 +81,6 @@
     <string name="hide_advanced_button">Hide advanced</string>
 
     <!-- Noise sensitivity -->
-    <string name="noise_clip_sensitivity_label">Noise Clip Sensitivity</string>
     <string name="noise_sensitivity_title">Noise clip sensitivity</string>
     <string name="noise_sensitivity_button">Sensitivity: %s</string>
     <string name="noise_sens_low_title">Low</string>

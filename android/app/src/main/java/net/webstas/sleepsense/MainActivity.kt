@@ -1,6 +1,8 @@
 package net.webstas.sleepsense
 
 import android.Manifest
+import android.animation.ObjectAnimator
+import android.animation.PropertyValuesHolder
 import android.app.TimePickerDialog
 import android.appwidget.AppWidgetManager
 import android.content.ActivityNotFoundException
@@ -12,6 +14,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.AlarmClock
+import android.provider.Settings
 import android.text.format.DateFormat
 import android.view.View
 import android.view.WindowInsets
@@ -109,6 +112,12 @@ class MainActivity : AppCompatActivity() {
                 refreshTracking()
             }
         }
+        id<MaterialSwitch>(R.id.bedtime_switch).setOnCheckedChangeListener { _, on ->
+            BedtimeMode.setEnabled(this, on)
+            if (on && !BedtimeMode.hasAccess(this)) {
+                startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
+            }
+        }
         id<Button>(R.id.snooze_button).setOnClickListener { chooseSnooze() }
         id<MaterialSwitch>(R.id.noise_switch).apply {
             isChecked = NoiseClips.isEnabled(this@MainActivity)
@@ -195,6 +204,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Off again if the user came back from the settings page without granting access
+        id<MaterialSwitch>(R.id.bedtime_switch).isChecked = BedtimeMode.isEnabled(this) && BedtimeMode.hasAccess(this)
         refreshNoise()
         refreshHealth()
         refreshWhiteNoise()
@@ -210,6 +221,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         handler.removeCallbacks(refreshLoop)
+        stopDotPulses()
         super.onPause()
     }
 
@@ -252,6 +264,7 @@ class MainActivity : AppCompatActivity() {
         val tracking = WidgetState.tracking(this)
         val (title, subtitle) = WidgetState.lines(this)
         id<TextView>(R.id.tracking_status_text).text = title
+        setTrackingDots(tracking)
         id<TextView>(R.id.alarm_status_text).text = PhoneAlarmSync.describe(this).lineSequence().first()
         id<Button>(R.id.tracking_button).apply {
             setText(if (tracking) R.string.stop_tracking_button else R.string.start_tracking_button)
@@ -259,6 +272,37 @@ class MainActivity : AppCompatActivity() {
         }
         refreshAlarmSettings()
         id<TextView>(R.id.home_assistant_status_text).setText(HomeAssistant.statusText(this))
+    }
+
+    private val dotPulses = mutableListOf<ObjectAnimator>()
+
+    // Green dots either side of the status pulse while tracking, out of step with each other
+    private fun setTrackingDots(tracking: Boolean) {
+        val dots = listOf(id<View>(R.id.tracking_dot_start), id<View>(R.id.tracking_dot_end))
+        dots.forEach { it.visibility = if (tracking) View.VISIBLE else View.GONE }
+        if (!tracking) {
+            stopDotPulses()
+        } else if (dotPulses.isEmpty()) {
+            dots.forEachIndexed { i, dot ->
+                dotPulses += ObjectAnimator.ofPropertyValuesHolder(
+                    dot,
+                    PropertyValuesHolder.ofFloat(View.ALPHA, 0.25f, 1f),
+                    PropertyValuesHolder.ofFloat(View.SCALE_X, 0.6f, 1f),
+                    PropertyValuesHolder.ofFloat(View.SCALE_Y, 0.6f, 1f),
+                ).apply {
+                    duration = 900
+                    startDelay = i * 450L
+                    repeatCount = ObjectAnimator.INFINITE
+                    repeatMode = ObjectAnimator.REVERSE
+                    start()
+                }
+            }
+        }
+    }
+
+    private fun stopDotPulses() {
+        dotPulses.forEach { it.cancel() }
+        dotPulses.clear()
     }
 
     // The alarm time can be set here only while the phone's own alarm isn't being followed

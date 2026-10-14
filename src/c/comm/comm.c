@@ -161,6 +161,7 @@ void comm_send_session_update(const SleepSession *session) {
   dict_write_uint8(out_iter, MESSAGE_KEY_SMART_ALARM_ENABLED, alarm->enabled ? 1 : 0);
   dict_write_uint8(out_iter, MESSAGE_KEY_SNOOZE_MINUTES, alarm->snooze_minutes);
   dict_write_uint8(out_iter, MESSAGE_KEY_TRACKING_ACTIVE, session->is_tracking ? 1 : 0);
+  dict_write_uint8(out_iter, MESSAGE_KEY_STATUS_QUIET_TIME, quiet_time_is_active() ? 1 : 0);
 
   app_message_outbox_send();
 }
