@@ -87,7 +87,13 @@ static void prv_inbox_dropped(AppMessageResult reason, void *context) {
   APP_LOG(APP_LOG_LEVEL_WARNING, "AppMessage inbox dropped: %d", reason);
 }
 
+// Updates the phone never got, counted since the app started and reported with every update so a
+// gap in the phone's history can be told apart from a quiet link
+static uint16_t s_send_fails = 0; // sent, but the phone did not take it
+static uint16_t s_send_busy = 0;  // not sent: the outbox was busy or the link was down
+
 static void prv_outbox_failed(DictionaryIterator *iter, AppMessageResult reason, void *context) {
+  if (s_send_fails < UINT16_MAX) s_send_fails++;
   APP_LOG(APP_LOG_LEVEL_WARNING, "AppMessage outbox failed: %d", reason);
 }
 
@@ -126,6 +132,7 @@ void comm_send_session_update(const SleepSession *session) {
   DictionaryIterator *out_iter;
   AppMessageResult result = app_message_outbox_begin(&out_iter);
   if (result != APP_MSG_OK || !out_iter) {
+    if (s_send_busy < UINT16_MAX) s_send_busy++;
     return;
   }
 
@@ -138,6 +145,8 @@ void comm_send_session_update(const SleepSession *session) {
   dict_write_uint8(out_iter, MESSAGE_KEY_STATUS_SLEEP_SCORE, session->sleep_score);
   dict_write_uint8(out_iter, MESSAGE_KEY_STATUS_HEART_RATE, session->current_hr);
   dict_write_uint16(out_iter, MESSAGE_KEY_STATUS_VMC, session->current_vmc); // movement (accelerometer)
+  dict_write_uint16(out_iter, MESSAGE_KEY_STATUS_SEND_FAILS, s_send_fails);
+  dict_write_uint16(out_iter, MESSAGE_KEY_STATUS_SEND_BUSY, s_send_busy);
   dict_write_uint8(out_iter, MESSAGE_KEY_STATUS_SNOOZE_COUNT, session->snooze_count);
   dict_write_uint32(out_iter, MESSAGE_KEY_STATUS_SNOOZE_SEC, session->snooze_sec);
   // 0 = quiet, 1 = ringing, 2 = snoozed (the phone turns changes into timeline events)

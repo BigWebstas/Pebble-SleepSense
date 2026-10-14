@@ -23,6 +23,7 @@ object SessionStore {
     private const val KEY_LAST_EXPORT = "last_export"
     private const val KEY_DELETED = "deleted"
     private const val KEY_RATINGS = "ratings" // "start:stars" entries; 0 stars clears a rating
+    private const val MAX_SAMPLE_GAP_MS = 10L * 60_000 // a gap in the samples is unknown time, not sleep (as in report-core.js)
     private const val FORGET_AFTER_MS = 40L * 24 * 3600 * 1000 // the JS keeps 35 days, so it is long gone by then
 
     private fun file(context: Context) = File(context.filesDir, FILE)
@@ -89,7 +90,7 @@ object SessionStore {
             val sample = samples.getJSONObject(j)
             if (sample.optInt("s") == 0) continue
             val until = if (j + 1 < samples.length()) samples.getJSONObject(j + 1).optLong("t") else end
-            asleepMs += (until - sample.optLong("t")).coerceAtLeast(0) // a gap holds the last stage, as in report-core.js
+            asleepMs += (until - sample.optLong("t")).coerceIn(0, MAX_SAMPLE_GAP_MS)
         }
         return asleepMs / 60_000
     }

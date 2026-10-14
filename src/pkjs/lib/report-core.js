@@ -21,6 +21,7 @@ function reportCore() {
     { name: 'V.Dark', value: 1, color: '#4d4426' }
   ];
   var MIN = 60000;
+  var MAX_HOLD = 10 * MIN; // keep in step with SessionStore.MAX_SAMPLE_GAP_MS
   var ALARM_EVENTS = {
     1: { name: 'Alarm rang', word: 'rang', color: '#ff4d4f' },
     2: { name: 'Snoozed', word: 'snoozed', color: '#f5a623' },
@@ -44,11 +45,12 @@ function reportCore() {
     return Math.floor(m / 60) + 'h ' + pad(m % 60) + 'm';
   }
 
-  // Samples with the time each one held until the next (or the session end)
+  // Samples with the time each one held until the next (or the session end). A gap in the samples
+  // is unknown time, so a sample holds for MAX_HOLD at most
   function spans(s) {
     return s.samples.map(function (p, i) {
       var to = i + 1 < s.samples.length ? s.samples[i + 1].t : s.end;
-      return { from: p.t, to: Math.max(to, p.t), p: p };
+      return { from: p.t, to: Math.min(Math.max(to, p.t), p.t + MAX_HOLD), p: p };
     });
   }
 
