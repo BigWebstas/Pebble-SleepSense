@@ -35,6 +35,7 @@ private const val MAX_BODY = 5 * 1024 * 1024 // a month of history is ~150 KB
 class AlarmBridgeService : Service() {
     private var server: ServerSocket? = null
     private val monitor by lazy { NoiseMonitor(applicationContext) }
+    private val oximeter by lazy { OximeterMonitor(applicationContext) }
 
     // The service is always running, so it sees every change to the next alarm as it happens
     private val alarmChanged = object : BroadcastReceiver() {
@@ -214,6 +215,7 @@ class AlarmBridgeService : Service() {
         """{"listening":${monitor.listening},"db":${monitor.lastDb},"avg":${monitor.avg60},"clips":${NoiseClips.list(this).size}}"""
 
     private fun onTrackingStarted() {
+        if (OximeterLog.isEnabled(this)) oximeter.start()
         if (WhiteNoisePrefs.isPlayWhileTracking(this)) {
             WhiteNoisePlayer.start(this)
             monitor.resetBaseline()
@@ -221,6 +223,7 @@ class AlarmBridgeService : Service() {
     }
 
     private fun onTrackingStopped() {
+        oximeter.stop()
         if (WhiteNoisePlayer.isPlaying) {
             WhiteNoisePlayer.stop()
             monitor.resetBaseline()
@@ -234,6 +237,7 @@ class AlarmBridgeService : Service() {
     override fun onDestroy() {
         WhiteNoisePlayer.stop()
         monitor.stop()
+        oximeter.stop()
         unregisterReceiver(alarmChanged)
         server?.close()
         super.onDestroy()

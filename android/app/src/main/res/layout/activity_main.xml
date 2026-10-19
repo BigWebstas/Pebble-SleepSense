@@ -232,6 +232,42 @@
                 android:layout_marginTop="24dp" />
 
             <TextView
+                android:id="@+id/oximeter_section_label"
+                style="@style/SectionHeader"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/oximeter_section" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/oximeter_switch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/oximeter_label" />
+
+            <TextView
+                android:id="@+id/oximeter_status_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/oximeter_choose_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:minWidth="220dp"
+                android:text="@string/oximeter_choose_button" />
+
+            <com.google.android.material.divider.MaterialDivider
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp" />
+
+            <TextView
                 android:id="@+id/bedtime_section_label"
                 style="@style/SectionHeader"
                 android:layout_width="wrap_content"

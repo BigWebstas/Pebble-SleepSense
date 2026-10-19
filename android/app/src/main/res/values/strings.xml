@@ -103,4 +103,16 @@
     <string name="white_noise_white_desc">White noise (crisp static)</string>
     <string name="white_noise_play_button">Play white noise</string>
     <string name="white_noise_stop_button">Stop white noise</string>
+
+    <string name="oximeter_section">Pulse Oximeter</string>
+    <string name="oximeter_label">Record SpO2 from a Wellue finger oximeter while tracking</string>
+    <string name="oximeter_off">Off. Connects over Bluetooth only while the watch is tracking sleep. Switch the oximeter on and clip it on before bed.</string>
+    <string name="oximeter_no_device">Choose your oximeter to start.</string>
+    <string name="oximeter_needs_permission">Bluetooth permission is needed. Switch this off and on to be asked again.</string>
+    <string name="oximeter_ready">Will connect to %1$s when you start tracking.</string>
+    <string name="oximeter_last_run">Last night: average %1$d%%, lowest %2$d%%, %3$d min below 90%%.</string>
+    <string name="oximeter_choose_button">Choose oximeter</string>
+    <string name="oximeter_scanning">Looking for oximeters… switch yours on.</string>
+    <string name="oximeter_choose_title">Choose your oximeter</string>
+    <string name="oximeter_none_found">No Bluetooth devices found. Switch the oximeter on and try again.</string>
 </resources>

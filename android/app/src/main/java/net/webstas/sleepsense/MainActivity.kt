@@ -51,6 +51,12 @@ class MainActivity : AppCompatActivity() {
 
     private val requestMic =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { refreshNoise() }
+    private val requestOximeter =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { refreshOximeter() }
+    private val requestOximeterScan =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+            if (oximeterPermissionsGranted(this)) chooseOximeter() else refreshOximeter()
+        }
     private val requestHealth =
         registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { refreshHealth() }
 
@@ -131,6 +137,17 @@ class MainActivity : AppCompatActivity() {
             setIcon(R.drawable.ic_tune)
             setOnClickListener { chooseNoiseSensitivity() }
         }
+        id<MaterialSwitch>(R.id.oximeter_switch).apply {
+            isChecked = OximeterLog.isEnabled(this@MainActivity)
+            setOnCheckedChangeListener { _, on ->
+                OximeterLog.setEnabled(this@MainActivity, on)
+                if (on && !oximeterPermissionsGranted(this@MainActivity)) requestOximeter.launch(oximeterPermissions())
+                refreshOximeter()
+            }
+        }
+        id<Button>(R.id.oximeter_choose_button).setOnClickListener {
+            if (oximeterPermissionsGranted(this)) chooseOximeter() else requestOximeterScan.launch(oximeterPermissions())
+        }
         id<Button>(R.id.clips_button).setOnClickListener { startActivity(Intent(this, ClipsActivity::class.java)) }
         id<Button>(R.id.history_button).setOnClickListener { startActivity(Intent(this, HistoryActivity::class.java)) }
 
@@ -207,6 +224,7 @@ class MainActivity : AppCompatActivity() {
         // Off again if the user came back from the settings page without granting access
         id<MaterialSwitch>(R.id.bedtime_switch).isChecked = BedtimeMode.isEnabled(this) && BedtimeMode.hasAccess(this)
         refreshNoise()
+        refreshOximeter()
         refreshHealth()
         refreshWhiteNoise()
         refreshCalendar()
@@ -451,6 +469,37 @@ class MainActivity : AppCompatActivity() {
             startActivity(open)
         } catch (e: ActivityNotFoundException) {
             Toast.makeText(this, R.string.install_watch_no_handler, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun refreshOximeter() {
+        val summary = OximeterLog.lastRun(this)
+        id<TextView>(R.id.oximeter_status_text).text = when {
+            !OximeterLog.isEnabled(this) -> getString(R.string.oximeter_off)
+            !oximeterPermissionsGranted(this) -> getString(R.string.oximeter_needs_permission)
+            OximeterLog.address(this) == null -> getString(R.string.oximeter_no_device)
+            summary != null ->
+                getString(R.string.oximeter_last_run, summary.average, summary.lowest, summary.minutesLow)
+            else -> getString(R.string.oximeter_ready, OximeterLog.name(this) ?: OximeterLog.address(this))
+        }
+    }
+
+    private fun chooseOximeter() {
+        Toast.makeText(this, R.string.oximeter_scanning, Toast.LENGTH_SHORT).show()
+        OximeterScanner.scan(this) { found ->
+            if (isFinishing || isDestroyed) return@scan
+            if (found.isEmpty()) {
+                Toast.makeText(this, R.string.oximeter_none_found, Toast.LENGTH_LONG).show()
+                return@scan
+            }
+            MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.oximeter_choose_title)
+                .setItems(found.map { it.name }.toTypedArray()) { _, which ->
+                    OximeterLog.setDevice(this, found[which].address, found[which].name)
+                    refreshOximeter()
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
         }
     }
 
