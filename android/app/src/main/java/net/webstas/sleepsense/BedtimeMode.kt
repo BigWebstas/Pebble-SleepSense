@@ -24,6 +24,9 @@ private val QUIET_TIME_TOGGLE_UUID: UUID = UUID.fromString("2220d805-cf9a-4e12-9
 private const val KEY_ENABLED = "enabled"
 private const val KEY_ACTIVE = "active"
 private const val KEY_WATCH_QUIET = "watch_quiet"
+private const val KEY_AWAITING_RATING = "awaiting_rating"
+/** How long Quiet Time stays on after the night ends, waiting for the star rating. */
+private const val RATING_WAIT_MS = 10 * 60_000L
 private const val KEY_RULE_ID = "rule_id"
 private const val KEY_PREVIOUS_FILTER = "previous_filter"
 
@@ -31,8 +34,13 @@ private const val KEY_PREVIOUS_FILTER = "previous_filter"
  * Turns on the phone's Bedtime mode and the watch's Quiet Time while the watch tracks sleep, and
  * off again when tracking stops. Bedtime mode needs "Do Not Disturb access". Only undoes what it
  * did itself, so a Quiet Time or Do Not Disturb the user set up another way is left alone.
+ * The watch's Quiet Time stays on until the night is rated (or [RATING_WAIT_MS] pass), because
+ * switching it replaces the rating screen on the watch.
  */
 object BedtimeMode {
+
+    /** The watch's Quiet Time as it last reported it. */
+    @Volatile private var lastQuietTime: Boolean? = null
 
     fun isEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_ENABLED, false)
 
@@ -48,9 +56,11 @@ object BedtimeMode {
      */
     fun onTracking(context: Context, tracking: Boolean, quietTime: Boolean?) {
         val prefs = prefs(context)
+        if (quietTime != null) lastQuietTime = quietTime
         if (tracking == prefs.getBoolean(KEY_ACTIVE, false)) return
         prefs.edit { putBoolean(KEY_ACTIVE, tracking) }
         if (tracking) {
+            prefs.edit { putBoolean(KEY_AWAITING_RATING, false) } // a new night: Quiet Time stays on
             if (!isEnabled(context)) return
             if (hasAccess(context)) applySafely(context, true)
             // The watch can only flip Quiet Time, so only flip it when it isn't already on
@@ -61,10 +71,22 @@ object BedtimeMode {
         } else {
             if (hasAccess(context)) applySafely(context, false)
             if (prefs.getBoolean(KEY_WATCH_QUIET, false)) {
-                prefs.edit { putBoolean(KEY_WATCH_QUIET, false) }
-                if (quietTime != false) toggleWatchQuietTime(context, reopenSleepSense = false)
+                prefs.edit { putBoolean(KEY_AWAITING_RATING, true) }
+                val app = context.applicationContext
+                CoroutineScope(Dispatchers.IO).launch {
+                    delay(RATING_WAIT_MS)
+                    onRated(app)
+                }
             }
         }
+    }
+
+    /** The night has been rated (or waiting for the rating timed out): Quiet Time can go off. */
+    fun onRated(context: Context) {
+        val prefs = prefs(context)
+        if (!prefs.getBoolean(KEY_AWAITING_RATING, false)) return
+        prefs.edit { putBoolean(KEY_AWAITING_RATING, false); putBoolean(KEY_WATCH_QUIET, false) }
+        if (lastQuietTime != false) toggleWatchQuietTime(context, reopenSleepSense = false)
     }
 
     /**

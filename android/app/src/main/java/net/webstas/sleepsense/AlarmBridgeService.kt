@@ -139,6 +139,7 @@ class AlarmBridgeService : Service() {
                 }
                 if (read == contentLength) {
                     SessionStore.save(this, String(bytes, Charsets.UTF_8))
+                    if (SessionStore.latestRatedNight(this) != null) BedtimeMode.onRated(this)
                     HomeAssistant.publishRating(this) // a rating given on the watch arrives with the history
                     HomeAssistant.publishSleepDuration(this) // and a night that just ended counts towards today
                     "200 OK" to """{"ok":true,"bytes":$read}"""
