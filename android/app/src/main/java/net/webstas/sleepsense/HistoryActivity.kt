@@ -36,7 +36,7 @@ class HistoryActivity : AppCompatActivity() {
 
     // Called from the page's JavaScript on a background thread
     private inner class Bridge {
-        @JavascriptInterface fun sessions(): String = SessionStore.load(this@HistoryActivity)
+        @JavascriptInterface fun sessions(): String = SessionStore.loadWithOximeter(this@HistoryActivity)
 
         @JavascriptInterface fun lastExport(): Long = SessionStore.lastExport(this@HistoryActivity)
 

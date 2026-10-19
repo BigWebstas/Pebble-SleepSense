@@ -98,6 +98,11 @@ class AlarmBridgeService : Service() {
                     val since = Regex("since=(\\d+)").find(request)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
                     val stage = Regex("stage=(\\d+)").find(request)?.groupValues?.get(1)?.toIntOrNull()
                     val hr = Regex("hr=(\\d+)").find(request)?.groupValues?.get(1)?.toIntOrNull()
+                    noteLive(request, "vmc", LiveReadings.Stream.MOVEMENT)
+                    noteLive(request, "light", LiveReadings.Stream.LIGHT)
+                    noteLive(request, "sound", LiveReadings.Stream.SOUND)
+                    LiveReadings.note(LiveReadings.Stream.STAGE, stage)
+                    if (hr != null) LiveReadings.note(LiveReadings.Stream.HEART_RATE, hr)
                     val duration = Regex("duration=(\\d+)").find(request)?.groupValues?.get(1)?.toIntOrNull()
                     val isTracking = tracking == "1"
                     val wasTracking = WidgetState.tracking(this)
@@ -140,7 +145,7 @@ class AlarmBridgeService : Service() {
                 }
                 if (read == contentLength) {
                     SessionStore.save(this, String(bytes, Charsets.UTF_8))
-                    if (SessionStore.latestRatedNight(this) != null) BedtimeMode.onRated(this)
+                    SessionStore.latestRatedNight(this)?.let { BedtimeMode.onNightRated(this, it.optLong("end")) }
                     HomeAssistant.publishRating(this) // a rating given on the watch arrives with the history
                     HomeAssistant.publishSleepDuration(this) // and a night that just ended counts towards today
                     "200 OK" to """{"ok":true,"bytes":$read}"""
@@ -187,6 +192,10 @@ class AlarmBridgeService : Service() {
         val types = ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or
             (if (on) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0)
         startForeground(1, notification(on), types)
+    }
+
+    private fun noteLive(request: String, key: String, stream: LiveReadings.Stream) {
+        LiveReadings.note(stream, Regex("[?&]$key=(\\d+)").find(request)?.groupValues?.get(1)?.toIntOrNull())
     }
 
     private fun noiseStart(): String {

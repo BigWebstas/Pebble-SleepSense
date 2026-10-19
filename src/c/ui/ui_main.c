@@ -39,7 +39,13 @@ static char s_countdown_buf[32];
 #define BELL_UNITS 110                          // the bell below is drawn on a 110-unit-tall grid
 #define BELL_CLAPPER_LEN 108
 #define BELL_CLAPPER_R 8
-#define BELL_TIME_H 26                          // the clock under the bell
+#if defined(PBL_PLATFORM_EMERY)
+#define BELL_TIME_H 62                          // the clock under the bell: as big as on the main screen
+#define BELL_TIME_FONT FONT_KEY_LECO_60_BOLD_NUMBERS_AM_PM
+#else
+#define BELL_TIME_H 26
+#define BELL_TIME_FONT FONT_KEY_GOTHIC_24_BOLD
+#endif
 #define BELL_HINT_RESERVE PBL_IF_ROUND_ELSE(48, 22)  // the button hint at the bottom, at its tallest
 
 //! The bell outline, hanging from (0, 0): a rounded crown and shoulders flaring out to the lip
@@ -102,7 +108,7 @@ static void prv_bell_update_proc(Layer *layer, GContext *ctx) {
   char time_buf[8];
   strftime(time_buf, sizeof(time_buf), clock_is_24h_style() ? "%H:%M" : "%I:%M", localtime(&now));
   graphics_context_set_text_color(ctx, GColorWhite);
-  graphics_draw_text(ctx, time_buf, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),
+  graphics_draw_text(ctx, time_buf, fonts_get_system_font(BELL_TIME_FONT),
                      GRect(0, bounds.size.h - BELL_HINT_RESERVE - BELL_TIME_H, bounds.size.w, BELL_TIME_H),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 

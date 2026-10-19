@@ -25,7 +25,8 @@ private const val TAG = "Oximeter"
 private val NUS_SERVICE: UUID = UUID.fromString("6e400001-b5a3-f393-e0a9-e50e24dcca9e")
 private val NUS_TX: UUID = UUID.fromString("6e400003-b5a3-f393-e0a9-e50e24dcca9e") // notifications from the device
 private val CCCD: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
-private const val RECONNECT_MS = 10_000L
+private const val POLL_MS = 10_000L   // how often a lost oximeter is looked for again
+private const val STALE_MS = 30_000L  // a connection that says nothing for this long is dropped and retried
 private const val SCAN_MS = 8_000L
 private const val WINDOW_MS = 30_000L // one saved sample per window: the lowest SpO2 and the average pulse
 private const val LOW_SPO2 = 90
@@ -136,6 +137,19 @@ object OximeterLog {
         file(context).appendText("$at,$spo2,$pulse\n")
     }
 
+    /** The saved samples between [start] and [end] as (time in millis, lowest SpO2 %). */
+    @Synchronized
+    fun samples(context: Context, start: Long, end: Long): List<Pair<Long, Int>> {
+        val f = file(context)
+        if (!f.exists()) return emptyList()
+        return f.readLines().mapNotNull { line ->
+            val p = line.split(',')
+            val at = p.getOrNull(0)?.toLongOrNull()
+            val spo2 = p.getOrNull(1)?.toIntOrNull()
+            if (p.size == 3 && at != null && spo2 != null && at in start..end) at to spo2 else null
+        }
+    }
+
     /** How the latest run went, or null when it has no samples. */
     @Synchronized
     fun lastRun(context: Context): OximeterSummary? {
@@ -169,9 +183,10 @@ fun oximeterPermissionsGranted(context: Context) = oximeterPermissions().all {
 @SuppressLint("MissingPermission") // start() checks oximeterPermissionsGranted() first
 class OximeterMonitor(private val context: Context) {
     private val handler = Handler(Looper.getMainLooper())
-    private var gatt: BluetoothGatt? = null
+    @Volatile private var gatt: BluetoothGatt? = null
     private var running = false
     private var parser = OximeterParser()
+    private var lastActivity = 0L // the last connection attempt or data from the oximeter
 
     private var windowStart = 0L
     private var windowMin = 101
@@ -183,7 +198,7 @@ class OximeterMonitor(private val context: Context) {
         if (running || !oximeterPermissionsGranted(context)) return
         running = true
         OximeterLog.startRun(context)
-        connect(address)
+        poll()
     }
 
     fun stop() {
@@ -195,15 +210,29 @@ class OximeterMonitor(private val context: Context) {
         gatt = null
     }
 
-    private fun connect(address: String) {
+    /**
+     * Every [POLL_MS] while running: connects if there is no connection, and gives up on one that
+     * has gone quiet. The oximeter switches itself off when the finger comes out and only
+     * advertises again once it is back on, so a lost one is simply tried again until stopped.
+     */
+    private fun poll() {
         if (!running) return
-        val adapter = context.getSystemService(BluetoothManager::class.java)?.adapter
-        if (adapter == null || !adapter.isEnabled) {
-            handler.postDelayed({ connect(address) }, RECONNECT_MS)
-            return
+        val now = System.currentTimeMillis()
+        if (gatt != null && now - lastActivity > STALE_MS) {
+            Log.i(TAG, "no data for ${(now - lastActivity) / 1000} s, reconnecting")
+            gatt?.close()
+            gatt = null
         }
-        gatt?.close()
+        if (gatt == null) connect()
+        handler.postDelayed(::poll, POLL_MS)
+    }
+
+    private fun connect() {
+        val address = OximeterLog.address(context) ?: return
+        val adapter = context.getSystemService(BluetoothManager::class.java)?.adapter
+        if (adapter == null || !adapter.isEnabled) return
         parser = OximeterParser()
+        lastActivity = System.currentTimeMillis()
         gatt = adapter.getRemoteDevice(address).connectGatt(context, false, callback, BluetoothDevice.TRANSPORT_LE)
     }
 
@@ -213,9 +242,7 @@ class OximeterMonitor(private val context: Context) {
                 g.discoverServices()
             } else {
                 g.close()
-                if (gatt === g) gatt = null
-                // The oximeter switches itself off when the finger comes out: keep trying until stopped
-                OximeterLog.address(context)?.let { handler.postDelayed({ connect(it) }, RECONNECT_MS) }
+                if (gatt === g) gatt = null // the next poll connects again
             }
         }
 
@@ -249,8 +276,11 @@ class OximeterMonitor(private val context: Context) {
         handler.post {
             if (!running) return@post
             val now = System.currentTimeMillis()
+            lastActivity = now
             Log.v(TAG, "rx " + data.joinToString(" ") { "%02x".format(it) })
             for (r in parser.feed(data)) {
+                LiveReadings.note(LiveReadings.Stream.SPO2, r.spo2, now)
+                LiveReadings.note(LiveReadings.Stream.OXIMETER_PULSE, r.pulse, now)
                 if (windowStart == 0L) windowStart = now
                 windowMin = minOf(windowMin, r.spo2)
                 pulseSum += r.pulse

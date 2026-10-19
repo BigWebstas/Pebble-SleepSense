@@ -42,6 +42,9 @@ var soundInterval = null;
 var isTracking = false;
 var currentStage = null;
 var currentHr = null;
+var currentVmc = null;   // movement, light and sound: shown live in the Android app
+var currentLight = null;
+var currentSound = null;
 var watchQuietTime = null; // the watch's Quiet Time, as last reported
 var currentDuration = 0;
 
@@ -130,6 +133,9 @@ function trackingStatus() {
     since: sleepHistory.openSessionStart(),
     stage: currentStage,
     hr: currentHr,
+    vmc: currentVmc,
+    light: currentLight,
+    sound: currentSound,
     duration: currentDuration,
     quiet: watchQuietTime
   };
@@ -329,6 +335,13 @@ Pebble.addEventListener("appmessage", function(e) {
     currentHr = hrVal;
   }
 
+  var vmcVal = getDictValue(dict, "STATUS_VMC", 10024);
+  if (vmcVal !== undefined) currentVmc = vmcVal;
+  var lightVal = getDictValue(dict, "STATUS_LIGHT_LEVEL", 10003);
+  if (lightVal !== undefined) currentLight = lightVal;
+  var soundVal = getDictValue(dict, "STATUS_SOUND_LEVEL", 10004);
+  if (soundVal !== undefined) currentSound = soundVal;
+
   var durVal = getDictValue(dict, "STATUS_DURATION", 10001);
   if (durVal !== undefined) {
     currentDuration = durVal;
@@ -348,6 +361,7 @@ Pebble.addEventListener("appmessage", function(e) {
     if (!isTracking) {
       currentStage = null;
       currentHr = null;
+      currentVmc = currentLight = currentSound = null;
       currentDuration = 0;
     }
     if (wasTracking !== isTracking || isTracking) {

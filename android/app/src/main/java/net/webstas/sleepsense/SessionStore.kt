@@ -129,6 +129,29 @@ object SessionStore {
     @Synchronized
     fun load(context: Context): String = file(context).takeIf { it.exists() }?.readText() ?: "[]"
 
+    /**
+     * The sessions as the History report reads them: each sample carries "o2", the lowest SpO2
+     * the oximeter measured during that sample's interval, if it was on.
+     */
+    fun loadWithOximeter(context: Context): String {
+        val all = JSONArray(load(context))
+        val now = System.currentTimeMillis()
+        for (i in 0 until all.length()) {
+            val session = all.getJSONObject(i)
+            val samples = session.optJSONArray("samples") ?: continue
+            if (samples.length() == 0) continue
+            val end = session.optLong("end").takeIf { it > 0 } ?: now
+            var next = 0
+            for ((at, spo2) in OximeterLog.samples(context, session.optLong("start"), end)) {
+                // The sample whose interval holds this reading: the last one that began at or before it
+                while (next + 1 < samples.length() && samples.getJSONObject(next + 1).optLong("t") <= at) next++
+                val sample = samples.getJSONObject(next)
+                sample.put("o2", minOf(spo2, sample.optInt("o2", 101)))
+            }
+        }
+        return all.toString()
+    }
+
     fun lastExport(context: Context): Long =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong(KEY_LAST_EXPORT, 0)
 

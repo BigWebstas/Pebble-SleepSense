@@ -17,6 +17,9 @@ function fetchPhoneAlarm(callback, status) {
     if (status.hr !== null && status.hr !== undefined && status.hr > 0) {
       query += '&hr=' + status.hr;
     }
+    ['vmc', 'light', 'sound'].forEach(function (key) {
+      if (status[key] !== null && status[key] !== undefined) query += '&' + key + '=' + status[key];
+    });
     if (status.duration !== null && status.duration !== undefined) {
       query += '&duration=' + status.duration;
     }

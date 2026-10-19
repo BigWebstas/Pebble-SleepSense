@@ -24,9 +24,11 @@ private val QUIET_TIME_TOGGLE_UUID: UUID = UUID.fromString("2220d805-cf9a-4e12-9
 private const val KEY_ENABLED = "enabled"
 private const val KEY_ACTIVE = "active"
 private const val KEY_WATCH_QUIET = "watch_quiet"
-private const val KEY_AWAITING_RATING = "awaiting_rating"
+private const val KEY_AWAITING_SINCE = "awaiting_rating_since" // when the night ended, 0 = not waiting
 /** How long Quiet Time stays on after the night ends, waiting for the star rating. */
 private const val RATING_WAIT_MS = 10 * 60_000L
+/** A rated night counts as the one just ended if it finished this close to when tracking stopped. */
+private const val NIGHT_END_SLACK_MS = 5 * 60_000L
 private const val KEY_RULE_ID = "rule_id"
 private const val KEY_PREVIOUS_FILTER = "previous_filter"
 
@@ -60,7 +62,7 @@ object BedtimeMode {
         if (tracking == prefs.getBoolean(KEY_ACTIVE, false)) return
         prefs.edit { putBoolean(KEY_ACTIVE, tracking) }
         if (tracking) {
-            prefs.edit { putBoolean(KEY_AWAITING_RATING, false) } // a new night: Quiet Time stays on
+            prefs.edit { putLong(KEY_AWAITING_SINCE, 0) } // a new night: Quiet Time stays on
             if (!isEnabled(context)) return
             if (hasAccess(context)) applySafely(context, true)
             // The watch can only flip Quiet Time, so only flip it when it isn't already on
@@ -71,21 +73,33 @@ object BedtimeMode {
         } else {
             if (hasAccess(context)) applySafely(context, false)
             if (prefs.getBoolean(KEY_WATCH_QUIET, false)) {
-                prefs.edit { putBoolean(KEY_AWAITING_RATING, true) }
+                prefs.edit { putLong(KEY_AWAITING_SINCE, System.currentTimeMillis()) }
                 val app = context.applicationContext
                 CoroutineScope(Dispatchers.IO).launch {
                     delay(RATING_WAIT_MS)
-                    onRated(app)
+                    Log.i(TAG, "no rating after ${RATING_WAIT_MS / 60_000} min, quiet time off")
+                    release(app)
                 }
             }
         }
     }
 
-    /** The night has been rated (or waiting for the rating timed out): Quiet Time can go off. */
-    fun onRated(context: Context) {
+    /**
+     * A rated night has reached the phone. It only counts when it is the one that just ended: the
+     * newest finished night can also be an earlier, already rated one.
+     */
+    fun onNightRated(context: Context, nightEnd: Long) {
+        val since = prefs(context).getLong(KEY_AWAITING_SINCE, 0)
+        if (since == 0L || nightEnd < since - NIGHT_END_SLACK_MS) return
+        Log.i(TAG, "night rated, quiet time off")
+        release(context)
+    }
+
+    /** Quiet Time can go off: the night has been rated, or waiting for the rating timed out. */
+    private fun release(context: Context) {
         val prefs = prefs(context)
-        if (!prefs.getBoolean(KEY_AWAITING_RATING, false)) return
-        prefs.edit { putBoolean(KEY_AWAITING_RATING, false); putBoolean(KEY_WATCH_QUIET, false) }
+        if (prefs.getLong(KEY_AWAITING_SINCE, 0) == 0L) return
+        prefs.edit { putLong(KEY_AWAITING_SINCE, 0); putBoolean(KEY_WATCH_QUIET, false) }
         if (lastQuietTime != false) toggleWatchQuietTime(context, reopenSleepSense = false)
     }
 

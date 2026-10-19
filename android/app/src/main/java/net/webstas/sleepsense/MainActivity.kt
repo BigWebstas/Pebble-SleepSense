@@ -45,6 +45,7 @@ class MainActivity : AppCompatActivity() {
     private val refreshLoop = object : Runnable {
         override fun run() {
             refreshTracking()
+            id<TextView>(R.id.live_readings_text).text = LiveReadings.describe(this@MainActivity)
             handler.postDelayed(this, 3000) // the watch checks in about once a minute and on every change
         }
     }
@@ -196,7 +197,7 @@ class MainActivity : AppCompatActivity() {
         id<Button>(R.id.calendar_button).setOnClickListener {
             if (CalendarSync.hasPermission(this)) chooseCalendar() else requestCalendar.launch(CalendarSync.PERMISSIONS)
         }
-        id<Button>(R.id.grant_hc_button).setOnClickListener { requestHealth.launch(setOf(WRITE_SLEEP, WRITE_HEART_RATE)) }
+        id<Button>(R.id.grant_hc_button).setOnClickListener { requestHealth.launch(setOf(WRITE_SLEEP, WRITE_HEART_RATE, WRITE_OXYGEN_SATURATION)) }
         id<Button>(R.id.widget_button).setOnClickListener {
             val manager = getSystemService(AppWidgetManager::class.java)
             if (manager.isRequestPinAppWidgetSupported) {
