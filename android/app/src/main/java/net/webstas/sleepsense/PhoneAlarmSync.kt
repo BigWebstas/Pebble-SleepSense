@@ -45,6 +45,20 @@ object PhoneAlarmSync {
         HomeAssistant.publishAlarmEnabled(context)
     }
 
+    /**
+     * The alarm time was changed on the watch: it becomes the alarm chosen in this app. Syncing the
+     * phone's alarm is turned off, as it would put the phone's time back on the watch within a minute.
+     * Followed without sending it back, like [alarmEnabledOnWatch].
+     */
+    fun alarmTimeOnWatch(context: Context, hour: Int, minute: Int) {
+        if (!isEnabled(context) && customAlarm(context) == hour to minute) return
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+            putBoolean(KEY_ENABLED, false)
+            putInt(KEY_CUSTOM, hour * 60 + minute)
+        }
+        HomeAssistant.publishAlarmTime(context)
+    }
+
     /** The alarm for the watch as (hour, minute), or null if none: the phone's next alarm while syncing, else the one chosen in the app. */
     fun phoneAlarm(context: Context): Pair<Int, Int>? {
         if (!isEnabled(context)) return customAlarm(context)
