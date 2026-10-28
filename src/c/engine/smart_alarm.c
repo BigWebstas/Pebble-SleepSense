@@ -3,7 +3,7 @@
 
 #define PERSIST_KEY_ALARM 100
 #define ALARM_REPEAT_TIMER_MS 2500
-#define ALARM_SOUND_DELAY_SEC 30      // the speaker stays silent for this long (the vibration wakes first)...
+#define ALARM_SOUND_DELAY_SEC 10     // the speaker stays silent for this long (the vibration wakes first)...
 #define ALARM_SOUND_RAMP_SEC (5 * 60) // ...then goes from 0% to 100% over this
 #ifdef _PBL_API_EXISTS_speaker_play_notes
 #define HAS_SPEAKER 1
@@ -11,7 +11,7 @@
 #else
 #define ALARM_TIMEOUT_SEC 180
 #endif
-#define DEFAULT_SNOOZE_MIN 9
+#define DEFAULT_SNOOZE_MIN 10
 #define ALARM_WAKEUP_COOKIE 2
 #define ALARM_WAKEUP_LEAD_SEC 60 // launches the app a minute early, so it is up for the minute tick on the alarm time
 #define ALARM_CATCH_UP_SEC 180   // an alarm missed by up to this long still rings when the app comes back
@@ -188,9 +188,14 @@ static time_t prv_alarm_time_today(time_t now) {
   return mktime(t);
 }
 
+//! The alarm has rung for this alarm time: at the time itself, or earlier inside the smart wake window
+static bool prv_rung_for(time_t at) {
+  return s_settings.triggered && s_settings.trigger_time >= at - s_settings.window_minutes * 60;
+}
+
 //! The alarm hasn't rung for this alarm time yet
 static bool prv_not_rung_since(time_t at) {
-  return !(s_settings.triggered && s_settings.trigger_time >= at);
+  return !prv_rung_for(at);
 }
 
 //! When the app has to be running to ring the alarm: its time, or the end of a snooze (0 = never).
@@ -208,7 +213,8 @@ static time_t prv_next_ring_time(time_t now) {
     return 0;
   }
   if (at > now) {
-    return at;
+    // Already rung early by the smart wake: today's alarm time is done, the next is tomorrow's
+    return prv_rung_for(at) ? at + 24 * 3600 : at;
   }
   if (at == s_wakeup_for && now - at <= ALARM_CATCH_UP_SEC && prv_not_rung_since(at)) {
     return at;
@@ -294,9 +300,13 @@ SmartAlarmSettings *smart_alarm_get_settings(void) {
 }
 
 void smart_alarm_set_target(uint8_t hour, uint8_t min) {
-  s_settings.target_hour = hour % 24;
-  s_settings.target_min = min % 60;
-  s_settings.triggered = false;
+  hour %= 24;
+  min %= 60;
+  if (hour != s_settings.target_hour || min != s_settings.target_min) {
+    s_settings.triggered = false; // a new time: it hasn't rung for that yet
+  }
+  s_settings.target_hour = hour;
+  s_settings.target_min = min;
   prv_save_settings();
   smart_alarm_sync_wakeup();
 }

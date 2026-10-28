@@ -42,6 +42,10 @@ var soundInterval = null;
 var isTracking = false;
 var currentStage = null;
 var currentHr = null;
+var currentVmc = null;   // movement, light and sound: shown live in the Android app
+var currentLight = null;
+var currentSound = null;
+var watchQuietTime = null; // the watch's Quiet Time, as last reported
 var currentDuration = 0;
 
 function getDictValue(dict, strKey, numKey) {
@@ -57,7 +61,7 @@ function sensorEnabled(name) {
 
 function snoozeMinutes() {
   var saved = localStorage.getItem("snooze_min");
-  return saved === null ? 9 : parseInt(saved, 10);
+  return saved === null ? 10 : parseInt(saved, 10);
 }
 
 function sensorDict() {
@@ -129,7 +133,11 @@ function trackingStatus() {
     since: sleepHistory.openSessionStart(),
     stage: currentStage,
     hr: currentHr,
-    duration: currentDuration
+    vmc: currentVmc,
+    light: currentLight,
+    sound: currentSound,
+    duration: currentDuration,
+    quiet: watchQuietTime
   };
 }
 
@@ -327,9 +335,21 @@ Pebble.addEventListener("appmessage", function(e) {
     currentHr = hrVal;
   }
 
+  var vmcVal = getDictValue(dict, "STATUS_VMC", 10024);
+  if (vmcVal !== undefined) currentVmc = vmcVal;
+  var lightVal = getDictValue(dict, "STATUS_LIGHT_LEVEL", 10003);
+  if (lightVal !== undefined) currentLight = lightVal;
+  var soundVal = getDictValue(dict, "STATUS_SOUND_LEVEL", 10004);
+  if (soundVal !== undefined) currentSound = soundVal;
+
   var durVal = getDictValue(dict, "STATUS_DURATION", 10001);
   if (durVal !== undefined) {
     currentDuration = durVal;
+  }
+
+  var quietVal = getDictValue(dict, "STATUS_QUIET_TIME", 10029);
+  if (quietVal !== undefined) {
+    watchQuietTime = quietVal !== 0;
   }
 
   var trackingVal = getDictValue(dict, "TRACKING_ACTIVE", 10011);
@@ -341,6 +361,7 @@ Pebble.addEventListener("appmessage", function(e) {
     if (!isTracking) {
       currentStage = null;
       currentHr = null;
+      currentVmc = currentLight = currentSound = null;
       currentDuration = 0;
     }
     if (wasTracking !== isTracking || isTracking) {
@@ -360,15 +381,23 @@ Pebble.addEventListener("appmessage", function(e) {
   var alarmHourVal = getDictValue(dict, "ALARM_TARGET_HOUR", 10007);
   var smartAlarmVal = getDictValue(dict, "SMART_ALARM_ENABLED", 10010);
   if (alarmHourVal !== undefined && smartAlarmVal !== undefined) {
+    var alarmMinVal = getDictValue(dict, "ALARM_TARGET_MIN", 10008);
+    var storedHour = localStorage.getItem("alarm_hour");
+    var storedMin = localStorage.getItem("alarm_min");
     localStorage.setItem("alarm_hour", alarmHourVal);
-    localStorage.setItem("alarm_min", getDictValue(dict, "ALARM_TARGET_MIN", 10008));
+    localStorage.setItem("alarm_min", alarmMinVal);
     localStorage.setItem("smart_win", getDictValue(dict, "SMART_WINDOW_MIN", 10009));
-    // Switched on or off on the watch (the phone's own changes arrive already stored): tell the app
+    // Changed on the watch (the phone's own changes arrive already stored): tell the app
     var alarmOn = smartAlarmVal !== 0;
     var storedAlarmEn = localStorage.getItem("alarm_en");
+    var status = trackingStatus();
     if (storedAlarmEn !== null && (storedAlarmEn !== "false") !== alarmOn) {
-      var status = trackingStatus();
       status.alarm = alarmOn;
+    }
+    if (storedHour !== null && (parseInt(storedHour, 10) !== alarmHourVal || parseInt(storedMin, 10) !== alarmMinVal)) {
+      status.alarmTime = alarmHourVal * 60 + alarmMinVal;
+    }
+    if (status.alarm !== undefined || status.alarmTime !== undefined) {
       phoneAlarm.fetchPhoneAlarm(function() {}, status);
     }
     localStorage.setItem("alarm_en", alarmOn);

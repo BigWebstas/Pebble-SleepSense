@@ -92,6 +92,11 @@ function record(tracking, d, now) {
     current.snoozes = d.STATUS_SNOOZE_COUNT;
     current.snoozeSec = d.STATUS_SNOOZE_SEC || 0;
   }
+  // Updates the watch could not send, cumulative since its app started: set against the gaps in the samples
+  if (d.STATUS_SEND_FAILS !== undefined) {
+    current.sendFails = d.STATUS_SEND_FAILS;
+    current.sendBusy = d.STATUS_SEND_BUSY || 0;
+  }
   // Alarm timeline: 1 = rang, 2 = snoozed, 0 = stopped; only changes are logged
   if (d.STATUS_ALARM_STATE !== undefined && d.STATUS_ALARM_STATE !== (current.alarm || 0)) {
     current.events = current.events || [];
@@ -166,6 +171,8 @@ function bucket(session) {
     snoozeSec: session.snoozeSec || 0,
     events: session.events || [],
     rating: session.rating || 0,
+    sendFails: session.sendFails || 0,
+    sendBusy: session.sendBusy || 0,
     samples: samples
   };
 }

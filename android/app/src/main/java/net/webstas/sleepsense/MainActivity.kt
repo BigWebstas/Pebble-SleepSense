@@ -1,6 +1,8 @@
 package net.webstas.sleepsense
 
 import android.Manifest
+import android.animation.ObjectAnimator
+import android.animation.PropertyValuesHolder
 import android.app.TimePickerDialog
 import android.appwidget.AppWidgetManager
 import android.content.ActivityNotFoundException
@@ -12,6 +14,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.AlarmClock
+import android.provider.Settings
 import android.text.format.DateFormat
 import android.view.View
 import android.view.WindowInsets
@@ -42,12 +45,19 @@ class MainActivity : AppCompatActivity() {
     private val refreshLoop = object : Runnable {
         override fun run() {
             refreshTracking()
+            id<TextView>(R.id.live_readings_text).text = LiveReadings.describe(this@MainActivity)
             handler.postDelayed(this, 3000) // the watch checks in about once a minute and on every change
         }
     }
 
     private val requestMic =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { refreshNoise() }
+    private val requestOximeter =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { refreshOximeter() }
+    private val requestOximeterScan =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+            if (oximeterPermissionsGranted(this)) chooseOximeter() else refreshOximeter()
+        }
     private val requestHealth =
         registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { refreshHealth() }
 
@@ -109,6 +119,12 @@ class MainActivity : AppCompatActivity() {
                 refreshTracking()
             }
         }
+        id<MaterialSwitch>(R.id.bedtime_switch).setOnCheckedChangeListener { _, on ->
+            BedtimeMode.setEnabled(this, on)
+            if (on && !BedtimeMode.hasAccess(this)) {
+                startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
+            }
+        }
         id<Button>(R.id.snooze_button).setOnClickListener { chooseSnooze() }
         id<MaterialSwitch>(R.id.noise_switch).apply {
             isChecked = NoiseClips.isEnabled(this@MainActivity)
@@ -121,6 +137,17 @@ class MainActivity : AppCompatActivity() {
         id<Button>(R.id.noise_sensitivity_button).apply {
             setIcon(R.drawable.ic_tune)
             setOnClickListener { chooseNoiseSensitivity() }
+        }
+        id<MaterialSwitch>(R.id.oximeter_switch).apply {
+            isChecked = OximeterLog.isEnabled(this@MainActivity)
+            setOnCheckedChangeListener { _, on ->
+                OximeterLog.setEnabled(this@MainActivity, on)
+                if (on && !oximeterPermissionsGranted(this@MainActivity)) requestOximeter.launch(oximeterPermissions())
+                refreshOximeter()
+            }
+        }
+        id<Button>(R.id.oximeter_choose_button).setOnClickListener {
+            if (oximeterPermissionsGranted(this)) chooseOximeter() else requestOximeterScan.launch(oximeterPermissions())
         }
         id<Button>(R.id.clips_button).setOnClickListener { startActivity(Intent(this, ClipsActivity::class.java)) }
         id<Button>(R.id.history_button).setOnClickListener { startActivity(Intent(this, HistoryActivity::class.java)) }
@@ -170,7 +197,7 @@ class MainActivity : AppCompatActivity() {
         id<Button>(R.id.calendar_button).setOnClickListener {
             if (CalendarSync.hasPermission(this)) chooseCalendar() else requestCalendar.launch(CalendarSync.PERMISSIONS)
         }
-        id<Button>(R.id.grant_hc_button).setOnClickListener { requestHealth.launch(setOf(WRITE_SLEEP, WRITE_HEART_RATE)) }
+        id<Button>(R.id.grant_hc_button).setOnClickListener { requestHealth.launch(setOf(WRITE_SLEEP, WRITE_HEART_RATE, WRITE_OXYGEN_SATURATION)) }
         id<Button>(R.id.widget_button).setOnClickListener {
             val manager = getSystemService(AppWidgetManager::class.java)
             if (manager.isRequestPinAppWidgetSupported) {
@@ -195,7 +222,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Off again if the user came back from the settings page without granting access
+        id<MaterialSwitch>(R.id.bedtime_switch).isChecked = BedtimeMode.isEnabled(this) && BedtimeMode.hasAccess(this)
         refreshNoise()
+        refreshOximeter()
         refreshHealth()
         refreshWhiteNoise()
         refreshCalendar()
@@ -210,6 +240,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         handler.removeCallbacks(refreshLoop)
+        stopDotPulses()
         super.onPause()
     }
 
@@ -252,6 +283,7 @@ class MainActivity : AppCompatActivity() {
         val tracking = WidgetState.tracking(this)
         val (title, subtitle) = WidgetState.lines(this)
         id<TextView>(R.id.tracking_status_text).text = title
+        setTrackingDots(tracking)
         id<TextView>(R.id.alarm_status_text).text = PhoneAlarmSync.describe(this).lineSequence().first()
         id<Button>(R.id.tracking_button).apply {
             setText(if (tracking) R.string.stop_tracking_button else R.string.start_tracking_button)
@@ -259,6 +291,37 @@ class MainActivity : AppCompatActivity() {
         }
         refreshAlarmSettings()
         id<TextView>(R.id.home_assistant_status_text).setText(HomeAssistant.statusText(this))
+    }
+
+    private val dotPulses = mutableListOf<ObjectAnimator>()
+
+    // Green dots either side of the status pulse while tracking, out of step with each other
+    private fun setTrackingDots(tracking: Boolean) {
+        val dots = listOf(id<View>(R.id.tracking_dot_start), id<View>(R.id.tracking_dot_end))
+        dots.forEach { it.visibility = if (tracking) View.VISIBLE else View.GONE }
+        if (!tracking) {
+            stopDotPulses()
+        } else if (dotPulses.isEmpty()) {
+            dots.forEachIndexed { i, dot ->
+                dotPulses += ObjectAnimator.ofPropertyValuesHolder(
+                    dot,
+                    PropertyValuesHolder.ofFloat(View.ALPHA, 0.25f, 1f),
+                    PropertyValuesHolder.ofFloat(View.SCALE_X, 0.6f, 1f),
+                    PropertyValuesHolder.ofFloat(View.SCALE_Y, 0.6f, 1f),
+                ).apply {
+                    duration = 900
+                    startDelay = i * 450L
+                    repeatCount = ObjectAnimator.INFINITE
+                    repeatMode = ObjectAnimator.REVERSE
+                    start()
+                }
+            }
+        }
+    }
+
+    private fun stopDotPulses() {
+        dotPulses.forEach { it.cancel() }
+        dotPulses.clear()
     }
 
     // The alarm time can be set here only while the phone's own alarm isn't being followed
@@ -407,6 +470,37 @@ class MainActivity : AppCompatActivity() {
             startActivity(open)
         } catch (e: ActivityNotFoundException) {
             Toast.makeText(this, R.string.install_watch_no_handler, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun refreshOximeter() {
+        val summary = OximeterLog.lastRun(this)
+        id<TextView>(R.id.oximeter_status_text).text = when {
+            !OximeterLog.isEnabled(this) -> getString(R.string.oximeter_off)
+            !oximeterPermissionsGranted(this) -> getString(R.string.oximeter_needs_permission)
+            OximeterLog.address(this) == null -> getString(R.string.oximeter_no_device)
+            summary != null ->
+                getString(R.string.oximeter_last_run, summary.average, summary.lowest, summary.minutesLow)
+            else -> getString(R.string.oximeter_ready, OximeterLog.name(this) ?: OximeterLog.address(this))
+        }
+    }
+
+    private fun chooseOximeter() {
+        Toast.makeText(this, R.string.oximeter_scanning, Toast.LENGTH_SHORT).show()
+        OximeterScanner.scan(this) { found ->
+            if (isFinishing || isDestroyed) return@scan
+            if (found.isEmpty()) {
+                Toast.makeText(this, R.string.oximeter_none_found, Toast.LENGTH_LONG).show()
+                return@scan
+            }
+            MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.oximeter_choose_title)
+                .setItems(found.map { it.name }.toTypedArray()) { _, which ->
+                    OximeterLog.setDevice(this, found[which].address, found[which].name)
+                    refreshOximeter()
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
         }
     }
 

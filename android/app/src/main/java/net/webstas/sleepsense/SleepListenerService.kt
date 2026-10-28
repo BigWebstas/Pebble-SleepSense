@@ -25,8 +25,14 @@ class SleepListenerService : BasePebbleListenerService() {
 
         val stage = data[WatchProtocol.KEY_STATUS_STATE]?.let(::intValueOf)
         val heartRate = data[WatchProtocol.KEY_STATUS_HEART_RATE]?.let(::intValueOf)
+        LiveReadings.note(LiveReadings.Stream.STAGE, stage)
+        LiveReadings.note(LiveReadings.Stream.MOVEMENT, data[WatchProtocol.KEY_STATUS_VMC]?.let(::intValueOf))
+        LiveReadings.note(LiveReadings.Stream.LIGHT, data[WatchProtocol.KEY_STATUS_LIGHT_LEVEL]?.let(::intValueOf))
+        LiveReadings.note(LiveReadings.Stream.SOUND, data[WatchProtocol.KEY_STATUS_SOUND_LEVEL]?.let(::intValueOf))
+        if (heartRate != null && heartRate > 0) LiveReadings.note(LiveReadings.Stream.HEART_RATE, heartRate)
         SleepRecorder.onWatchUpdate(this, tracking != 0, stage, heartRate)
         HomeAssistant.publishState(tracking != 0, stage, heartRate)
+        BedtimeMode.onTracking(this, tracking != 0, data[WatchProtocol.KEY_STATUS_QUIET_TIME]?.let(::intValueOf)?.let { it != 0 })
         if (tracking == 0) {
             val left = SleepRecorder.flush(this)
             Log.i(TAG, "Session ended; $left queued for Health Connect")

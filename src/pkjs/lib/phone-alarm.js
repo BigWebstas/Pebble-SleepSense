@@ -17,12 +17,22 @@ function fetchPhoneAlarm(callback, status) {
     if (status.hr !== null && status.hr !== undefined && status.hr > 0) {
       query += '&hr=' + status.hr;
     }
+    ['vmc', 'light', 'sound'].forEach(function (key) {
+      if (status[key] !== null && status[key] !== undefined) query += '&' + key + '=' + status[key];
+    });
     if (status.duration !== null && status.duration !== undefined) {
       query += '&duration=' + status.duration;
+    }
+    if (status.quiet !== null && status.quiet !== undefined) {
+      query += '&quiet=' + (status.quiet ? 1 : 0);
     }
     // Only sent when the alarm was switched on or off on the watch itself
     if (status.alarm !== undefined) {
       query += '&alarm=' + (status.alarm ? 1 : 0);
+    }
+    // Only sent when the alarm time was changed on the watch itself: minutes after midnight
+    if (status.alarmTime !== undefined) {
+      query += '&alarm_time=' + status.alarmTime;
     }
   }
   xhr.open('GET', URL + query, true);

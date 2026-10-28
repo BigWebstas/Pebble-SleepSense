@@ -35,6 +35,7 @@ private const val MAX_BODY = 5 * 1024 * 1024 // a month of history is ~150 KB
 class AlarmBridgeService : Service() {
     private var server: ServerSocket? = null
     private val monitor by lazy { NoiseMonitor(applicationContext) }
+    private val oximeter by lazy { OximeterMonitor(applicationContext) }
 
     // The service is always running, so it sees every change to the next alarm as it happens
     private val alarmChanged = object : BroadcastReceiver() {
@@ -91,12 +92,19 @@ class AlarmBridgeService : Service() {
             request.startsWith("GET /alarm") -> {
                 PhoneAlarmSync.noteRequest(this)
                 Regex("alarm=(\\d)").find(request)?.let { PhoneAlarmSync.alarmEnabledOnWatch(this, it.groupValues[1] == "1") }
+                Regex("alarm_time=(\\d+)").find(request)?.groupValues?.get(1)?.toIntOrNull()
+                    ?.let { PhoneAlarmSync.alarmTimeOnWatch(this, it / 60, it % 60) }
                 // The watchapp's JS checks in every minute and says whether the watch is tracking
                 val tracking = Regex("tracking=(\\d)").find(request)?.groupValues?.get(1)
                 if (tracking != null) {
                     val since = Regex("since=(\\d+)").find(request)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
                     val stage = Regex("stage=(\\d+)").find(request)?.groupValues?.get(1)?.toIntOrNull()
                     val hr = Regex("hr=(\\d+)").find(request)?.groupValues?.get(1)?.toIntOrNull()
+                    noteLive(request, "vmc", LiveReadings.Stream.MOVEMENT)
+                    noteLive(request, "light", LiveReadings.Stream.LIGHT)
+                    noteLive(request, "sound", LiveReadings.Stream.SOUND)
+                    LiveReadings.note(LiveReadings.Stream.STAGE, stage)
+                    if (hr != null) LiveReadings.note(LiveReadings.Stream.HEART_RATE, hr)
                     val duration = Regex("duration=(\\d+)").find(request)?.groupValues?.get(1)?.toIntOrNull()
                     val isTracking = tracking == "1"
                     val wasTracking = WidgetState.tracking(this)
@@ -114,6 +122,8 @@ class AlarmBridgeService : Service() {
                         HomeAssistant.publishState(isTracking, stage, hr, duration)
                     }
                     SleepRecorder.onWatchUpdate(this, isTracking, stage, hr)
+                    val quiet = Regex("quiet=(\\d)").find(request)?.groupValues?.get(1)?.let { it == "1" }
+                    BedtimeMode.onTracking(this, isTracking, quiet)
                     if (!isTracking && wasTracking) {
                         CoroutineScope(Dispatchers.IO).launch {
                             val left = SleepRecorder.flush(this@AlarmBridgeService)
@@ -137,6 +147,7 @@ class AlarmBridgeService : Service() {
                 }
                 if (read == contentLength) {
                     SessionStore.save(this, String(bytes, Charsets.UTF_8))
+                    SessionStore.latestRatedNight(this)?.let { BedtimeMode.onNightRated(this, it.optLong("end")) }
                     HomeAssistant.publishRating(this) // a rating given on the watch arrives with the history
                     HomeAssistant.publishSleepDuration(this) // and a night that just ended counts towards today
                     "200 OK" to """{"ok":true,"bytes":$read}"""
@@ -185,6 +196,10 @@ class AlarmBridgeService : Service() {
         startForeground(1, notification(on), types)
     }
 
+    private fun noteLive(request: String, key: String, stream: LiveReadings.Stream) {
+        LiveReadings.note(stream, Regex("[?&]$key=(\\d+)").find(request)?.groupValues?.get(1)?.toIntOrNull())
+    }
+
     private fun noiseStart(): String {
         if (!NoiseClips.isEnabled(this)) return """{"ok":false,"error":"noise monitoring is off in the app"}"""
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
@@ -211,6 +226,7 @@ class AlarmBridgeService : Service() {
         """{"listening":${monitor.listening},"db":${monitor.lastDb},"avg":${monitor.avg60},"clips":${NoiseClips.list(this).size}}"""
 
     private fun onTrackingStarted() {
+        if (OximeterLog.isEnabled(this)) oximeter.start()
         if (WhiteNoisePrefs.isPlayWhileTracking(this)) {
             WhiteNoisePlayer.start(this)
             monitor.resetBaseline()
@@ -218,6 +234,7 @@ class AlarmBridgeService : Service() {
     }
 
     private fun onTrackingStopped() {
+        oximeter.stop()
         if (WhiteNoisePlayer.isPlaying) {
             WhiteNoisePlayer.stop()
             monitor.resetBaseline()
@@ -231,6 +248,7 @@ class AlarmBridgeService : Service() {
     override fun onDestroy() {
         WhiteNoisePlayer.stop()
         monitor.stop()
+        oximeter.stop()
         unregisterReceiver(alarmChanged)
         server?.close()
         super.onDestroy()

@@ -1,12 +1,15 @@
 package net.webstas.sleepsense
 
 import android.content.Context
+import android.util.Log
 import androidx.core.content.edit
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.records.OxygenSaturationRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.metadata.Metadata
+import androidx.health.connect.client.units.Percentage
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
@@ -22,7 +25,11 @@ object WatchProtocol {
     // Auto-assigned from package.json `messageKeys` order (see build/js/message_keys.json).
     const val KEY_STATUS_STATE: UInt = 10000u
     const val KEY_TRACKING_ACTIVE: UInt = 10011u
+    const val KEY_STATUS_QUIET_TIME: UInt = 10029u
     const val KEY_STATUS_HEART_RATE: UInt = 10014u
+    const val KEY_STATUS_LIGHT_LEVEL: UInt = 10003u
+    const val KEY_STATUS_SOUND_LEVEL: UInt = 10004u
+    const val KEY_STATUS_VMC: UInt = 10024u
     const val KEY_ALARM_TARGET_HOUR: UInt = 10007u
     const val KEY_ALARM_TARGET_MIN: UInt = 10008u
     const val KEY_SMART_ALARM_ENABLED: UInt = 10010u
@@ -35,7 +42,9 @@ private const val MIN_SESSION_MS = 2 * 60_000L
 
 val WRITE_SLEEP = HealthPermission.getWritePermission(SleepSessionRecord::class)
 val WRITE_HEART_RATE = HealthPermission.getWritePermission(HeartRateRecord::class)
+val WRITE_OXYGEN_SATURATION = HealthPermission.getWritePermission(OxygenSaturationRecord::class)
 
+private const val SPO2_CHUNK = 500
 private const val MIN_HR_GAP_MS = 30_000L
 
 private fun hcStage(watchStage: Int): Int = when (watchStage) {
@@ -106,6 +115,7 @@ object SleepRecorder {
         val granted = client.permissionController.getGrantedPermissions()
         if (WRITE_SLEEP !in granted) return pending.length()
         val writeHr = WRITE_HEART_RATE in granted
+        val writeSpo2 = WRITE_OXYGEN_SATURATION in granted
 
         val remaining = JSONArray()
         for (i in 0 until pending.length()) {
@@ -117,10 +127,31 @@ object SleepRecorder {
                 client.insertRecords(records)
             } catch (e: Exception) {
                 remaining.put(session)
+                continue
+            }
+            // Apart from the sleep: a night of samples can pass the per-call record limit, and the
+            // sleep session must not be written twice if this fails
+            if (writeSpo2) {
+                runCatching {
+                    toOxygenSaturation(context, session).chunked(SPO2_CHUNK).forEach { client.insertRecords(it) }
+                }.onFailure { Log.w("SleepRecorder", "could not write SpO2: $it") }
             }
         }
         prefs.edit { putString(KEY_PENDING, remaining.toString()) }
         return remaining.length()
+    }
+
+    private fun toOxygenSaturation(context: Context, session: JSONObject): List<OxygenSaturationRecord> {
+        val zone = ZoneId.systemDefault().rules
+        return OximeterLog.samples(context, session.getLong("start"), session.getLong("end")).map { (at, spo2) ->
+            val time = Instant.ofEpochMilli(at)
+            OxygenSaturationRecord(
+                time = time,
+                zoneOffset = zone.getOffset(time),
+                percentage = Percentage(spo2.toDouble()),
+                metadata = Metadata.manualEntry(),
+            )
+        }
     }
 
     private fun toHeartRate(session: JSONObject): HeartRateRecord? {
