@@ -53,7 +53,7 @@ The sleep data in these screenshots is sample data, not a real night.
   - **Ambient light**: minute-level room light (`VeryDark` … `VeryLight`) to catch lights on, sleep onset and waking.
   - **Heart rate**: sampled every minute while tracking (watches with a sensor only).
   - **Room noise** *(Android app)*: measured by the phone's microphone. Without the companion app no noise level is sent.
-- **Smart wake alarm**: a target time plus a wake window (15 / 30 / 45 minutes). It vibrates gently once you are in light sleep inside the window, and at the exact time otherwise. **Snooze** (off, 5, 9, 10 or 15 minutes) is set in Settings.
+- **Smart wake alarm**: a target time plus a wake window (15 / 30 / 45 minutes). It vibrates gently once you are in light sleep inside the window, and at the exact time otherwise. **Snooze** (off, 5, 10 or 15 minutes) is set in Settings.
 - **On-wrist hypnogram**: colour-coded timeline of the last 2 hours, with sleep time, cycles, sleep score, light, noise and heart rate.
 - **Date and time** under the alarm row on the Pebble Time 2 (`emery`), in the largest digits that fit.
 - **Keeps recording**: while tracking, the watch schedules a wakeup so the app relaunches if the watch drops back to the watch face, and fills the gap from Pebble Health history.
@@ -68,7 +68,7 @@ Changes need a deliberate **hold** (about a second; the watch buzzes once to con
 | Button | Hold | Press / double-press | While the alarm rings |
 | :--- | :--- | :--- | :--- |
 | **SELECT** | Start / stop sleep tracking | Press: refresh from the phone. Double-press: voice dream journal | Press: stop the alarm (also stops tracking) |
-| **UP** | Turn the smart alarm on / off | Nothing | Press: snooze (when enabled) |
+| **UP** | Turn the smart alarm on / off | Double-press: change the alarm time (Up/Down hour, Select for minute, Select to save). It syncs to the Android app, which then stops following the phone's own alarm | Press: snooze (when enabled) |
 | **DOWN** | Cycle the smart wake window (15 → 30 → 45 min) | Nothing | Press: snooze (when enabled) |
 
 ### Settings and history (phone)

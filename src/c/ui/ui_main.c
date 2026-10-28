@@ -2,6 +2,7 @@
 #include "../engine/sleep_engine.h"
 #include "../engine/smart_alarm.h"
 #include "../comm/comm.h"
+#include "ui_alarm_edit.h"
 
 static Window *s_main_window;
 static TextLayer *s_header_layer;
@@ -414,6 +415,14 @@ static void prv_up_long_click_handler(ClickRecognizerRef recognizer, void *conte
   ui_main_update(sleep_engine_get_session());
 }
 
+// Change the alarm time: double-press Up
+static void prv_up_double_click_handler(ClickRecognizerRef recognizer, void *context) {
+  if (prv_handle_alarm_press(true)) {
+    return;
+  }
+  ui_alarm_edit_show();
+}
+
 static void prv_down_click_handler(ClickRecognizerRef recognizer, void *context) {
   prv_handle_alarm_press(true);
 }
@@ -433,6 +442,7 @@ static void prv_click_config_provider(void *context) {
   window_multi_click_subscribe(BUTTON_ID_SELECT, 2, 2, 300, true, prv_select_double_click_handler);
   window_long_click_subscribe(BUTTON_ID_SELECT, HOLD_MS, prv_select_long_click_handler, NULL);
   window_single_click_subscribe(BUTTON_ID_UP, prv_up_click_handler);
+  window_multi_click_subscribe(BUTTON_ID_UP, 2, 2, 300, true, prv_up_double_click_handler);
   window_long_click_subscribe(BUTTON_ID_UP, HOLD_MS, prv_up_long_click_handler, NULL);
   window_single_click_subscribe(BUTTON_ID_DOWN, prv_down_click_handler);
   window_long_click_subscribe(BUTTON_ID_DOWN, HOLD_MS, prv_down_long_click_handler, NULL);

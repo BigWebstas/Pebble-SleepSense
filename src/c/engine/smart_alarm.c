@@ -3,7 +3,7 @@
 
 #define PERSIST_KEY_ALARM 100
 #define ALARM_REPEAT_TIMER_MS 2500
-#define ALARM_SOUND_DELAY_SEC 30      // the speaker stays silent for this long (the vibration wakes first)...
+#define ALARM_SOUND_DELAY_SEC 10     // the speaker stays silent for this long (the vibration wakes first)...
 #define ALARM_SOUND_RAMP_SEC (5 * 60) // ...then goes from 0% to 100% over this
 #ifdef _PBL_API_EXISTS_speaker_play_notes
 #define HAS_SPEAKER 1

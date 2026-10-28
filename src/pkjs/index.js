@@ -409,15 +409,23 @@ Pebble.addEventListener("appmessage", function(e) {
   var alarmHourVal = getDictValue(dict, "ALARM_TARGET_HOUR", 10007);
   var smartAlarmVal = getDictValue(dict, "SMART_ALARM_ENABLED", 10010);
   if (alarmHourVal !== undefined && smartAlarmVal !== undefined) {
+    var alarmMinVal = getDictValue(dict, "ALARM_TARGET_MIN", 10008);
+    var storedHour = localStorage.getItem("alarm_hour");
+    var storedMin = localStorage.getItem("alarm_min");
     localStorage.setItem("alarm_hour", alarmHourVal);
-    localStorage.setItem("alarm_min", getDictValue(dict, "ALARM_TARGET_MIN", 10008));
+    localStorage.setItem("alarm_min", alarmMinVal);
     localStorage.setItem("smart_win", getDictValue(dict, "SMART_WINDOW_MIN", 10009));
-    // Switched on or off on the watch (the phone's own changes arrive already stored): tell the app
+    // Changed on the watch (the phone's own changes arrive already stored): tell the app
     var alarmOn = smartAlarmVal !== 0;
     var storedAlarmEn = localStorage.getItem("alarm_en");
+    var status = trackingStatus();
     if (storedAlarmEn !== null && (storedAlarmEn !== "false") !== alarmOn) {
-      var status = trackingStatus();
       status.alarm = alarmOn;
+    }
+    if (storedHour !== null && (parseInt(storedHour, 10) !== alarmHourVal || parseInt(storedMin, 10) !== alarmMinVal)) {
+      status.alarmTime = alarmHourVal * 60 + alarmMinVal;
+    }
+    if (status.alarm !== undefined || status.alarmTime !== undefined) {
       phoneAlarm.fetchPhoneAlarm(function() {}, status);
     }
     localStorage.setItem("alarm_en", alarmOn);

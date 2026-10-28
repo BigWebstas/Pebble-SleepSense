@@ -37,6 +37,10 @@ function fetchPhoneAlarm(callback, status) {
     if (status.alarm !== undefined) {
       query += '&alarm=' + (status.alarm ? 1 : 0);
     }
+    // Only sent when the alarm time was changed on the watch itself: minutes after midnight
+    if (status.alarmTime !== undefined) {
+      query += '&alarm_time=' + status.alarmTime;
+    }
   }
   xhr.open('GET', URL + query, true);
   xhr.timeout = 4000;
