@@ -416,7 +416,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun chooseSnooze() {
-        val lengths = intArrayOf(0, 5, 9, 10, 15, 20)
+        val lengths = intArrayOf(0, 5, 10, 15, 20)
         val labels = lengths.map { if (it == 0) getString(R.string.snooze_off) else getString(R.string.snooze_minutes, it) }
         MaterialAlertDialogBuilder(this)
             .setItems(labels.toTypedArray()) { _, which ->

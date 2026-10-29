@@ -90,6 +90,7 @@ object PhoneAlarmSync {
     /** Snooze length chosen in this app (0 = snooze off), or null if never chosen. */
     fun snoozeMinutes(context: Context): Int? =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(KEY_SNOOZE, -1).takeIf { it >= 0 }
+            ?.let { if (it == 9) 10 else it } // 9 minutes is no longer offered
 
     fun setSnoozeMinutes(context: Context, minutes: Int) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putInt(KEY_SNOOZE, minutes) }
