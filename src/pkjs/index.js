@@ -140,7 +140,8 @@ function trackingStatus() {
     sound: currentSound,
     duration: currentDuration,
     quiet: watchQuietTime,
-    rating: watchRatingPending
+    rating: watchRatingPending,
+    window: parseInt(localStorage.getItem("smart_win"), 10) || null
   };
 }
 

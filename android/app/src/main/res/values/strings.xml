@@ -20,6 +20,9 @@
     <string name="alarm_time_synced">Watch alarm time: follows the phone alarm</string>
     <string name="snooze_button">Snooze: %1$s</string>
     <string name="snooze_unset">as set on the watch</string>
+    <string name="smart_window">Smart wake window: %1$s</string>
+    <string name="smart_window_unset">not reported by the watch yet</string>
+    <string name="smart_window_minutes">%1$d min (set on the watch)</string>
     <string name="snooze_off">off</string>
     <string name="snooze_minutes">%1$d min</string>
     <string name="alarm_sync_label">Sync phone alarm to Pebble</string>

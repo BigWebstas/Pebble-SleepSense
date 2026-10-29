@@ -96,6 +96,7 @@ class AlarmBridgeService : Service() {
             request.startsWith("GET /alarm") -> {
                 PhoneAlarmSync.noteRequest(this)
                 Regex("alarm=(\\d)").find(request)?.let { PhoneAlarmSync.alarmEnabledOnWatch(this, it.groupValues[1] == "1") }
+                Regex("window=(\\d+)").find(request)?.groupValues?.get(1)?.toIntOrNull()?.let { PhoneAlarmSync.setSmartWindowMinutes(this, it) }
                 // The watchapp's JS checks in every minute and says whether the watch is tracking
                 val tracking = Regex("tracking=(\\d)").find(request)?.groupValues?.get(1)
                 if (tracking != null) {

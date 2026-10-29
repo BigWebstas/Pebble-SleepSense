@@ -368,6 +368,11 @@ class MainActivity : AppCompatActivity() {
             },
         )
         id<MaterialSwitch>(R.id.alarm_enabled_switch).isChecked = PhoneAlarmSync.isAlarmEnabled(this)
+        id<TextView>(R.id.smart_window_text).text = getString(
+            R.string.smart_window,
+            PhoneAlarmSync.smartWindowMinutes(this)?.let { getString(R.string.smart_window_minutes, it) }
+                ?: getString(R.string.smart_window_unset),
+        )
     }
 
     private fun chooseAlarmTime() {

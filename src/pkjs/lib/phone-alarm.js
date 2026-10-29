@@ -29,6 +29,10 @@ function fetchPhoneAlarm(callback, status) {
     if (status.rating !== null && status.rating !== undefined) {
       query += '&rating=' + (status.rating ? 1 : 0);
     }
+    // The smart alarm window set on the watch, in minutes
+    if (status.window) {
+      query += '&window=' + status.window;
+    }
     // Only sent when the alarm was switched on or off on the watch itself
     if (status.alarm !== undefined) {
       query += '&alarm=' + (status.alarm ? 1 : 0);
