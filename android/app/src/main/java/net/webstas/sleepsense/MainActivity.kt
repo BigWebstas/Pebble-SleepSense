@@ -52,12 +52,12 @@ class MainActivity : AppCompatActivity() {
     }
     private val waveformLoop = object : Runnable {
         override fun run() {
-            val view = id<WaveformView>(R.id.live_waveform)
+            val box = id<View>(R.id.live_waveform_box)
             if (LiveReadings.hasWaveform()) {
-                view.visibility = View.VISIBLE
-                view.invalidate() // the view redraws itself every frame from here
+                box.visibility = View.VISIBLE
+                id<WaveformView>(R.id.live_waveform).invalidate() // the view redraws itself every frame from here
             } else {
-                view.visibility = View.GONE
+                box.visibility = View.GONE
             }
             handler.postDelayed(this, 500)
         }
@@ -498,10 +498,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshChest() {
         val rates = ChestCapture.rates(this)
-        id<ChestRateView>(R.id.chest_rate_view).apply {
-            visibility = if (rates.size >= 2) View.VISIBLE else View.GONE
-            setRates(rates)
-        }
+        id<View>(R.id.chest_rate_box).visibility = if (rates.size >= 2) View.VISIBLE else View.GONE
+        id<ChestRateView>(R.id.chest_rate_view).setRates(rates)
         id<TextView>(R.id.chest_status_text).setText(
             if (ChestCapture.isEnabled(this)) R.string.chest_on else R.string.chest_off,
         )

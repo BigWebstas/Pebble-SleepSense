@@ -488,21 +488,57 @@
                 android:layout_marginTop="8dp"
                 android:textSize="14sp" />
 
-            <net.webstas.sleepsense.WaveformView
-                android:id="@+id/live_waveform"
+            <LinearLayout
+                android:id="@+id/live_waveform_box"
                 android:layout_width="match_parent"
-                android:layout_height="64dp"
+                android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:contentDescription="@string/live_waveform"
-                android:visibility="gone" />
+                android:orientation="vertical"
+                android:visibility="gone">
 
-            <net.webstas.sleepsense.ChestRateView
-                android:id="@+id/chest_rate_view"
+                <TextView
+                    android:id="@+id/live_waveform_header_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:alpha="0.7"
+                    android:gravity="end"
+                    android:text="@string/live_waveform_header"
+                    android:textSize="12sp" />
+
+                <net.webstas.sleepsense.WaveformView
+                    android:id="@+id/live_waveform"
+                    android:layout_width="match_parent"
+                    android:layout_height="64dp"
+                    android:contentDescription="@string/live_waveform"
+                    android:layout_marginTop="2dp" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/chest_rate_box"
                 android:layout_width="match_parent"
-                android:layout_height="120dp"
+                android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:contentDescription="@string/chest_rate_graph"
-                android:visibility="gone" />
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/chest_rate_header_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:alpha="0.7"
+                    android:gravity="end"
+                    android:text="@string/chest_rate_header"
+                    android:textSize="12sp" />
+
+                <net.webstas.sleepsense.ChestRateView
+                    android:id="@+id/chest_rate_view"
+                    android:layout_width="match_parent"
+                    android:layout_height="120dp"
+                    android:contentDescription="@string/chest_rate_graph"
+                    android:layout_marginTop="2dp" />
+
+            </LinearLayout>
 
         </LinearLayout>
 
