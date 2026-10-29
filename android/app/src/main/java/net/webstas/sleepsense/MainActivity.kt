@@ -498,6 +498,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshChest() {
+        val rates = ChestCapture.rates(this)
+        id<ChestRateView>(R.id.chest_rate_view).apply {
+            visibility = if (rates.size >= 2) View.VISIBLE else View.GONE
+            setRates(rates)
+        }
         id<Button>(R.id.chest_button).setText(if (ChestCapture.active) R.string.chest_stop else R.string.chest_start)
         val (chunks, missed) = ChestCapture.summary(this) ?: (null to null)
         id<TextView>(R.id.chest_status_text).text = when {

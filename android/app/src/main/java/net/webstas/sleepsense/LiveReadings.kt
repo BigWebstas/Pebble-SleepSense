@@ -12,6 +12,7 @@ object LiveReadings {
         HEART_RATE(R.string.live_heart_rate),
         SPO2(R.string.live_spo2),
         OXIMETER_PULSE(R.string.live_oximeter_pulse),
+        BREATHING(R.string.live_breathing),
     }
 
     class Reading(val value: Int, val at: Long)
@@ -106,6 +107,7 @@ object LiveReadings {
         Stream.SOUND -> context.getString(R.string.live_unit_percent, v)
         Stream.HEART_RATE, Stream.OXIMETER_PULSE -> context.getString(R.string.live_unit_bpm, v)
         Stream.SPO2 -> context.getString(R.string.live_unit_percent, v)
+        Stream.BREATHING -> context.getString(R.string.live_unit_per_minute, v)
     }
 
     private fun ago(context: Context, ms: Long): String {

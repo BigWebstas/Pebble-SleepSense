@@ -469,6 +469,14 @@
                 android:gravity="center"
                 android:textSize="13sp" />
 
+            <net.webstas.sleepsense.ChestRateView
+                android:id="@+id/chest_rate_view"
+                android:layout_width="match_parent"
+                android:layout_height="120dp"
+                android:layout_marginTop="8dp"
+                android:contentDescription="@string/chest_rate_graph"
+                android:visibility="gone" />
+
             <com.google.android.material.divider.MaterialDivider
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

@@ -122,6 +122,7 @@
     <string name="chest_idle">Start tracking on the watch first, then start the test and rest the watch face-up on your chest.</string>
     <string name="chest_needs_tracking">The watch is not tracking. Start tracking first.</string>
     <string name="chest_running">Recording: %1$d s received, %2$d chunks missed.</string>
+    <string name="chest_rate_graph">Breathing rate over the chest test</string>
     <string name="chest_last">Last test: %1$d s received, %2$d chunks missed.</string>
     <string name="live_section">Live Readings</string>
     <string name="live_stage">Sleep stage</string>
@@ -130,6 +131,8 @@
     <string name="live_sound">Sound</string>
     <string name="live_heart_rate">Heart rate (watch)</string>
     <string name="live_spo2">SpO2</string>
+    <string name="live_breathing">Breathing (chest test)</string>
+    <string name="live_unit_per_minute">%1$d /min</string>
     <string name="live_oximeter_pulse">Pulse (oximeter)</string>
     <string name="live_waveform">Pulse waveform (oximeter)</string>
     <string name="live_value_ago">%1$s (%2$s)</string>
