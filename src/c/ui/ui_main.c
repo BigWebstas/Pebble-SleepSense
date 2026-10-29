@@ -391,7 +391,15 @@ static void prv_down_long_click_handler(ClickRecognizerRef recognizer, void *con
   ui_main_update(sleep_engine_get_session());
 }
 
+// With the watch resting on the chest for the breathing test, a press of Back would close the app and end the test
+static void prv_back_click_handler(ClickRecognizerRef recognizer, void *context) {
+  if (!sleep_engine_chest_capture_active()) {
+    window_stack_pop(true);
+  }
+}
+
 static void prv_click_config_provider(void *context) {
+  window_single_click_subscribe(BUTTON_ID_BACK, prv_back_click_handler);
   window_single_click_subscribe(BUTTON_ID_SELECT, prv_select_click_handler);
   window_multi_click_subscribe(BUTTON_ID_SELECT, 2, 2, 300, true, prv_select_double_click_handler);
   window_long_click_subscribe(BUTTON_ID_SELECT, HOLD_MS, prv_select_long_click_handler, NULL);

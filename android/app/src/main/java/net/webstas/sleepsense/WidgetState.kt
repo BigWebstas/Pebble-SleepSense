@@ -71,6 +71,10 @@ object Commands {
 
     fun queueSync() = queue("sync")
 
+    fun queueChestStart() = queue("chest-start")
+
+    fun queueChestStop() = queue("chest-stop")
+
     private fun queue(command: String) = synchronized(lock) {
         pending = command // a newer request replaces an older one
         lock.notifyAll()

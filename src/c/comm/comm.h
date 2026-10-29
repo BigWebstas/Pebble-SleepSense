@@ -14,6 +14,9 @@ void comm_send_session_update(const SleepSession *session);
 //! Start a voice dream journal note using Pebble microphone (if supported)
 void comm_start_voice_journal(void);
 
+//! Sends one chunk of the chest breathing test: a sequence number, then x, y, z (milli-g) per sample
+void comm_send_chest(uint8_t seq, const int16_t axes[][3], uint8_t count);
+
 //! Asks the phone to sync now (alarm, history, status) instead of at its next scheduled check
 void comm_request_refresh(void);
 

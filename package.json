@@ -61,7 +61,9 @@
       "SLEEP_RATING",
       "STATUS_SEND_FAILS",
       "STATUS_SEND_BUSY",
-      "STATUS_QUIET_TIME"
+      "STATUS_QUIET_TIME",
+      "COMMAND_CHEST_CAPTURE",
+      "CHEST_SAMPLES"
     ],
     "resources": {
       "media": [

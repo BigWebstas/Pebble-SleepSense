@@ -170,6 +170,10 @@ function listenForCommands() {
       console.log("SleepSense PKJS: Start tracking requested from the phone");
       trackingCommand("COMMAND_START_TRACKING", true, 0);
     }
+    if (cmd === "chest-start" || cmd === "chest-stop") {
+      console.log("SleepSense PKJS: Chest test " + cmd.substr(6) + " requested from the phone");
+      sendToWatch({ COMMAND_CHEST_CAPTURE: cmd === "chest-start" ? 1 : 0 });
+    }
     if (cmd === "sync") {
       console.log("SleepSense PKJS: Phone alarm sync requested from the phone");
       syncPhoneAlarm();
@@ -308,6 +312,12 @@ Pebble.addEventListener("ready", function(e) {
 
 Pebble.addEventListener("appmessage", function(e) {
   var dict = e.payload;
+  // Chest breathing test chunk: straight on to the Android app, nothing else here needs it
+  var chestChunk = getDictValue(dict, "CHEST_SAMPLES", 10031);
+  if (chestChunk !== undefined) {
+    sessionPush.pushChest(chestChunk);
+    return;
+  }
   console.log("SleepSense PKJS: Received message: " + JSON.stringify(dict));
 
   // A tap on Select on the watch: sync everything with the phone now

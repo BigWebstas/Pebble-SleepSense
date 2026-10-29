@@ -105,6 +105,7 @@ class AlarmBridgeService : Service() {
                     if (hr != null) LiveReadings.note(LiveReadings.Stream.HEART_RATE, hr)
                     val duration = Regex("duration=(\\d+)").find(request)?.groupValues?.get(1)?.toIntOrNull()
                     val isTracking = tracking == "1"
+                    if (isTracking && ChestCapture.needsRestart()) Commands.queueChestStart()
                     val wasTracking = WidgetState.tracking(this)
                     WidgetState.note(this, isTracking, since)
                     if (isTracking && !wasTracking) {
@@ -135,6 +136,11 @@ class AlarmBridgeService : Service() {
             request.startsWith("GET /noise/start") -> "200 OK" to noiseStart()
             request.startsWith("GET /noise/stop") -> "200 OK" to noiseStop()
             request.startsWith("GET /noise") -> "200 OK" to noiseStatus()
+            request.startsWith("POST /chest") && contentLength in 1..MAX_BODY -> {
+                val hex = String(readBody(input, contentLength), Charsets.US_ASCII)
+                ChestCapture.addChunk(this, hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray())
+                "200 OK" to """{"ok":true}"""
+            }
             request.startsWith("POST /sessions") && contentLength in 1..MAX_BODY -> {
                 val bytes = ByteArray(contentLength)
                 var read = 0
@@ -165,7 +171,20 @@ class AlarmBridgeService : Service() {
             // The caller went away: a command it was handed must not be lost
             if (body.contains("\"start\"")) Commands.queueStart()
             if (body.contains("\"stop\"")) Commands.queueStop()
+            if (body.contains("chest-start")) Commands.queueChestStart()
+            if (body.contains("chest-stop")) Commands.queueChestStop()
         }
+    }
+
+    private fun readBody(input: java.io.InputStream, length: Int): ByteArray {
+        val bytes = ByteArray(length)
+        var read = 0
+        while (read < length) {
+            val n = input.read(bytes, read, length - read)
+            if (n < 0) break
+            read += n
+        }
+        return bytes.copyOf(read)
     }
 
     // One header line without its CRLF (bytes read raw so a body is never swallowed by a text reader)

@@ -443,6 +443,35 @@
                 android:layout_marginTop="24dp" />
 
             <TextView
+                android:id="@+id/chest_section_label"
+                style="@style/SectionHeader"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/chest_section" />
+
+            <Button
+                android:id="@+id/chest_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:minWidth="220dp"
+                android:text="@string/chest_start" />
+
+            <TextView
+                android:id="@+id/chest_status_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center"
+                android:textSize="13sp" />
+
+            <com.google.android.material.divider.MaterialDivider
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp" />
+
+            <TextView
                 android:id="@+id/live_section_label"
                 style="@style/SectionHeader"
                 android:layout_width="wrap_content"

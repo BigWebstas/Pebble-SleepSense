@@ -41,6 +41,14 @@ void sleep_engine_set_minute_callback(SleepEngineMinuteCallback callback);
 //! Count a snooze of the given length against the current session
 void sleep_engine_add_snooze(uint32_t seconds);
 
+//! Chest breathing test: while on (and tracking, which is what runs the accelerometer) the raw axes are
+//! averaged to about 5 a second and handed over in chunks of this many samples
+#define CHEST_CHUNK_SAMPLES 30
+typedef void (*SleepEngineChestCallback)(uint8_t seq, const int16_t axes[][3], uint8_t count);
+void sleep_engine_set_chest_callback(SleepEngineChestCallback callback);
+void sleep_engine_set_chest_capture(bool on);
+bool sleep_engine_chest_capture_active(void);
+
 //! Enable or disable each sensor; persisted and applied immediately
 void sleep_engine_set_sensors(bool light, bool mic, bool heart_rate);
 

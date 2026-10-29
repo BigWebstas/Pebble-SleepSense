@@ -274,11 +274,56 @@ static void prv_backfill_gap(void) {
 }
 #endif
 
+// Chest breathing test. Breathing tilts the watch, which moves the individual axes but leaves the
+// magnitude used for movement near 1 G, so the raw axes are kept: each 5 samples are averaged into one
+// (the accelerometer delivers 25 Hz whatever rate is asked for, so that is 5 a second), and every
+// CHEST_CHUNK_SAMPLES of those go to the chest callback with a running sequence number.
+#define CHEST_AVERAGE 5
+static SleepEngineChestCallback s_chest_cb;
+static bool s_chest_capture;
+static int32_t s_chest_sum[3];
+static uint8_t s_chest_summed;
+static int16_t s_chest_axes[CHEST_CHUNK_SAMPLES][3];
+static uint8_t s_chest_count;
+static uint8_t s_chest_seq;
+
+static void prv_chest_sample(int32_t x, int32_t y, int32_t z) {
+  s_chest_sum[0] += x;
+  s_chest_sum[1] += y;
+  s_chest_sum[2] += z;
+  if (++s_chest_summed < CHEST_AVERAGE) return;
+  for (int axis = 0; axis < 3; axis++) {
+    s_chest_axes[s_chest_count][axis] = (int16_t)(s_chest_sum[axis] / CHEST_AVERAGE);
+    s_chest_sum[axis] = 0;
+  }
+  s_chest_summed = 0;
+  if (++s_chest_count < CHEST_CHUNK_SAMPLES) return;
+  s_chest_count = 0;
+  if (s_chest_cb) s_chest_cb(s_chest_seq++, s_chest_axes, CHEST_CHUNK_SAMPLES);
+}
+
+void sleep_engine_set_chest_callback(SleepEngineChestCallback callback) {
+  s_chest_cb = callback;
+}
+
+void sleep_engine_set_chest_capture(bool on) {
+  s_chest_capture = on && s_accel_subscribed;
+  s_chest_sum[0] = s_chest_sum[1] = s_chest_sum[2] = 0;
+  s_chest_summed = 0;
+  s_chest_count = 0;
+  s_chest_seq = 0;
+}
+
+bool sleep_engine_chest_capture_active(void) {
+  return s_chest_capture;
+}
+
 static void prv_accel_handler(AccelData *data, uint32_t num_samples) {
   for (uint32_t i = 0; i < num_samples; i++) {
     int32_t x = data[i].x;
     int32_t y = data[i].y;
     int32_t z = data[i].z;
+    if (s_chest_capture) prv_chest_sample(x, y, z);
     // Calculate 3D magnitude (1G = 1000)
     int32_t mag = (int32_t)prv_isqrt((uint32_t)(x * x + y * y + z * z));
     int32_t delta = mag - 1000;
@@ -412,6 +457,7 @@ void sleep_engine_start_session(void) {
 }
 
 void sleep_engine_stop_session(void) {
+  s_chest_capture = false;
   s_session.is_tracking = false;
   s_session.session_end = time(NULL);
   s_session.current_hr = 0;

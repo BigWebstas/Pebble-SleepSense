@@ -46,6 +46,7 @@ class MainActivity : AppCompatActivity() {
         override fun run() {
             refreshTracking()
             id<TextView>(R.id.live_readings_text).text = LiveReadings.describe(this@MainActivity)
+            refreshChest()
             handler.postDelayed(this, 3000) // the watch checks in about once a minute and on every change
         }
     }
@@ -157,6 +158,14 @@ class MainActivity : AppCompatActivity() {
                 if (on && !oximeterPermissionsGranted(this@MainActivity)) requestOximeter.launch(oximeterPermissions())
                 refreshOximeter()
             }
+        }
+        id<Button>(R.id.chest_button).setOnClickListener {
+            if (ChestCapture.active) {
+                ChestCapture.stop()
+            } else if (!ChestCapture.start(this)) {
+                Toast.makeText(this, R.string.chest_needs_tracking, Toast.LENGTH_LONG).show()
+            }
+            refreshChest()
         }
         id<Button>(R.id.oximeter_choose_button).setOnClickListener {
             if (oximeterPermissionsGranted(this)) chooseOximeter() else requestOximeterScan.launch(oximeterPermissions())
@@ -485,6 +494,16 @@ class MainActivity : AppCompatActivity() {
             startActivity(open)
         } catch (e: ActivityNotFoundException) {
             Toast.makeText(this, R.string.install_watch_no_handler, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun refreshChest() {
+        id<Button>(R.id.chest_button).setText(if (ChestCapture.active) R.string.chest_stop else R.string.chest_start)
+        val (chunks, missed) = ChestCapture.summary(this) ?: (null to null)
+        id<TextView>(R.id.chest_status_text).text = when {
+            chunks == null || missed == null -> getString(R.string.chest_idle)
+            ChestCapture.active -> getString(R.string.chest_running, ChestCapture.secondsOf(chunks), missed)
+            else -> getString(R.string.chest_last, ChestCapture.secondsOf(chunks), missed)
         }
     }
 

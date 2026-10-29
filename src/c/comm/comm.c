@@ -47,6 +47,12 @@ static void prv_inbox_received(DictionaryIterator *iter, void *context) {
     sleep_engine_stop_session();
   }
 
+  // Chest breathing test on or off, on request of the phone
+  Tuple *chest_cmd = dict_find(iter, MESSAGE_KEY_COMMAND_CHEST_CAPTURE);
+  if (chest_cmd) {
+    sleep_engine_set_chest_capture(chest_cmd->value->uint8 != 0);
+  }
+
   // 2. Sensor toggles (always sent together)
   Tuple *light_en = dict_find(iter, MESSAGE_KEY_SENSOR_LIGHT_ENABLED);
   Tuple *mic_en = dict_find(iter, MESSAGE_KEY_SENSOR_MIC_ENABLED);
@@ -163,6 +169,20 @@ void comm_send_session_update(const SleepSession *session) {
   dict_write_uint8(out_iter, MESSAGE_KEY_TRACKING_ACTIVE, session->is_tracking ? 1 : 0);
   dict_write_uint8(out_iter, MESSAGE_KEY_STATUS_QUIET_TIME, quiet_time_is_active() ? 1 : 0);
 
+  app_message_outbox_send();
+}
+
+void comm_send_chest(uint8_t seq, const int16_t axes[][3], uint8_t count) {
+  DictionaryIterator *out_iter;
+  AppMessageResult begin = app_message_outbox_begin(&out_iter);
+  if (begin != APP_MSG_OK || !out_iter) {
+    APP_LOG(APP_LOG_LEVEL_WARNING, "chest chunk %d not sent: %d", seq, begin);
+    return; // the gap shows in the sequence numbers
+  }
+  uint8_t bytes[1 + CHEST_CHUNK_SAMPLES * 3 * sizeof(int16_t)];
+  bytes[0] = seq;
+  memcpy(&bytes[1], axes, (size_t)count * 3 * sizeof(int16_t)); // little-endian on the watch, as the phone reads it
+  dict_write_data(out_iter, MESSAGE_KEY_CHEST_SAMPLES, bytes, 1 + (size_t)count * 3 * sizeof(int16_t));
   app_message_outbox_send();
 }
 

@@ -32,6 +32,7 @@ static void prv_init(void) {
 
   sleep_engine_set_update_callback(prv_engine_update_handler);
   sleep_engine_set_minute_callback(ui_main_refresh_clock);
+  sleep_engine_set_chest_callback(comm_send_chest);
   smart_alarm_set_trigger_callback(prv_alarm_trigger_handler);
   smart_alarm_set_dismiss_callback(prv_alarm_dismiss_handler);
 }
