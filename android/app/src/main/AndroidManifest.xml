@@ -4,6 +4,7 @@
     <uses-permission android:name="android.permission.health.WRITE_SLEEP" />
     <uses-permission android:name="android.permission.health.WRITE_HEART_RATE" />
     <uses-permission android:name="android.permission.health.WRITE_OXYGEN_SATURATION" />
+    <uses-permission android:name="android.permission.health.WRITE_RESPIRATORY_RATE" />
     <!-- Alarm bridge: a loopback-only server run as a foreground service -->
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Android 17 blocks connections to other devices on the home network without this (the MQTT broker) -->

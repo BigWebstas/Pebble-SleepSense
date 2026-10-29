@@ -7,6 +7,7 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.OxygenSaturationRecord
+import androidx.health.connect.client.records.RespiratoryRateRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.metadata.Metadata
 import androidx.health.connect.client.units.Percentage
@@ -45,8 +46,11 @@ val WRITE_SLEEP = HealthPermission.getWritePermission(SleepSessionRecord::class)
 val WRITE_HEART_RATE = HealthPermission.getWritePermission(HeartRateRecord::class)
 val WRITE_OXYGEN_SATURATION = HealthPermission.getWritePermission(OxygenSaturationRecord::class)
 
+val WRITE_RESPIRATORY_RATE = HealthPermission.getWritePermission(RespiratoryRateRecord::class)
+
 private const val SPO2_CHUNK = 500
 private const val MIN_HR_GAP_MS = 30_000L
+private const val MIN_BREATH_GAP_MS = 30_000L
 
 private fun hcStage(watchStage: Int): Int = when (watchStage) {
     1 -> SleepSessionRecord.STAGE_TYPE_LIGHT
@@ -71,6 +75,12 @@ object SleepRecorder {
         if (!tracking) {
             if (open != null) {
                 open.put("end", now)
+                // The chest file is replaced when the next session starts, but the queue may wait longer for Health Connect
+                val breath = JSONArray()
+                ChestCapture.rates(context).forEach { (at, perMinute) ->
+                    if (perMinute != null) breath.put(JSONObject().put("at", at).put("perMinute", perMinute))
+                }
+                open.put("breath", breath)
                 queue(prefs, open)
                 prefs.edit { remove(KEY_OPEN) }
             }
@@ -117,6 +127,7 @@ object SleepRecorder {
         if (WRITE_SLEEP !in granted) return pending.length()
         val writeHr = WRITE_HEART_RATE in granted
         val writeSpo2 = WRITE_OXYGEN_SATURATION in granted
+        val writeBreath = WRITE_RESPIRATORY_RATE in granted
 
         val remaining = JSONArray()
         for (i in 0 until pending.length()) {
@@ -132,6 +143,10 @@ object SleepRecorder {
             }
             // Apart from the sleep: a night of samples can pass the per-call record limit, and the
             // sleep session must not be written twice if this fails
+            if (writeBreath) {
+                runCatching { client.insertRecords(toRespiratoryRate(session)) }
+                    .onFailure { Log.w("SleepRecorder", "could not write breathing rate: $it") }
+            }
             if (writeSpo2) {
                 runCatching {
                     toOxygenSaturation(context, session).chunked(SPO2_CHUNK).forEach { client.insertRecords(it) }
@@ -150,6 +165,23 @@ object SleepRecorder {
                 time = time,
                 zoneOffset = zone.getOffset(time),
                 percentage = Percentage(spo2.toDouble()),
+                metadata = Metadata.manualEntry(),
+            )
+        }
+    }
+
+    private fun toRespiratoryRate(session: JSONObject): List<RespiratoryRateRecord> {
+        val breath = session.optJSONArray("breath") ?: return emptyList()
+        val zone = ZoneId.systemDefault().rules
+        var lastAt = 0L
+        return (0 until breath.length()).map { breath.getJSONObject(it) }.filter {
+            (it.getLong("at") - lastAt >= MIN_BREATH_GAP_MS).also { keep -> if (keep) lastAt = it.getLong("at") }
+        }.map {
+            val time = Instant.ofEpochMilli(it.getLong("at"))
+            RespiratoryRateRecord(
+                time = time,
+                zoneOffset = zone.getOffset(time),
+                rate = it.getDouble("perMinute"),
                 metadata = Metadata.manualEntry(),
             )
         }

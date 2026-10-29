@@ -217,7 +217,7 @@ class MainActivity : AppCompatActivity() {
         id<Button>(R.id.calendar_button).setOnClickListener {
             if (CalendarSync.hasPermission(this)) chooseCalendar() else requestCalendar.launch(CalendarSync.PERMISSIONS)
         }
-        id<Button>(R.id.grant_hc_button).setOnClickListener { requestHealth.launch(setOf(WRITE_SLEEP, WRITE_HEART_RATE, WRITE_OXYGEN_SATURATION)) }
+        id<Button>(R.id.grant_hc_button).setOnClickListener { requestHealth.launch(setOf(WRITE_SLEEP, WRITE_HEART_RATE, WRITE_OXYGEN_SATURATION, WRITE_RESPIRATORY_RATE)) }
         id<Button>(R.id.widget_button).setOnClickListener {
             val manager = getSystemService(AppWidgetManager::class.java)
             if (manager.isRequestPinAppWidgetSupported) {
