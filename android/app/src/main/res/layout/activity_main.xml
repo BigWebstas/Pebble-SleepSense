@@ -189,10 +189,13 @@
             android:orientation="vertical"
             android:visibility="gone">
 
+            <!-- Thicker and in the accent colour, so it shows where the basic settings end -->
             <com.google.android.material.divider.MaterialDivider
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp" />
+                android:layout_marginTop="24dp"
+                app:dividerColor="?attr/colorPrimary"
+                app:dividerThickness="3dp" />
 
             <TextView
                 android:id="@+id/noise_clips_section_label"
