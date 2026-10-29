@@ -24,6 +24,56 @@ object LiveReadings {
 
     fun get(stream: Stream): Reading? = latest[stream]
 
+    private const val WAVE_SAMPLES = 400 // the oximeter sends about 50 a second: 8 s
+    private const val WAVE_SAMPLE_MS = 20L
+    private const val WAVE_STALE_MS = 3_000L
+    private val waveValues = IntArray(WAVE_SAMPLES)
+    private val waveTimes = LongArray(WAVE_SAMPLES)
+    private var waveCount = 0 // samples written so far, the newest at (waveCount - 1) % WAVE_SAMPLES
+    private var waveClock = 0L // when the newest sample was taken
+
+    class Waveform(val times: LongArray, val values: IntArray)
+
+    /**
+     * Adds the oximeter's waveform bytes: 0 to 127, with 128 added on the one spike sample of each beat.
+     * Frames arrive in bursts of 5, so the samples are put on an even 20 ms clock that follows the arrivals,
+     * which lets the view scroll smoothly instead of in steps.
+     */
+    @Synchronized
+    fun noteWaveform(samples: ByteArray, now: Long = System.currentTimeMillis()) {
+        val ideal = now - (samples.size - 1) * WAVE_SAMPLE_MS
+        var t = waveClock + WAVE_SAMPLE_MS
+        if (t < ideal - 100 || t > ideal + 100) t = ideal // the first frame, a dropout, or drift
+        for (b in samples) {
+            val i = waveCount++ % WAVE_SAMPLES
+            waveValues[i] = b.toInt() and 0x7F
+            waveTimes[i] = t
+            waveClock = t
+            t += WAVE_SAMPLE_MS
+        }
+    }
+
+    @Synchronized
+    fun hasWaveform(now: Long = System.currentTimeMillis()) = waveCount > 0 && now - waveClock <= WAVE_STALE_MS
+
+    /** The samples taken between [from] and [to] (millis), oldest first, or null when the oximeter has gone quiet. */
+    @Synchronized
+    fun waveform(from: Long, to: Long, now: Long = System.currentTimeMillis()): Waveform? {
+        if (!hasWaveform(now)) return null
+        val n = minOf(waveCount, WAVE_SAMPLES)
+        val times = LongArray(n)
+        val values = IntArray(n)
+        var kept = 0
+        for (k in waveCount - n until waveCount) { // oldest first, without allocating per sample: this runs every frame
+            val i = k % WAVE_SAMPLES
+            if (waveTimes[i] in from..to) {
+                times[kept] = waveTimes[i]
+                values[kept++] = waveValues[i]
+            }
+        }
+        return Waveform(times.copyOf(kept), values.copyOf(kept))
+    }
+
     /** "Name: value (12 s ago)" per stream, "--" for one not heard from yet. */
     fun describe(context: Context, now: Long = System.currentTimeMillis()): String =
         Stream.entries.joinToString("\n") { stream ->

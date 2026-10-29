@@ -39,14 +39,17 @@ data class OximeterReading(val spo2: Int, val pulse: Int)
  * The Wellue/Viatom PC-60FW family talks over the Nordic UART service. A frame is
  * `AA 55 <type> <length> <function> <payload...> <crc>`, where the length counts everything after
  * itself and the CRC is CRC-8/MAXIM over the whole frame (so a good frame checks to zero).
- * Function 0x01 carries SpO2 and pulse; 0x02 is the pulse waveform, which is not used here.
+ * Function 0x01 carries SpO2 and pulse; 0x02 carries 5 samples of the pulse waveform, only shown live.
  * Protocol from https://github.com/sza2/viatom_pc60fw.
  */
 class OximeterParser {
     private var buffer = ByteArray(0)
 
-    /** Takes bytes as they arrive and returns the readings completed by them. */
-    fun feed(data: ByteArray): List<OximeterReading> {
+    /**
+     * Takes bytes as they arrive and returns the readings completed by them. Each waveform frame is
+     * passed to [onWaveform] as its 5 sample bytes.
+     */
+    fun feed(data: ByteArray, onWaveform: (ByteArray) -> Unit = {}): List<OximeterReading> {
         buffer += data
         val out = ArrayList<OximeterReading>()
         while (true) {
@@ -62,6 +65,7 @@ class OximeterParser {
             val frame = buffer.copyOfRange(0, total)
             buffer = buffer.copyOfRange(total, buffer.size)
             if (crc8Maxim(frame) != 0) continue
+            if (frame.size == 11 && frame[4] == 0x02.toByte()) onWaveform(frame.copyOfRange(5, 10))
             readingOf(frame)?.let(out::add)
         }
         return out
@@ -278,7 +282,7 @@ class OximeterMonitor(private val context: Context) {
             val now = System.currentTimeMillis()
             lastActivity = now
             Log.v(TAG, "rx " + data.joinToString(" ") { "%02x".format(it) })
-            for (r in parser.feed(data)) {
+            for (r in parser.feed(data) { LiveReadings.noteWaveform(it, now) }) {
                 LiveReadings.note(LiveReadings.Stream.SPO2, r.spo2, now)
                 LiveReadings.note(LiveReadings.Stream.OXIMETER_PULSE, r.pulse, now)
                 if (windowStart == 0L) windowStart = now

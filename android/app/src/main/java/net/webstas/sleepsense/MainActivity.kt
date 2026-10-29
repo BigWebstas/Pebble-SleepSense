@@ -49,6 +49,18 @@ class MainActivity : AppCompatActivity() {
             handler.postDelayed(this, 3000) // the watch checks in about once a minute and on every change
         }
     }
+    private val waveformLoop = object : Runnable {
+        override fun run() {
+            val view = id<WaveformView>(R.id.live_waveform)
+            if (LiveReadings.hasWaveform()) {
+                view.visibility = View.VISIBLE
+                view.invalidate() // the view redraws itself every frame from here
+            } else {
+                view.visibility = View.GONE
+            }
+            handler.postDelayed(this, 500)
+        }
+    }
 
     private val requestMic =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { refreshNoise() }
@@ -230,16 +242,19 @@ class MainActivity : AppCompatActivity() {
         refreshWhiteNoise()
         refreshCalendar()
         handler.post(refreshLoop)
+        handler.post(waveformLoop)
     }
 
     override fun onDestroy() {
         WhiteNoisePlayer.removeListener(whiteNoiseListener)
         handler.removeCallbacks(refreshLoop)
+        handler.removeCallbacks(waveformLoop)
         super.onDestroy()
     }
 
     override fun onPause() {
         handler.removeCallbacks(refreshLoop)
+        handler.removeCallbacks(waveformLoop)
         stopDotPulses()
         super.onPause()
     }
