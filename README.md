@@ -68,8 +68,8 @@ Changes need a deliberate **hold** (about a second; the watch buzzes once to con
 | Button | Hold | Press / double-press | While the alarm rings |
 | :--- | :--- | :--- | :--- |
 | **SELECT** | Start / stop sleep tracking | Press: refresh from the phone. Double-press: voice dream journal | Press: stop the alarm (also stops tracking) |
-| **UP** | Turn the smart alarm on / off | Double-press: change the alarm time (Up/Down hour, Select for minute, Select to save). It syncs to the Android app, which then stops following the phone's own alarm | Press: snooze (when enabled) |
-| **DOWN** | Cycle the smart wake window (15 → 30 → 45 min) | Nothing | Press: snooze (when enabled) |
+| **UP** | Turn the smart alarm on / off | Double-press (Up or Down): change the alarm time (Up/Down hour, Select for minute, Select to save). It syncs to the Android app, which then stops following the phone's own alarm | Press: snooze (when enabled) |
+| **DOWN** | Cycle the smart wake window (15 → 30 → 45 min) | Double-press: change the alarm time, as on UP | Press: snooze (when enabled) |
 
 ### Settings and history (phone)
 
