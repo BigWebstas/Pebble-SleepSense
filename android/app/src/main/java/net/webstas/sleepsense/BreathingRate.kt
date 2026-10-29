@@ -11,7 +11,8 @@ import kotlin.math.sqrt
  * it shows in the axes (not in their magnitude). Each axis of a one-minute window is band-passed to 0.1 to
  * 0.55 Hz (6 to 33 breaths a minute), the direction with the most motion is taken, and the strongest frequency
  * in it is the rate. The tone is the share of the band's power within 0.03 Hz of that frequency: near 1 for a
- * steady breath, low when you move or breathe unevenly, in which case there is no reading.
+ * steady breath, low when you move or breathe unevenly, in which case there is no reading. A strongest frequency
+ * at either edge of the band is no reading either: the real peak lies outside it (slow drift as the watch settles).
  */
 object BreathingRate {
     const val SAMPLES_PER_SECOND = 5
@@ -23,8 +24,8 @@ object BreathingRate {
     private const val PEAK_WIDTH_HZ = 0.03
     private const val MIN_TONE = 0.5 // below this a reading is mostly noise: movement reads as the band's lower edge
 
-    class Estimate(val perMinute: Double, val tone: Double) {
-        val reliable get() = tone >= MIN_TONE
+    class Estimate(val perMinute: Double, val tone: Double, val atEdge: Boolean = false) {
+        val reliable get() = tone >= MIN_TONE && !atEdge
     }
 
     // Whole-window DFT bins inside the band, and their sine and cosine tables
@@ -57,7 +58,7 @@ object BreathingRate {
         val total = power.sum()
         if (total <= 0.0) return Estimate(0.0, 0.0)
         val near = power.indices.filter { abs((it - peak) * PEAK_STEP_HZ) <= PEAK_WIDTH_HZ }.sumOf { power[it] }
-        return Estimate((LOW_HZ + peak * PEAK_STEP_HZ) * 60, near / total)
+        return Estimate((LOW_HZ + peak * PEAK_STEP_HZ) * 60, near / total, atEdge = peak == 0 || peak == steps - 1)
     }
 
     /** The window with its mean and everything outside the band removed (a mask on the DFT bins, zero phase). */
