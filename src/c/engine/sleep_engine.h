@@ -54,6 +54,9 @@ void sleep_engine_set_chest_callback(SleepEngineChestCallback callback);
 void sleep_engine_set_chest_capture(bool on);
 
 //! Enable or disable each sensor; persisted and applied immediately
+//! The chest breathing rate from the phone (breaths a minute, 0 for none); used for REM while it stays fresh
+void sleep_engine_set_breathing(uint8_t rate);
+
 void sleep_engine_set_sensors(bool light, bool mic, bool heart_rate);
 
 //! Current sensor settings

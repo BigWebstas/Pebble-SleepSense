@@ -51,6 +51,7 @@ static void prv_inbox_received(DictionaryIterator *iter, void *context) {
   // The breathing rate the phone worked out from the chest samples (0: no reading)
   Tuple *breathing = dict_find(iter, MESSAGE_KEY_BREATHING_RATE);
   if (breathing) {
+    sleep_engine_set_breathing(breathing->value->uint8);
     ui_main_set_breathing(breathing->value->uint8);
   }
 

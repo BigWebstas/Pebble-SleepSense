@@ -77,10 +77,65 @@ static AppLightLevel prv_convert_health_light(uint8_t raw_light) {
 }
 #endif
 
+// REM from the body: heart rate and breathing, judged against this night's own deep sleep
+#define REM_WINDOW 5            // minutes looked at, the current one included
+#define REM_BASELINE_MIN 10     // deep minutes with a heart rate before there is a baseline
+#define REM_HR_RISE 3           // bpm above the deep-sleep average that counts as raised
+#define REM_BREATH_SPREAD 3     // breaths a minute between the slowest and fastest that counts as uneven
+#define BREATHING_STALE_SEC 60
+static uint8_t s_breathing;
+static time_t s_breathing_at;
+
+//! Average heart rate of the history's deep minutes, 0 until there are enough of them
+static uint8_t prv_deep_hr_baseline(void) {
+  uint32_t sum = 0, n = 0;
+  for (uint16_t i = 0; i < s_session.epoch_count; i++) {
+    const SleepEpoch *e = &s_session.epochs[i];
+    if (e->stage == SLEEP_STAGE_DEEP && e->heart_rate > 0) {
+      sum += e->heart_rate;
+      n++;
+    }
+  }
+  return (n >= REM_BASELINE_MIN) ? (uint8_t)(sum / n) : 0;
+}
+
+//! Does the body look like REM? Each signal that has data casts a vote and most must agree (both when two have
+//! data). Returns false with `known` false when there is nothing to judge by.
+static bool prv_body_says_rem(uint8_t heart_rate, uint8_t breathing, bool *known) {
+  uint32_t hr_sum = heart_rate, hr_n = heart_rate > 0;
+  uint8_t br_min = breathing ? breathing : 255, br_max = breathing;
+  uint32_t br_n = breathing > 0;
+  for (uint16_t i = 1; i < REM_WINDOW && i <= s_session.epoch_count; i++) {
+    const SleepEpoch *e = &s_session.epochs[(s_session.epoch_head + SLEEP_EPOCH_HISTORY_MAX - i) % SLEEP_EPOCH_HISTORY_MAX];
+    if (e->heart_rate > 0) {
+      hr_sum += e->heart_rate;
+      hr_n++;
+    }
+    if (e->breathing > 0) {
+      if (e->breathing < br_min) br_min = e->breathing;
+      if (e->breathing > br_max) br_max = e->breathing;
+      br_n++;
+    }
+  }
+
+  uint8_t baseline = prv_deep_hr_baseline();
+  uint32_t voters = 0, votes = 0;
+  if (baseline > 0 && hr_n >= 3) {
+    voters++;
+    if (hr_sum / hr_n >= (uint32_t)baseline + REM_HR_RISE) votes++;
+  }
+  if (br_n >= 4) {
+    voters++;
+    if (br_max - br_min >= REM_BREATH_SPREAD) votes++;
+  }
+  *known = voters > 0;
+  return voters > 0 && votes == voters;
+}
+
 //! Classify a 1-minute epoch using sensor fusion:
-//! VMC (movement), Ambient Light, Sound level, and Ultradian cycle position (~90 min)
+//! VMC (movement), Ambient Light, Sound level, heart rate and breathing, with the ~90 minute cycle as the fallback
 static SleepStage prv_classify_epoch(uint16_t vmc, uint32_t mean_vmc, AppLightLevel light, uint8_t sound,
-                                     uint32_t elapsed_sec) {
+                                     uint8_t heart_rate, uint8_t breathing, uint32_t elapsed_sec) {
   // 1. Check for Awakening:
   // Bright lights turned on + moderate movement
   if ((light >= APP_LIGHT_LIGHT) && (vmc > 50)) {
@@ -107,13 +162,16 @@ static SleepStage prv_classify_epoch(uint16_t vmc, uint32_t mean_vmc, AppLightLe
   }
 
   // 4. Low movement in dark environment: Distinguish between Deep Sleep and REM
-  // Standard ultradian sleep cycle is ~90 minutes (5400 sec)
-  uint32_t cycle_min = (elapsed_sec % 5400) / 60;
-
-  // SWS (Slow-Wave Deep Sleep) predominates during the early-to-mid phase of a cycle (min 15-55)
-  // REM sleep recurs at the end of the 90-min cycle (min 65-88)
-  if (elapsed_sec > 1800 && cycle_min >= 65 && cycle_min <= 88) {
-    return SLEEP_STAGE_REM;
+  // REM has a raised, uneven heart rate and uneven breathing. Without that data, fall back on the
+  // standard ~90 minute cycle: REM recurs at its end (min 65-88), deep sleep earlier (min 15-55)
+  if (elapsed_sec > 1800) {
+    bool known;
+    bool rem = prv_body_says_rem(heart_rate, breathing, &known);
+    if (!known) {
+      uint32_t cycle_min = (elapsed_sec % 5400) / 60;
+      rem = cycle_min >= 65 && cycle_min <= 88;
+    }
+    if (rem) return SLEEP_STAGE_REM;
   }
 
   // Sustained stillness early in cycle = Deep Restful Sleep (N3)
@@ -135,10 +193,10 @@ static uint32_t prv_recent_mean_vmc(uint16_t current) {
 }
 
 static void prv_record_epoch(time_t now, uint16_t vmc, AppLightLevel light, uint8_t sound,
-                             uint8_t orientation, uint8_t heart_rate, bool live) {
+                             uint8_t orientation, uint8_t heart_rate, uint8_t breathing, bool live) {
   uint32_t elapsed_sec = (s_session.session_start > 0) ? (now - s_session.session_start) : 0;
 
-  SleepStage stage = prv_classify_epoch(vmc, prv_recent_mean_vmc(vmc), light, sound, elapsed_sec);
+  SleepStage stage = prv_classify_epoch(vmc, prv_recent_mean_vmc(vmc), light, sound, heart_rate, breathing, elapsed_sec);
 
   s_session.current_stage = stage;
   s_session.current_light = light;
@@ -154,6 +212,7 @@ static void prv_record_epoch(time_t now, uint16_t vmc, AppLightLevel light, uint
     .sound_level = sound,
     .orientation = orientation,
     .heart_rate = heart_rate,
+    .breathing = breathing,
     .stage = stage,
   };
 
@@ -266,7 +325,7 @@ static void prv_backfill_gap(void) {
       }
       AppLightLevel light = s_sensors.light ? prv_convert_health_light(records[i].light) : APP_LIGHT_UNKNOWN;
       uint8_t heart_rate = s_sensors.heart_rate ? records[i].heart_rate_bpm : 0;
-      prv_record_epoch(when, records[i].vmc, light, 0, records[i].orientation, heart_rate, false);
+      prv_record_epoch(when, records[i].vmc, light, 0, records[i].orientation, heart_rate, 0, false);
     }
     from += chunk * 60;
   }
@@ -329,6 +388,10 @@ static void prv_accel_handler(AccelData *data, uint32_t num_samples) {
   }
 }
 
+static uint8_t prv_fresh_breathing(void) {
+  return (s_breathing && time(NULL) - s_breathing_at <= BREATHING_STALE_SEC) ? s_breathing : 0;
+}
+
 static void prv_process_minute(void) {
   if (!s_session.is_tracking) {
     return;
@@ -369,7 +432,7 @@ static void prv_process_minute(void) {
   s_minute_accel_acc = 0;
   s_minute_accel_samples = 0;
 
-  prv_record_epoch(time(NULL), vmc, light, s_session.current_sound, orientation, heart_rate, true);
+  prv_record_epoch(time(NULL), vmc, light, s_session.current_sound, orientation, heart_rate, prv_fresh_breathing(), true);
   prv_schedule_wakeup();
 }
 
@@ -526,6 +589,11 @@ void sleep_engine_add_snooze(uint32_t seconds) {
   if (s_update_cb) {
     s_update_cb(&s_session);
   }
+}
+
+void sleep_engine_set_breathing(uint8_t rate) {
+  s_breathing = rate;
+  s_breathing_at = time(NULL);
 }
 
 void sleep_engine_set_sensors(bool light, bool mic, bool heart_rate) {

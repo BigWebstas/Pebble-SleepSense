@@ -30,6 +30,7 @@ typedef struct {
   uint8_t sound_level;     //!< Phone mic sound level (0 - 100)
   uint8_t orientation;     //!< Pitch/yaw orientation
   uint8_t heart_rate;      //!< Beats per minute, 0 if unavailable
+  uint8_t breathing;       //!< Breaths per minute from the chest, 0 if unavailable
   SleepStage stage;        //!< Staged classification
 } SleepEpoch;
 
