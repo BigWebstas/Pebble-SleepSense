@@ -63,7 +63,11 @@ object WidgetState {
 object Commands {
     private val lock = Object()
     private var pending: String? = null
+    private var breathing: Int? = null
     private var newestPoll = 0
+
+    /** What a poll collects: a command ("none" if there is only a rate) and a breathing rate, if one is waiting. */
+    class Update(val command: String, val breathing: Int?)
 
     fun queueStart() = queue("start")
 
@@ -75,28 +79,35 @@ object Commands {
 
     fun queueChestStop() = queue("chest-stop")
 
+    /** The breathing rate (0 for none) goes to the watch next to any command; a newer one replaces an older. */
+    fun queueBreathing(rate: Int) = synchronized(lock) {
+        breathing = rate
+        lock.notifyAll()
+    }
+
     private fun queue(command: String) = synchronized(lock) {
         pending = command // a newer request replaces an older one
         lock.notifyAll()
     }
 
     /**
-     * Holds the caller up to [timeoutMs] until a command is queued; returns it ("start" or "stop")
-     * or "none". Only the newest poll can take a command: an older one (its client gone, e.g. the
+     * Holds the caller up to [timeoutMs] until a command or a breathing rate is queued and returns what is waiting
+     * (command "none" if nothing). Only the newest poll can take them: an older one (its client gone, e.g. the
      * watch app closed) gives up as soon as a newer poll arrives, so it can't swallow a command.
      */
-    fun await(timeoutMs: Long): String = synchronized(lock) {
+    fun await(timeoutMs: Long): Update = synchronized(lock) {
         val mine = ++newestPoll
         lock.notifyAll()
         val deadline = System.currentTimeMillis() + timeoutMs
-        while (pending == null) {
+        while (pending == null && breathing == null) {
             val left = deadline - System.currentTimeMillis()
-            if (left <= 0 || newestPoll != mine) return "none"
+            if (left <= 0 || newestPoll != mine) return Update("none", null)
             lock.wait(left)
         }
-        if (newestPoll != mine) return "none"
-        val command = pending!!
+        if (newestPoll != mine) return Update("none", null)
+        val update = Update(pending ?: "none", breathing)
         pending = null
-        command
+        breathing = null
+        update
     }
 }

@@ -453,13 +453,12 @@
                 android:layout_marginTop="16dp"
                 android:text="@string/chest_section" />
 
-            <Button
-                android:id="@+id/chest_button"
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/chest_switch"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:minWidth="220dp"
-                android:text="@string/chest_start" />
+                android:text="@string/chest_label" />
 
             <TextView
                 android:id="@+id/chest_status_text"

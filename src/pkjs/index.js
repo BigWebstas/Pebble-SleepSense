@@ -160,8 +160,17 @@ function trackingCommand(key, wantTracking, attempt) {
 }
 
 // Held open by the app until the widget is tapped, so a command arrives within a second
+// The newest breathing rate replaces any still waiting in the outbox (the one being sent stays)
+function sendBreathing(rate) {
+  outbox = outbox.filter(function(item, i) {
+    return item.dict.BREATHING_RATE === undefined || (i === 0 && outboxBusy);
+  });
+  sendToWatch({ BREATHING_RATE: rate });
+}
+
 function listenForCommands() {
-  phoneAlarm.waitForCommand(function(cmd) {
+  phoneAlarm.waitForCommand(function(cmd, breathing) {
+    if (typeof breathing === "number") sendBreathing(breathing);
     if (cmd === "stop" && isTracking) {
       console.log("SleepSense PKJS: Stop tracking requested from the phone");
       trackingCommand("COMMAND_STOP_TRACKING", false, 0);

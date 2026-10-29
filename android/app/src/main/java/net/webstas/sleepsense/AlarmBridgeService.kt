@@ -88,7 +88,11 @@ class AlarmBridgeService : Service() {
         }
 
         val (status, body) = when {
-            request.startsWith("GET /command") -> "200 OK" to """{"cmd":"${Commands.await(25_000)}"}"""
+            request.startsWith("GET /command") -> {
+                val update = Commands.await(25_000)
+                val breathing = update.breathing?.let { ""","breathing":$it""" } ?: ""
+                "200 OK" to """{"cmd":"${update.command}"$breathing}"""
+            }
             request.startsWith("GET /alarm") -> {
                 PhoneAlarmSync.noteRequest(this)
                 Regex("alarm=(\\d)").find(request)?.let { PhoneAlarmSync.alarmEnabledOnWatch(this, it.groupValues[1] == "1") }
@@ -105,7 +109,7 @@ class AlarmBridgeService : Service() {
                     if (hr != null) LiveReadings.note(LiveReadings.Stream.HEART_RATE, hr)
                     val duration = Regex("duration=(\\d+)").find(request)?.groupValues?.get(1)?.toIntOrNull()
                     val isTracking = tracking == "1"
-                    if (isTracking && ChestCapture.needsRestart()) Commands.queueChestStart()
+                    if (isTracking && ChestCapture.needsRestart(this)) Commands.queueChestStart()
                     val wasTracking = WidgetState.tracking(this)
                     WidgetState.note(this, isTracking, since)
                     if (isTracking && !wasTracking) {
@@ -243,6 +247,7 @@ class AlarmBridgeService : Service() {
         """{"listening":${monitor.listening},"db":${monitor.lastDb},"avg":${monitor.avg60},"clips":${NoiseClips.list(this).size}}"""
 
     private fun onTrackingStarted() {
+        ChestCapture.onTrackingStarted(this)
         if (OximeterLog.isEnabled(this)) oximeter.start()
         if (WhiteNoisePrefs.isPlayWhileTracking(this)) {
             WhiteNoisePlayer.start(this)

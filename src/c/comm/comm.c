@@ -1,6 +1,7 @@
 #include "comm.h"
 #include "../engine/sleep_engine.h"
 #include "../engine/smart_alarm.h"
+#include "../ui/ui_main.h"
 #include <message_keys.auto.h>
 
 #if defined(PBL_MICROPHONE)
@@ -47,7 +48,13 @@ static void prv_inbox_received(DictionaryIterator *iter, void *context) {
     sleep_engine_stop_session();
   }
 
-  // Chest breathing test on or off, on request of the phone
+  // The breathing rate the phone worked out from the chest samples (0: no reading)
+  Tuple *breathing = dict_find(iter, MESSAGE_KEY_BREATHING_RATE);
+  if (breathing) {
+    ui_main_set_breathing(breathing->value->uint8);
+  }
+
+  // Chest breathing rate on or off, on request of the phone
   Tuple *chest_cmd = dict_find(iter, MESSAGE_KEY_COMMAND_CHEST_CAPTURE);
   if (chest_cmd) {
     sleep_engine_set_chest_capture(chest_cmd->value->uint8 != 0);

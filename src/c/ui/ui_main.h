@@ -14,5 +14,8 @@ void ui_main_update(const SleepSession *session);
 //! Notify UI of smart alarm trigger state
 void ui_main_alarm_trigger(bool is_smart_wake);
 
+//! The breathing rate from the phone (breaths a minute, 0 for none); shown in the header while it stays fresh
+void ui_main_set_breathing(uint8_t rate);
+
 //! Refresh the on-screen date and time (Pebble Time 2 only; no-op elsewhere)
 void ui_main_refresh_clock(void);

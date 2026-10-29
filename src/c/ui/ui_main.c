@@ -25,6 +25,11 @@ static int16_t s_bell_clapper_len;
 static int16_t s_bell_clapper_r;
 static bool s_bell_on;
 
+// The breathing rate the phone last sent, shown while it is fresh
+#define BREATHING_STALE_SEC 60
+static uint8_t s_breathing;
+static time_t s_breathing_at;
+
 static char s_header_buf[32];
 static char s_stage_buf[32];
 static char s_duration_buf[48];
@@ -221,7 +226,48 @@ static void prv_refresh_countdown(void) {
   text_layer_set_text(s_countdown_layer, s_countdown_buf);
 }
 
+static uint8_t prv_breathing(void) {
+  return (s_breathing && time(NULL) - s_breathing_at <= BREATHING_STALE_SEC) ? s_breathing : 0;
+}
+
+static void prv_refresh_header(const SleepSession *session) {
+  if (!s_header_layer || !session) return;
+  uint8_t breathing = prv_breathing();
+  if (smart_alarm_is_active()) {
+    snprintf(s_header_buf, sizeof(s_header_buf), "ALARM RINGING!");
+  } else if (session->is_tracking && breathing) {
+#if defined(PBL_PLATFORM_EMERY)
+    // Room on the wide screen for the marker as well
+    if (session->current_hr > 0) {
+      snprintf(s_header_buf, sizeof(s_header_buf), "[REC]  HR %d  BR %d", session->current_hr, breathing);
+    } else {
+      snprintf(s_header_buf, sizeof(s_header_buf), "[REC]  BR %d", breathing);
+    }
+#else
+    if (session->current_hr > 0) {
+      snprintf(s_header_buf, sizeof(s_header_buf), "HR %d  BR %d", session->current_hr, breathing);
+    } else {
+      snprintf(s_header_buf, sizeof(s_header_buf), "[REC]  BR %d", breathing);
+    }
+#endif
+  } else if (session->is_tracking && session->current_hr > 0) {
+    snprintf(s_header_buf, sizeof(s_header_buf), "[REC]  HR %d", session->current_hr);
+  } else if (session->is_tracking) {
+    snprintf(s_header_buf, sizeof(s_header_buf), "SleepSense  [REC]");
+  } else {
+    snprintf(s_header_buf, sizeof(s_header_buf), "SleepSense  [IDLE]");
+  }
+  text_layer_set_text(s_header_layer, s_header_buf);
+}
+
+void ui_main_set_breathing(uint8_t rate) {
+  s_breathing = rate;
+  s_breathing_at = time(NULL);
+  prv_refresh_header(sleep_engine_get_session());
+}
+
 void ui_main_refresh_clock(void) {
+  prv_refresh_header(sleep_engine_get_session()); // lets a rate the phone stopped updating drop out
   prv_refresh_countdown();
 #if defined(PBL_PLATFORM_EMERY)
   if (!s_time_layer) return;
@@ -242,16 +288,7 @@ void ui_main_update(const SleepSession *session) {
   SmartAlarmSettings *alarm = smart_alarm_get_settings();
 
   // 1. Header
-  if (is_ringing) {
-    snprintf(s_header_buf, sizeof(s_header_buf), "ALARM RINGING!");
-  } else if (session->is_tracking && session->current_hr > 0) {
-    snprintf(s_header_buf, sizeof(s_header_buf), "[REC]  HR %d", session->current_hr);
-  } else if (session->is_tracking) {
-    snprintf(s_header_buf, sizeof(s_header_buf), "SleepSense  [REC]");
-  } else {
-    snprintf(s_header_buf, sizeof(s_header_buf), "SleepSense  [IDLE]");
-  }
-  text_layer_set_text(s_header_layer, s_header_buf);
+  prv_refresh_header(session);
 
   // 2. Stage Hero
   if (is_ringing) {
@@ -391,15 +428,7 @@ static void prv_down_long_click_handler(ClickRecognizerRef recognizer, void *con
   ui_main_update(sleep_engine_get_session());
 }
 
-// With the watch resting on the chest for the breathing test, a press of Back would close the app and end the test
-static void prv_back_click_handler(ClickRecognizerRef recognizer, void *context) {
-  if (!sleep_engine_chest_capture_active()) {
-    window_stack_pop(true);
-  }
-}
-
 static void prv_click_config_provider(void *context) {
-  window_single_click_subscribe(BUTTON_ID_BACK, prv_back_click_handler);
   window_single_click_subscribe(BUTTON_ID_SELECT, prv_select_click_handler);
   window_multi_click_subscribe(BUTTON_ID_SELECT, 2, 2, 300, true, prv_select_double_click_handler);
   window_long_click_subscribe(BUTTON_ID_SELECT, HOLD_MS, prv_select_long_click_handler, NULL);

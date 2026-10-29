@@ -45,14 +45,16 @@ function fetchPhoneAlarm(callback, status) {
   xhr.send();
 }
 
-// Waits (up to ~25 s, held open by the app) for a command from the phone: "start", "stop" or "none"
+// Waits (up to ~25 s, held open by the app) for a command from the phone: "start", "stop" or "none",
+// and the breathing rate from the chest samples when there is a new one
 function waitForCommand(callback) {
   var xhr = new XMLHttpRequest();
   xhr.open('GET', 'http://127.0.0.1:8765/command', true);
   xhr.timeout = 35000;
   xhr.onload = function () {
     try {
-      callback(JSON.parse(xhr.responseText).cmd);
+      var reply = JSON.parse(xhr.responseText);
+      callback(reply.cmd, reply.breathing);
     } catch (err) {
       callback(null);
     }

@@ -47,7 +47,6 @@ void sleep_engine_add_snooze(uint32_t seconds);
 typedef void (*SleepEngineChestCallback)(uint8_t seq, const int16_t axes[][3], uint8_t count);
 void sleep_engine_set_chest_callback(SleepEngineChestCallback callback);
 void sleep_engine_set_chest_capture(bool on);
-bool sleep_engine_chest_capture_active(void);
 
 //! Enable or disable each sensor; persisted and applied immediately
 void sleep_engine_set_sensors(bool light, bool mic, bool heart_rate);

@@ -314,10 +314,6 @@ void sleep_engine_set_chest_capture(bool on) {
   s_chest_seq = 0;
 }
 
-bool sleep_engine_chest_capture_active(void) {
-  return s_chest_capture;
-}
-
 static void prv_accel_handler(AccelData *data, uint32_t num_samples) {
   for (uint32_t i = 0; i < num_samples; i++) {
     int32_t x = data[i].x;

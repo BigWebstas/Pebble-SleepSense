@@ -116,14 +116,11 @@
     <string name="oximeter_choose_title">Choose your oximeter</string>
     <string name="oximeter_none_found">No Bluetooth devices found. Switch the oximeter on and try again.</string>
 
-    <string name="chest_section">Chest Breathing Test</string>
-    <string name="chest_start">Start chest test</string>
-    <string name="chest_stop">Stop chest test</string>
-    <string name="chest_idle">Start tracking on the watch first, then start the test and rest the watch face-up on your chest.</string>
-    <string name="chest_needs_tracking">The watch is not tracking. Start tracking first.</string>
-    <string name="chest_running">Recording: %1$d s received, %2$d chunks missed.</string>
-    <string name="chest_rate_graph">Breathing rate over the chest test</string>
-    <string name="chest_last">Last test: %1$d s received, %2$d chunks missed.</string>
+    <string name="chest_section">Chest Breathing Rate</string>
+    <string name="chest_label">Show breathing rate (watch resting on the chest)</string>
+    <string name="chest_off">Off. Switch it on to see your breathing rate while the watch tracks with its face on your chest.</string>
+    <string name="chest_on">On while the watch tracks. Rest it face-up on your chest. The rate shows on the watch and under Live Readings; it needs about a minute of still breathing.</string>
+    <string name="chest_rate_graph">Breathing rate this session</string>
     <string name="live_section">Live Readings</string>
     <string name="live_stage">Sleep stage</string>
     <string name="live_movement">Movement</string>
@@ -131,7 +128,7 @@
     <string name="live_sound">Sound</string>
     <string name="live_heart_rate">Heart rate (watch)</string>
     <string name="live_spo2">SpO2</string>
-    <string name="live_breathing">Breathing (chest test)</string>
+    <string name="live_breathing">Breathing (chest)</string>
     <string name="live_unit_per_minute">%1$d /min</string>
     <string name="live_oximeter_pulse">Pulse (oximeter)</string>
     <string name="live_waveform">Pulse waveform (oximeter)</string>
