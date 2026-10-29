@@ -62,7 +62,8 @@ function sensorEnabled(name) {
 
 function snoozeMinutes() {
   var saved = localStorage.getItem("snooze_min");
-  return saved === null ? 9 : parseInt(saved, 10);
+  var minutes = saved === null ? 10 : parseInt(saved, 10);
+  return minutes === 9 ? 10 : minutes; // 9 minutes is no longer offered
 }
 
 function sensorDict() {

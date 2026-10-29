@@ -11,7 +11,7 @@
 #else
 #define ALARM_TIMEOUT_SEC 180
 #endif
-#define DEFAULT_SNOOZE_MIN 9
+#define DEFAULT_SNOOZE_MIN 10
 #define ALARM_WAKEUP_COOKIE 2
 #define ALARM_WAKEUP_LEAD_SEC 60 // launches the app a minute early, so it is up for the minute tick on the alarm time
 #define ALARM_CATCH_UP_SEC 180   // an alarm missed by up to this long still rings when the app comes back
@@ -51,6 +51,9 @@ static void prv_load_settings(void) {
       // Saved by a version without snooze
       s_settings.snooze_minutes = DEFAULT_SNOOZE_MIN;
       s_settings.snooze_until = 0;
+    }
+    if (s_settings.snooze_minutes == 9) {
+      s_settings.snooze_minutes = DEFAULT_SNOOZE_MIN; // 9 minutes is no longer offered
     }
   } else {
     // Defaults: 07:00 AM, 30m window, enabled
