@@ -64,7 +64,8 @@
       "STATUS_QUIET_TIME",
       "COMMAND_CHEST_CAPTURE",
       "CHEST_SAMPLES",
-      "BREATHING_RATE"
+      "BREATHING_RATE",
+      "STATUS_RATING_PENDING"
     ],
     "resources": {
       "media": [

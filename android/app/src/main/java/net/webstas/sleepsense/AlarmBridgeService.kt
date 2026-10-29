@@ -126,7 +126,8 @@ class AlarmBridgeService : Service() {
                     }
                     SleepRecorder.onWatchUpdate(this, isTracking, stage, hr)
                     val quiet = Regex("quiet=(\\d)").find(request)?.groupValues?.get(1)?.let { it == "1" }
-                    BedtimeMode.onTracking(this, isTracking, quiet)
+                    val ratingPending = Regex("rating=(\\d)").find(request)?.groupValues?.get(1)?.let { it == "1" }
+                    BedtimeMode.onTracking(this, isTracking, quiet, ratingPending)
                     if (!isTracking && wasTracking) {
                         CoroutineScope(Dispatchers.IO).launch {
                             val left = SleepRecorder.flush(this@AlarmBridgeService)

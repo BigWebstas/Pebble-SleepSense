@@ -26,6 +26,7 @@ object WatchProtocol {
     const val KEY_STATUS_STATE: UInt = 10000u
     const val KEY_TRACKING_ACTIVE: UInt = 10011u
     const val KEY_STATUS_QUIET_TIME: UInt = 10029u
+    const val KEY_STATUS_RATING_PENDING: UInt = 10033u
     const val KEY_STATUS_HEART_RATE: UInt = 10014u
     const val KEY_STATUS_LIGHT_LEVEL: UInt = 10003u
     const val KEY_STATUS_SOUND_LEVEL: UInt = 10004u

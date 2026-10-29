@@ -417,7 +417,18 @@ void sleep_engine_deinit(void) {
   prv_save_session();
 }
 
+static bool s_rating_pending;
+
+void sleep_engine_set_rating_pending(bool pending) {
+  s_rating_pending = pending;
+}
+
+bool sleep_engine_rating_pending(void) {
+  return s_rating_pending;
+}
+
 void sleep_engine_start_session(void) {
+  s_rating_pending = false;
   time_t now = time(NULL);
   s_session.is_tracking = true;
   s_session.session_start = now;

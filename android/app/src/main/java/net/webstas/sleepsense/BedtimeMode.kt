@@ -54,9 +54,10 @@ object BedtimeMode {
 
     /**
      * Follows the watch: called with every status update, acts only when tracking changes.
-     * [quietTime] is the watch's own Quiet Time state, or null if it didn't say.
+     * [quietTime] is the watch's own Quiet Time state, or null if it didn't say. [ratingPending] is whether the end of
+     * the night is waiting for a rating on the watch (the alarm ended it), or null if it didn't say.
      */
-    fun onTracking(context: Context, tracking: Boolean, quietTime: Boolean?) {
+    fun onTracking(context: Context, tracking: Boolean, quietTime: Boolean?, ratingPending: Boolean? = null) {
         val prefs = prefs(context)
         if (quietTime != null) lastQuietTime = quietTime
         if (tracking == prefs.getBoolean(KEY_ACTIVE, false)) return
@@ -74,6 +75,13 @@ object BedtimeMode {
             if (hasAccess(context)) applySafely(context, false)
             if (prefs.getBoolean(KEY_WATCH_QUIET, false)) {
                 prefs.edit { putLong(KEY_AWAITING_SINCE, System.currentTimeMillis()) }
+                if (ratingPending == false) {
+                    // Stopped by hand (the app's button or a long press on the watch): there is no rating screen
+                    // to protect, so Quiet Time goes off at once
+                    Log.i(TAG, "stopped by hand, quiet time off")
+                    release(context)
+                    return
+                }
                 val app = context.applicationContext
                 CoroutineScope(Dispatchers.IO).launch {
                     delay(RATING_WAIT_MS)

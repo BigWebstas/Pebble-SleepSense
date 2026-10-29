@@ -396,6 +396,7 @@ void smart_alarm_dismiss(void) {
     smart_alarm_sync_wakeup();
     bool was_tracking = sleep_engine_is_tracking();
     if (was_tracking) {
+      sleep_engine_set_rating_pending(true); // before the stop: its update to the phone already carries it
       sleep_engine_stop_session();
     }
     if (s_dismiss_cb) {

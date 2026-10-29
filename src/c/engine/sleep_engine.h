@@ -22,6 +22,11 @@ void sleep_engine_toggle_session(void);
 //! Returns true if tracking session is currently active
 bool sleep_engine_is_tracking(void);
 
+//! Set when the alarm ended the night and the rating screen is about to open, so the phone knows a rating is
+//! coming (and that Quiet Time must not switch the watch app away before it); cleared when a session starts
+void sleep_engine_set_rating_pending(bool pending);
+bool sleep_engine_rating_pending(void);
+
 //! Get current sleep session pointer
 const SleepSession *sleep_engine_get_session(void);
 

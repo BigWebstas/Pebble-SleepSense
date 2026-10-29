@@ -46,6 +46,7 @@ var currentVmc = null;   // movement, light and sound: shown live in the Android
 var currentLight = null;
 var currentSound = null;
 var watchQuietTime = null; // the watch's Quiet Time, as last reported
+var watchRatingPending = null; // whether the end of the night is waiting for a rating on the watch
 var currentDuration = 0;
 
 function getDictValue(dict, strKey, numKey) {
@@ -137,7 +138,8 @@ function trackingStatus() {
     light: currentLight,
     sound: currentSound,
     duration: currentDuration,
-    quiet: watchQuietTime
+    quiet: watchQuietTime,
+    rating: watchRatingPending
   };
 }
 
@@ -364,6 +366,11 @@ Pebble.addEventListener("appmessage", function(e) {
   var durVal = getDictValue(dict, "STATUS_DURATION", 10001);
   if (durVal !== undefined) {
     currentDuration = durVal;
+  }
+
+  var ratingPendingVal = getDictValue(dict, "STATUS_RATING_PENDING", 10033);
+  if (ratingPendingVal !== undefined) {
+    watchRatingPending = ratingPendingVal !== 0;
   }
 
   var quietVal = getDictValue(dict, "STATUS_QUIET_TIME", 10029);

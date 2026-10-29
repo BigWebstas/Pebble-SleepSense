@@ -26,6 +26,9 @@ function fetchPhoneAlarm(callback, status) {
     if (status.quiet !== null && status.quiet !== undefined) {
       query += '&quiet=' + (status.quiet ? 1 : 0);
     }
+    if (status.rating !== null && status.rating !== undefined) {
+      query += '&rating=' + (status.rating ? 1 : 0);
+    }
     // Only sent when the alarm was switched on or off on the watch itself
     if (status.alarm !== undefined) {
       query += '&alarm=' + (status.alarm ? 1 : 0);
