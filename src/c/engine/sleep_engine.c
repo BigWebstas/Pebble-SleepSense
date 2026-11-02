@@ -11,7 +11,7 @@
 // still and a few hundred to a few thousand for a turn in bed (daytime medians are 400-1400), so a
 // single busy minute is not waking: judge the average of the last 5 minutes, and let only a very
 // large burst count on its own.
-#define VMC_THRESHOLD_DEEP 30
+#define VMC_THRESHOLD_DEEP 50 // still: this watch's quiet floor is 40 to 50 a minute
 #define VMC_MEAN_AWAKE 400
 #define VMC_BURST_AWAKE 2500
 #define VMC_WINDOW 5
