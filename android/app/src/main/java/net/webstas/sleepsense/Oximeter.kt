@@ -136,6 +136,18 @@ object OximeterLog {
         f.writeText(kept.joinToString("") { it + "\n" } + "S,$now\n")
     }
 
+    private fun waveFile(context: Context) = File(context.filesDir, "oximeter_wave.csv")
+
+    /**
+     * The waveform of the latest run, for working out the beat-to-beat intervals: "<millis>,<s1>,..,<s5>" per
+     * frame, the five bytes as they came (128 is added on the one spike sample of each beat). Replaced when a run starts.
+     */
+    @Synchronized
+    fun startWave(context: Context) = waveFile(context).writeText("")
+
+    @Synchronized
+    fun addWave(context: Context, lines: CharSequence) = waveFile(context).appendText(lines.toString())
+
     @Synchronized
     fun addSample(context: Context, at: Long, spo2: Int, pulse: Int) {
         file(context).appendText("$at,$spo2,$pulse\n")
@@ -189,6 +201,7 @@ class OximeterMonitor(private val context: Context) {
     private val handler = Handler(Looper.getMainLooper())
     @Volatile private var gatt: BluetoothGatt? = null
     private var running = false
+    private val wave = StringBuilder() // waveform lines not yet written, written with each window
     private var parser = OximeterParser()
     private var lastActivity = 0L // the last connection attempt or data from the oximeter
 
@@ -202,6 +215,7 @@ class OximeterMonitor(private val context: Context) {
         if (running || !oximeterPermissionsGranted(context)) return
         running = true
         OximeterLog.startRun(context)
+        OximeterLog.startWave(context)
         poll()
     }
 
@@ -282,7 +296,10 @@ class OximeterMonitor(private val context: Context) {
             val now = System.currentTimeMillis()
             lastActivity = now
             Log.v(TAG, "rx " + data.joinToString(" ") { "%02x".format(it) })
-            for (r in parser.feed(data) { LiveReadings.noteWaveform(it, now) }) {
+            for (r in parser.feed(data) { frame ->
+                LiveReadings.noteWaveform(frame, now)
+                wave.append(now).also { frame.forEach { b -> wave.append(',').append(b.toInt() and 0xFF) } }.append('\n')
+            }) {
                 LiveReadings.note(LiveReadings.Stream.SPO2, r.spo2, now)
                 LiveReadings.note(LiveReadings.Stream.OXIMETER_PULSE, r.pulse, now)
                 if (windowStart == 0L) windowStart = now
@@ -295,6 +312,10 @@ class OximeterMonitor(private val context: Context) {
     }
 
     private fun flushWindow() {
+        if (wave.isNotEmpty()) {
+            OximeterLog.addWave(context, wave)
+            wave.setLength(0)
+        }
         if (pulseCount > 0) OximeterLog.addSample(context, windowStart, windowMin, pulseSum / pulseCount)
         windowStart = 0L
         windowMin = 101
