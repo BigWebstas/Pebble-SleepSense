@@ -42,6 +42,8 @@ var soundInterval = null;
 var isTracking = false;
 var currentStage = null;
 var currentHr = null;
+var breathingRate = 0; // the chest rate last sent to the watch, and when: kept in the night's history while it is fresh
+var breathingAt = 0;
 var currentVmc = null;   // movement, light and sound: shown live in the Android app
 var currentLight = null;
 var currentSound = null;
@@ -166,6 +168,8 @@ function trackingCommand(key, wantTracking, attempt) {
 // Held open by the app until the widget is tapped, so a command arrives within a second
 // The newest breathing rate replaces any still waiting in the outbox (the one being sent stays)
 function sendBreathing(rate) {
+  breathingRate = rate;
+  breathingAt = Date.now();
   outbox = outbox.filter(function(item, i) {
     return item.dict.BREATHING_RATE === undefined || (i === 0 && outboxBusy);
   });
@@ -383,6 +387,7 @@ Pebble.addEventListener("appmessage", function(e) {
 
   var trackingVal = getDictValue(dict, "TRACKING_ACTIVE", 10011);
   if (trackingVal !== undefined) {
+    dict.STATUS_BREATHING = Date.now() - breathingAt <= 60000 ? breathingRate : 0;
     sleepHistory.record(trackingVal === 1, dict, Date.now());
     pushHistory(trackingVal === 0);
     var wasTracking = isTracking;
