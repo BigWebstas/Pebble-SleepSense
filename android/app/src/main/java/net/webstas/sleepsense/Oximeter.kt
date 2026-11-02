@@ -143,7 +143,18 @@ object OximeterLog {
      * frame, the five bytes as they came (128 is added on the one spike sample of each beat). Replaced when a run starts.
      */
     @Synchronized
-    fun startWave(context: Context) = waveFile(context).writeText("")
+    fun startWave(context: Context) {
+        waveFile(context).writeText("")
+        eventFile(context).writeText("")
+    }
+
+    private fun eventFile(context: Context) = File(context.filesDir, "oximeter_events.csv")
+
+    /** What the connection did, as "<millis>,<what>" lines, so a night with no data can be explained. Replaced with the waveform. */
+    @Synchronized
+    fun event(context: Context, what: String, now: Long = System.currentTimeMillis()) {
+        eventFile(context).appendText("$now,$what\n")
+    }
 
     @Synchronized
     fun addWave(context: Context, lines: CharSequence) = waveFile(context).appendText(lines.toString())
@@ -204,6 +215,7 @@ class OximeterMonitor(private val context: Context) {
     private val wave = StringBuilder() // waveform lines not yet written, written with each window
     private var parser = OximeterParser()
     private var lastActivity = 0L // the last connection attempt or data from the oximeter
+    private var gotData = false // data has come on this connection, which is logged once
 
     private var windowStart = 0L
     private var windowMin = 101
@@ -216,12 +228,14 @@ class OximeterMonitor(private val context: Context) {
         running = true
         OximeterLog.startRun(context)
         OximeterLog.startWave(context)
+        OximeterLog.event(context, "start")
         poll()
     }
 
     fun stop() {
         if (!running) return
         running = false
+        OximeterLog.event(context, "stop")
         handler.removeCallbacksAndMessages(null)
         flushWindow()
         gatt?.close()
@@ -238,6 +252,7 @@ class OximeterMonitor(private val context: Context) {
         val now = System.currentTimeMillis()
         if (gatt != null && now - lastActivity > STALE_MS) {
             Log.i(TAG, "no data for ${(now - lastActivity) / 1000} s, reconnecting")
+            OximeterLog.event(context, "quiet for ${(now - lastActivity) / 1000} s, dropped")
             gatt?.close()
             gatt = null
         }
@@ -248,14 +263,20 @@ class OximeterMonitor(private val context: Context) {
     private fun connect() {
         val address = OximeterLog.address(context) ?: return
         val adapter = context.getSystemService(BluetoothManager::class.java)?.adapter
-        if (adapter == null || !adapter.isEnabled) return
+        if (adapter == null || !adapter.isEnabled) {
+            OximeterLog.event(context, "bluetooth off")
+            return
+        }
         parser = OximeterParser()
         lastActivity = System.currentTimeMillis()
+        gotData = false
+        OximeterLog.event(context, "connect")
         gatt = adapter.getRemoteDevice(address).connectGatt(context, false, callback, BluetoothDevice.TRANSPORT_LE)
     }
 
     private val callback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
+            OximeterLog.event(context, "state $newState status $status")
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 g.discoverServices()
             } else {
@@ -268,6 +289,7 @@ class OximeterMonitor(private val context: Context) {
         override fun onServicesDiscovered(g: BluetoothGatt, status: Int) {
             val tx = g.getService(NUS_SERVICE)?.getCharacteristic(NUS_TX)
             if (tx == null) {
+                OximeterLog.event(context, "no UART service")
                 Log.w(TAG, "no Nordic UART service on ${g.device.address}, it has: ${g.services.map { it.uuid }}")
                 g.disconnect()
                 return
@@ -277,6 +299,7 @@ class OximeterMonitor(private val context: Context) {
                 it.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
                 g.writeDescriptor(it)
             }
+            OximeterLog.event(context, "listening")
             Log.i(TAG, "connected to ${g.device.address}")
         }
 
@@ -295,6 +318,10 @@ class OximeterMonitor(private val context: Context) {
             if (!running) return@post
             val now = System.currentTimeMillis()
             lastActivity = now
+            if (!gotData) {
+                gotData = true
+                OximeterLog.event(context, "data")
+            }
             Log.v(TAG, "rx " + data.joinToString(" ") { "%02x".format(it) })
             for (r in parser.feed(data) { frame ->
                 LiveReadings.noteWaveform(frame, now)
