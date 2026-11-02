@@ -403,17 +403,21 @@ static void prv_process_minute(void) {
   uint8_t heart_rate = 0;
 
 #if defined(PBL_HEALTH)
+  // The minute that has just ended may not be in the Health records yet when this runs at the turn of the
+  // minute, so look at the last few and take the newest valid one
   time_t now = time(NULL);
-  time_t time_start = now - 60;
+  time_t time_start = now - 5 * 60;
   time_t time_end = now;
 
-  HealthMinuteData records[2];
-  uint32_t count = health_service_get_minute_history(records, 2, &time_start, &time_end);
-  if (count > 0 && !records[0].is_invalid) {
-    vmc = records[0].vmc;
-    light = prv_convert_health_light(records[0].light);
-    orientation = records[0].orientation;
-    heart_rate = records[0].heart_rate_bpm;
+  HealthMinuteData records[5];
+  uint32_t count = health_service_get_minute_history(records, 5, &time_start, &time_end);
+  int newest = (int)count - 1;
+  while (newest >= 0 && records[newest].is_invalid) newest--;
+  if (newest >= 0) {
+    vmc = records[newest].vmc;
+    light = prv_convert_health_light(records[newest].light);
+    orientation = records[newest].orientation;
+    heart_rate = records[newest].heart_rate_bpm;
   } else
 #endif
   {
