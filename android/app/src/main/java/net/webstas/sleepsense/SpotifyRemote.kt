@@ -1,6 +1,8 @@
 package net.webstas.sleepsense
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import com.spotify.android.appremote.api.ConnectionParams
 import com.spotify.android.appremote.api.Connector
@@ -21,8 +23,22 @@ object SpotifyRemote {
 
     private var remote: SpotifyAppRemote? = null
 
+    // The SDK makes handlers for its answers, so it must be called from a thread with a looper: the main one
+    private val main = Handler(Looper.getMainLooper())
+
     /** Connects, asking Spotify's permission when [allowPrompt] (the app is in front); calls back with whether it worked. */
     fun connect(context: Context, allowPrompt: Boolean, done: (Boolean) -> Unit) {
+        main.post {
+            try {
+                connectOnMain(context, allowPrompt, done)
+            } catch (e: Exception) {
+                Log.w(TAG, "could not connect to Spotify: $e")
+                done(false)
+            }
+        }
+    }
+
+    private fun connectOnMain(context: Context, allowPrompt: Boolean, done: (Boolean) -> Unit) {
         remote?.takeIf { it.isConnected }?.let { done(true); return }
         val params = ConnectionParams.Builder(CLIENT_ID)
             .setRedirectUri(REDIRECT_URI)
@@ -55,11 +71,13 @@ object SpotifyRemote {
     }
 
     fun pause() {
-        remote?.takeIf { it.isConnected }?.playerApi?.pause()
+        main.post { remote?.takeIf { it.isConnected }?.playerApi?.pause() }
     }
 
     fun disconnect() {
-        remote?.let { SpotifyAppRemote.disconnect(it) }
-        remote = null
+        main.post {
+            remote?.let { SpotifyAppRemote.disconnect(it) }
+            remote = null
+        }
     }
 }
