@@ -283,8 +283,10 @@ static uint32_t prv_isqrt(uint32_t n) {
 
 //! If the app is closed while tracking (the watch can drop back to the watch face overnight),
 //! a wakeup relaunches it. Every live minute pushes the wakeup out, so it only fires once
-//! the app has stopped ticking.
-#define WAKEUP_DELAY_SEC (5 * 60)
+//! the app has stopped ticking: one to two minutes after it was left.
+#define WAKEUP_DELAY_SEC (2 * 60)
+#define WAKEUP_RETRY_SEC 60
+#define WAKEUP_TRIES 4
 #define WAKEUP_COOKIE 1
 
 static WakeupId s_wakeup_id = -1;
@@ -294,8 +296,16 @@ static void prv_schedule_wakeup(void) {
     wakeup_cancel(s_wakeup_id); // only ours: the alarm has its own wakeup
     s_wakeup_id = -1;
   }
-  if (s_session.is_tracking) {
-    s_wakeup_id = wakeup_schedule(time(NULL) + WAKEUP_DELAY_SEC, WAKEUP_COOKIE, false);
+  if (!s_session.is_tracking) {
+    return;
+  }
+  // Wakeups can't sit within a minute of each other (the alarm's may be near), so a refused one is tried a minute later
+  time_t now = time(NULL);
+  for (int i = 0; i < WAKEUP_TRIES && s_wakeup_id < 0; i++) {
+    s_wakeup_id = wakeup_schedule(now + WAKEUP_DELAY_SEC + i * WAKEUP_RETRY_SEC, WAKEUP_COOKIE, false);
+  }
+  if (s_wakeup_id < 0) {
+    APP_LOG(APP_LOG_LEVEL_WARNING, "No tracking wakeup could be scheduled: %d", (int)s_wakeup_id);
   }
 }
 
