@@ -18,6 +18,7 @@ object PhoneAlarmSync {
     private const val KEY_ALARM_ENABLED = "alarm_enabled"
     private const val KEY_LAST_REQUEST = "last_request"
     private const val KEY_REVISION = "revision"
+    private const val KEY_WINDOW = "smart_window_minutes" // reported by the watch, never sent to it
     private const val KEY_CUSTOM = "custom_alarm" // minutes after midnight; unset until chosen
     private const val KEY_SNOOZE = "snooze_minutes" // unset until chosen, so the watch's own value stands
 
@@ -36,6 +37,14 @@ object PhoneAlarmSync {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean(KEY_ALARM_ENABLED, enabled) }
         noteAlarmChanged(context)
         Commands.queueSync()
+    }
+
+    /** The smart alarm window set on the watch (minutes), or null until the watch has reported it. */
+    fun smartWindowMinutes(context: Context): Int? =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(KEY_WINDOW, -1).takeIf { it > 0 }
+
+    fun setSmartWindowMinutes(context: Context, minutes: Int) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putInt(KEY_WINDOW, minutes) }
     }
 
     /** The alarm was switched on or off on the watch: follow it, without sending it back. */
@@ -81,6 +90,7 @@ object PhoneAlarmSync {
     /** Snooze length chosen in this app (0 = snooze off), or null if never chosen. */
     fun snoozeMinutes(context: Context): Int? =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(KEY_SNOOZE, -1).takeIf { it >= 0 }
+            ?.let { if (it == 9) 10 else it } // 9 minutes is no longer offered
 
     fun setSnoozeMinutes(context: Context, minutes: Int) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putInt(KEY_SNOOZE, minutes) }

@@ -138,6 +138,12 @@
             android:layout_marginTop="8dp"
             android:minWidth="220dp" />
 
+        <TextView
+            android:id="@+id/smart_window_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp" />
+
         <com.google.android.material.divider.MaterialDivider
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -189,10 +195,13 @@
             android:orientation="vertical"
             android:visibility="gone">
 
+            <!-- Thicker and in the accent colour, so it shows where the basic settings end -->
             <com.google.android.material.divider.MaterialDivider
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp" />
+                android:layout_marginTop="24dp"
+                app:dividerColor="?attr/colorPrimary"
+                app:dividerThickness="3dp" />
 
             <TextView
                 android:id="@+id/noise_clips_section_label"
@@ -253,6 +262,13 @@
                 android:layout_marginTop="4dp"
                 android:gravity="center"
                 android:textSize="13sp" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/oximeter_hrv_switch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/oximeter_hrv_label" />
 
             <Button
                 android:id="@+id/oximeter_choose_button"
@@ -443,6 +459,34 @@
                 android:layout_marginTop="24dp" />
 
             <TextView
+                android:id="@+id/chest_section_label"
+                style="@style/SectionHeader"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/chest_section" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/chest_switch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/chest_label" />
+
+            <TextView
+                android:id="@+id/chest_status_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center"
+                android:textSize="13sp" />
+
+            <com.google.android.material.divider.MaterialDivider
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp" />
+
+            <TextView
                 android:id="@+id/live_section_label"
                 style="@style/SectionHeader"
                 android:layout_width="wrap_content"
@@ -456,6 +500,58 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:textSize="14sp" />
+
+            <LinearLayout
+                android:id="@+id/live_waveform_box"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/live_waveform_header_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:alpha="0.7"
+                    android:gravity="end"
+                    android:text="@string/live_waveform_header"
+                    android:textSize="12sp" />
+
+                <net.webstas.sleepsense.WaveformView
+                    android:id="@+id/live_waveform"
+                    android:layout_width="match_parent"
+                    android:layout_height="64dp"
+                    android:contentDescription="@string/live_waveform"
+                    android:layout_marginTop="2dp" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/chest_rate_box"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/chest_rate_header_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:alpha="0.7"
+                    android:gravity="end"
+                    android:text="@string/chest_rate_header"
+                    android:textSize="12sp" />
+
+                <net.webstas.sleepsense.ChestRateView
+                    android:id="@+id/chest_rate_view"
+                    android:layout_width="match_parent"
+                    android:layout_height="120dp"
+                    android:contentDescription="@string/chest_rate_graph"
+                    android:layout_marginTop="2dp" />
+
+            </LinearLayout>
 
         </LinearLayout>
 

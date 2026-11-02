@@ -46,7 +46,20 @@ class MainActivity : AppCompatActivity() {
         override fun run() {
             refreshTracking()
             id<TextView>(R.id.live_readings_text).text = LiveReadings.describe(this@MainActivity)
+            refreshChest()
             handler.postDelayed(this, 3000) // the watch checks in about once a minute and on every change
+        }
+    }
+    private val waveformLoop = object : Runnable {
+        override fun run() {
+            val box = id<View>(R.id.live_waveform_box)
+            if (LiveReadings.hasWaveform()) {
+                box.visibility = View.VISIBLE
+                id<WaveformView>(R.id.live_waveform).invalidate() // the view redraws itself every frame from here
+            } else {
+                box.visibility = View.GONE
+            }
+            handler.postDelayed(this, 500)
         }
     }
 
@@ -146,6 +159,17 @@ class MainActivity : AppCompatActivity() {
                 refreshOximeter()
             }
         }
+        id<MaterialSwitch>(R.id.oximeter_hrv_switch).apply {
+            isChecked = OximeterLog.hrvEnabled(this@MainActivity)
+            setOnCheckedChangeListener { _, on -> OximeterLog.setHrvEnabled(this@MainActivity, on) }
+        }
+        id<MaterialSwitch>(R.id.chest_switch).apply {
+            isChecked = ChestCapture.isEnabled(this@MainActivity)
+            setOnCheckedChangeListener { _, on ->
+                ChestCapture.setEnabled(this@MainActivity, on)
+                refreshChest()
+            }
+        }
         id<Button>(R.id.oximeter_choose_button).setOnClickListener {
             if (oximeterPermissionsGranted(this)) chooseOximeter() else requestOximeterScan.launch(oximeterPermissions())
         }
@@ -197,7 +221,7 @@ class MainActivity : AppCompatActivity() {
         id<Button>(R.id.calendar_button).setOnClickListener {
             if (CalendarSync.hasPermission(this)) chooseCalendar() else requestCalendar.launch(CalendarSync.PERMISSIONS)
         }
-        id<Button>(R.id.grant_hc_button).setOnClickListener { requestHealth.launch(setOf(WRITE_SLEEP, WRITE_HEART_RATE, WRITE_OXYGEN_SATURATION)) }
+        id<Button>(R.id.grant_hc_button).setOnClickListener { requestHealth.launch(setOf(WRITE_SLEEP, WRITE_HEART_RATE, WRITE_OXYGEN_SATURATION, WRITE_RESPIRATORY_RATE, WRITE_HRV)) }
         id<Button>(R.id.widget_button).setOnClickListener {
             val manager = getSystemService(AppWidgetManager::class.java)
             if (manager.isRequestPinAppWidgetSupported) {
@@ -230,16 +254,19 @@ class MainActivity : AppCompatActivity() {
         refreshWhiteNoise()
         refreshCalendar()
         handler.post(refreshLoop)
+        handler.post(waveformLoop)
     }
 
     override fun onDestroy() {
         WhiteNoisePlayer.removeListener(whiteNoiseListener)
         handler.removeCallbacks(refreshLoop)
+        handler.removeCallbacks(waveformLoop)
         super.onDestroy()
     }
 
     override fun onPause() {
         handler.removeCallbacks(refreshLoop)
+        handler.removeCallbacks(waveformLoop)
         stopDotPulses()
         super.onPause()
     }
@@ -345,6 +372,11 @@ class MainActivity : AppCompatActivity() {
             },
         )
         id<MaterialSwitch>(R.id.alarm_enabled_switch).isChecked = PhoneAlarmSync.isAlarmEnabled(this)
+        id<TextView>(R.id.smart_window_text).text = getString(
+            R.string.smart_window,
+            PhoneAlarmSync.smartWindowMinutes(this)?.let { getString(R.string.smart_window_minutes, it) }
+                ?: getString(R.string.smart_window_unset),
+        )
     }
 
     private fun chooseAlarmTime() {
@@ -388,7 +420,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun chooseSnooze() {
-        val lengths = intArrayOf(0, 5, 9, 10, 15, 20)
+        val lengths = intArrayOf(0, 5, 10, 15, 20)
         val labels = lengths.map { if (it == 0) getString(R.string.snooze_off) else getString(R.string.snooze_minutes, it) }
         MaterialAlertDialogBuilder(this)
             .setItems(labels.toTypedArray()) { _, which ->
@@ -471,6 +503,15 @@ class MainActivity : AppCompatActivity() {
         } catch (e: ActivityNotFoundException) {
             Toast.makeText(this, R.string.install_watch_no_handler, Toast.LENGTH_LONG).show()
         }
+    }
+
+    private fun refreshChest() {
+        val rates = ChestCapture.rates(this)
+        id<View>(R.id.chest_rate_box).visibility = if (rates.size >= 2) View.VISIBLE else View.GONE
+        id<ChestRateView>(R.id.chest_rate_view).setRates(rates)
+        id<TextView>(R.id.chest_status_text).setText(
+            if (ChestCapture.isEnabled(this)) R.string.chest_on else R.string.chest_off,
+        )
     }
 
     private fun refreshOximeter() {

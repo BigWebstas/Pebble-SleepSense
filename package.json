@@ -1,7 +1,7 @@
 {
   "name": "pebble-sleep-sense",
   "author": "PebbleDev",
-  "version": "0.6.2",
+  "version": "0.7.0",
   "keywords": [
     "pebble-app",
     "sleep-tracker",
@@ -61,7 +61,11 @@
       "SLEEP_RATING",
       "STATUS_SEND_FAILS",
       "STATUS_SEND_BUSY",
-      "STATUS_QUIET_TIME"
+      "STATUS_QUIET_TIME",
+      "COMMAND_CHEST_CAPTURE",
+      "CHEST_SAMPLES",
+      "BREATHING_RATE",
+      "STATUS_RATING_PENDING"
     ],
     "resources": {
       "media": [

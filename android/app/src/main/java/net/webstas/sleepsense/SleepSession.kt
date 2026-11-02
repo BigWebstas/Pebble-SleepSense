@@ -6,7 +6,10 @@ import androidx.core.content.edit
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.records.HeartRateVariabilityRmssdRecord
 import androidx.health.connect.client.records.OxygenSaturationRecord
+import androidx.health.connect.client.records.Record
+import androidx.health.connect.client.records.RespiratoryRateRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.metadata.Metadata
 import androidx.health.connect.client.units.Percentage
@@ -26,6 +29,7 @@ object WatchProtocol {
     const val KEY_STATUS_STATE: UInt = 10000u
     const val KEY_TRACKING_ACTIVE: UInt = 10011u
     const val KEY_STATUS_QUIET_TIME: UInt = 10029u
+    const val KEY_STATUS_RATING_PENDING: UInt = 10033u
     const val KEY_STATUS_HEART_RATE: UInt = 10014u
     const val KEY_STATUS_LIGHT_LEVEL: UInt = 10003u
     const val KEY_STATUS_SOUND_LEVEL: UInt = 10004u
@@ -44,8 +48,13 @@ val WRITE_SLEEP = HealthPermission.getWritePermission(SleepSessionRecord::class)
 val WRITE_HEART_RATE = HealthPermission.getWritePermission(HeartRateRecord::class)
 val WRITE_OXYGEN_SATURATION = HealthPermission.getWritePermission(OxygenSaturationRecord::class)
 
-private const val SPO2_CHUNK = 500
+val WRITE_RESPIRATORY_RATE = HealthPermission.getWritePermission(RespiratoryRateRecord::class)
+val WRITE_HRV = HealthPermission.getWritePermission(HeartRateVariabilityRmssdRecord::class)
+
+private const val RECORD_CHUNK = 500 // records in one insert
+private const val LIVE_EVERY_MS = 15 * 60_000L // how often a night's readings go to Health Connect while tracking
 private const val MIN_HR_GAP_MS = 30_000L
+private const val MIN_BREATH_GAP_MS = 30_000L
 
 private fun hcStage(watchStage: Int): Int = when (watchStage) {
     1 -> SleepSessionRecord.STAGE_TYPE_LIGHT
@@ -70,6 +79,19 @@ object SleepRecorder {
         if (!tracking) {
             if (open != null) {
                 open.put("end", now)
+                // The chest file is replaced when the next session starts, but the queue may wait longer for Health Connect
+                val breath = JSONArray()
+                ChestCapture.rates(context).forEach { (at, perMinute) ->
+                    if (perMinute != null) breath.put(JSONObject().put("at", at).put("perMinute", perMinute))
+                }
+                open.put("breath", breath)
+                if (OximeterLog.hrvEnabled(context)) {
+                    val hrv = JSONArray()
+                    PulseVariability.windows(OximeterLog.waveFile(context), maxOf(open.getLong("start"), done(open, "hrv")), now).forEach {
+                        hrv.put(JSONObject().put("at", it.at).put("rmssd", it.rmssdMs))
+                    }
+                    open.put("hrv", hrv)
+                }
                 queue(prefs, open)
                 prefs.edit { remove(KEY_OPEN) }
             }
@@ -102,6 +124,54 @@ object SleepRecorder {
     fun pendingCount(context: Context): Int =
         JSONArray(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_PENDING, "[]")).length()
 
+    /**
+     * Health Connect records of one kind, for the readings of a session newer than what was already written.
+     * [doneAt] becomes the session's mark for [key] once they are in, so no reading is written twice.
+     */
+    private class Batch(val key: String, val records: List<Record>, val doneAt: Long)
+
+    private fun done(session: JSONObject, key: String) = session.optJSONObject("done")?.optLong(key) ?: 0L
+
+    private fun markDone(session: JSONObject, key: String, at: Long) {
+        val marks = session.optJSONObject("done") ?: JSONObject().also { session.put("done", it) }
+        marks.put(key, maxOf(marks.optLong(key), at))
+    }
+
+    /** Every kind of reading but the sleep itself, for the readings [session] has after its marks, up to [upTo]. */
+    private fun batches(context: Context, session: JSONObject, upTo: Long, granted: Set<String>): List<Batch> = listOfNotNull(
+        if (WRITE_HEART_RATE in granted) heartRateBatch(session) else null,
+        if (WRITE_OXYGEN_SATURATION in granted) oxygenBatch(context, session, upTo) else null,
+        if (WRITE_RESPIRATORY_RATE in granted) breathingBatch(context, session) else null,
+        if (WRITE_HRV in granted && OximeterLog.hrvEnabled(context)) hrvBatch(context, session, upTo) else null,
+    )
+
+    /** Writes the readings of the night so far; returns when they are in or Health Connect would not take them. */
+    suspend fun flushLive(context: Context, now: Long = System.currentTimeMillis()) = flushLock.withLock {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val session = prefs.getString(KEY_OPEN, null)?.let(::JSONObject) ?: return@withLock
+        if (now - session.optLong("liveAt", session.getLong("start")) < LIVE_EVERY_MS) return@withLock
+        if (HealthConnectClient.getSdkStatus(context) != HealthConnectClient.SDK_AVAILABLE) return@withLock
+        val client = HealthConnectClient.getOrCreate(context)
+        val granted = client.permissionController.getGrantedPermissions()
+        for (batch in batches(context, session, now, granted)) {
+            if (batch.records.isEmpty()) continue
+            val ok = runCatching { batch.records.chunked(RECORD_CHUNK).forEach { client.insertRecords(it) } }
+                .onFailure { Log.w("SleepRecorder", "could not write ${batch.key}: $it") }.isSuccess
+            if (ok) recordLive(context, session.getLong("start")) { markDone(it, batch.key, batch.doneAt) }
+        }
+        recordLive(context, session.getLong("start")) { it.put("liveAt", now) }
+    }
+
+    // Changes the open session in the store, if it is still the one that was being written
+    @Synchronized
+    private fun recordLive(context: Context, start: Long, change: (JSONObject) -> Unit) {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val open = prefs.getString(KEY_OPEN, null)?.let(::JSONObject) ?: return
+        if (open.getLong("start") != start) return
+        change(open)
+        prefs.edit { putString(KEY_OPEN, open.toString()) }
+    }
+
     /** Writes queued sessions to Health Connect; returns how many remain queued. */
     suspend fun flush(context: Context): Int = flushLock.withLock { doFlush(context) }
 
@@ -114,36 +184,56 @@ object SleepRecorder {
         val client = HealthConnectClient.getOrCreate(context)
         val granted = client.permissionController.getGrantedPermissions()
         if (WRITE_SLEEP !in granted) return pending.length()
-        val writeHr = WRITE_HEART_RATE in granted
-        val writeSpo2 = WRITE_OXYGEN_SATURATION in granted
 
         val remaining = JSONArray()
         for (i in 0 until pending.length()) {
             val session = pending.getJSONObject(i)
             val sleep = toRecord(session)
             if (sleep == null) continue // too short or empty: drop
-            val records = listOfNotNull(sleep, if (writeHr) toHeartRate(session) else null)
             try {
-                client.insertRecords(records)
+                client.insertRecords(listOf(sleep))
             } catch (e: Exception) {
                 remaining.put(session)
                 continue
             }
             // Apart from the sleep: a night of samples can pass the per-call record limit, and the
             // sleep session must not be written twice if this fails
-            if (writeSpo2) {
-                runCatching {
-                    toOxygenSaturation(context, session).chunked(SPO2_CHUNK).forEach { client.insertRecords(it) }
-                }.onFailure { Log.w("SleepRecorder", "could not write SpO2: $it") }
+            for (batch in batches(context, session, session.getLong("end"), granted)) {
+                runCatching { batch.records.chunked(RECORD_CHUNK).forEach { client.insertRecords(it) } }
+                    .onFailure { Log.w("SleepRecorder", "could not write ${batch.key}: $it") }
             }
         }
         prefs.edit { putString(KEY_PENDING, remaining.toString()) }
         return remaining.length()
     }
 
-    private fun toOxygenSaturation(context: Context, session: JSONObject): List<OxygenSaturationRecord> {
+    private fun heartRateBatch(session: JSONObject): Batch? {
+        val hr = session.optJSONArray("hr") ?: return null
+        val after = done(session, "hr")
+        val samples = (0 until hr.length()).map { hr.getJSONObject(it) }.filter { it.getLong("at") > after }
+            .map { HeartRateRecord.Sample(Instant.ofEpochMilli(it.getLong("at")), it.getLong("bpm")) }
+        if (samples.isEmpty()) return null
         val zone = ZoneId.systemDefault().rules
-        return OximeterLog.samples(context, session.getLong("start"), session.getLong("end")).map { (at, spo2) ->
+        val start = samples.first().time
+        // Health Connect needs end > start and every sample inside the record.
+        val end = samples.last().time.plusMillis(1)
+        val record = HeartRateRecord(
+            startTime = start,
+            startZoneOffset = zone.getOffset(start),
+            endTime = end,
+            endZoneOffset = zone.getOffset(end),
+            samples = samples,
+            metadata = Metadata.manualEntry(),
+        )
+        return Batch("hr", listOf(record), samples.last().time.toEpochMilli())
+    }
+
+    private fun oxygenBatch(context: Context, session: JSONObject, upTo: Long): Batch? {
+        val after = done(session, "spo2")
+        val zone = ZoneId.systemDefault().rules
+        val readings = OximeterLog.samples(context, session.getLong("start"), upTo).filter { (at, _) -> at > after }
+        if (readings.isEmpty()) return null
+        val records = readings.map { (at, spo2) ->
             val time = Instant.ofEpochMilli(at)
             OxygenSaturationRecord(
                 time = time,
@@ -152,27 +242,54 @@ object SleepRecorder {
                 metadata = Metadata.manualEntry(),
             )
         }
+        return Batch("spo2", records, readings.last().first)
     }
 
-    private fun toHeartRate(session: JSONObject): HeartRateRecord? {
-        val hr = session.optJSONArray("hr") ?: return null
-        val samples = (0 until hr.length()).map {
-            val s = hr.getJSONObject(it)
-            HeartRateRecord.Sample(Instant.ofEpochMilli(s.getLong("at")), s.getLong("bpm"))
+    // The chest rates of the night, one about every 30 seconds: kept with the session once it has ended
+    private fun breathingBatch(context: Context, session: JSONObject): Batch? {
+        val kept = session.optJSONArray("breath")
+        val rates = if (kept != null) {
+            (0 until kept.length()).map { kept.getJSONObject(it) }.map { it.getLong("at") to it.getDouble("perMinute") }
+        } else {
+            ChestCapture.rates(context).mapNotNull { (at, perMinute) -> perMinute?.let { at to it } }
         }
-        if (samples.isEmpty()) return null
-        val start = Instant.ofEpochMilli(session.getLong("start"))
-        // Health Connect needs end > start and every sample inside the record.
-        val end = maxOf(Instant.ofEpochMilli(session.getLong("end")), samples.last().time.plusMillis(1))
+        var lastAt = done(session, "breath")
+        val thinned = rates.filter { (at, _) -> (at - lastAt >= MIN_BREATH_GAP_MS).also { keep -> if (keep) lastAt = at } }
+        if (thinned.isEmpty()) return null
         val zone = ZoneId.systemDefault().rules
-        return HeartRateRecord(
-            startTime = start,
-            startZoneOffset = zone.getOffset(start),
-            endTime = end,
-            endZoneOffset = zone.getOffset(end),
-            samples = samples,
-            metadata = Metadata.manualEntry(),
-        )
+        val records = thinned.map { (at, perMinute) ->
+            val time = Instant.ofEpochMilli(at)
+            RespiratoryRateRecord(
+                time = time,
+                zoneOffset = zone.getOffset(time),
+                rate = perMinute,
+                metadata = Metadata.manualEntry(),
+            )
+        }
+        return Batch("breath", records, thinned.last().first)
+    }
+
+    // Pulse variability: whole windows only, the ones the session kept once it ended, or those worked out now
+    private fun hrvBatch(context: Context, session: JSONObject, upTo: Long): Batch? {
+        val kept = session.optJSONArray("hrv")
+        val windows = if (kept != null) {
+            (0 until kept.length()).map { kept.getJSONObject(it) }.map { PulseVariability.Window(it.getLong("at"), it.getDouble("rmssd")) }
+        } else {
+            PulseVariability.windows(OximeterLog.waveFile(context), maxOf(session.getLong("start"), done(session, "hrv")), upTo)
+        }.filter { it.at > done(session, "hrv") }
+        if (windows.isEmpty()) return null
+        val zone = ZoneId.systemDefault().rules
+        val records = windows.map {
+            val time = Instant.ofEpochMilli(it.at)
+            HeartRateVariabilityRmssdRecord(
+                time = time,
+                zoneOffset = zone.getOffset(time),
+                heartRateVariabilityMillis = it.rmssdMs,
+                metadata = Metadata.manualEntry(),
+            )
+        }
+        // The next windows start where the last one ended
+        return Batch("hrv", records, windows.last().at + PulseVariability.WINDOW_MS / 2)
     }
 
     private fun toRecord(session: JSONObject): SleepSessionRecord? {

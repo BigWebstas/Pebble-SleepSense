@@ -52,6 +52,9 @@ static void prv_load_settings(void) {
       s_settings.snooze_minutes = DEFAULT_SNOOZE_MIN;
       s_settings.snooze_until = 0;
     }
+    if (s_settings.snooze_minutes == 9) {
+      s_settings.snooze_minutes = DEFAULT_SNOOZE_MIN; // 9 minutes is no longer offered
+    }
   } else {
     // Defaults: 07:00 AM, 30m window, enabled
     s_settings.enabled = true;
@@ -396,6 +399,7 @@ void smart_alarm_dismiss(void) {
     smart_alarm_sync_wakeup();
     bool was_tracking = sleep_engine_is_tracking();
     if (was_tracking) {
+      sleep_engine_set_rating_pending(true); // before the stop: its update to the phone already carries it
       sleep_engine_stop_session();
     }
     if (s_dismiss_cb) {

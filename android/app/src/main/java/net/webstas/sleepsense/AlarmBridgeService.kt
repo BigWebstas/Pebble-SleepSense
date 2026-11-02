@@ -88,10 +88,15 @@ class AlarmBridgeService : Service() {
         }
 
         val (status, body) = when {
-            request.startsWith("GET /command") -> "200 OK" to """{"cmd":"${Commands.await(25_000)}"}"""
+            request.startsWith("GET /command") -> {
+                val update = Commands.await(25_000)
+                val breathing = update.breathing?.let { ""","breathing":$it""" } ?: ""
+                "200 OK" to """{"cmd":"${update.command}"$breathing}"""
+            }
             request.startsWith("GET /alarm") -> {
                 PhoneAlarmSync.noteRequest(this)
                 Regex("alarm=(\\d)").find(request)?.let { PhoneAlarmSync.alarmEnabledOnWatch(this, it.groupValues[1] == "1") }
+                Regex("window=(\\d+)").find(request)?.groupValues?.get(1)?.toIntOrNull()?.let { PhoneAlarmSync.setSmartWindowMinutes(this, it) }
                 Regex("alarm_time=(\\d+)").find(request)?.groupValues?.get(1)?.toIntOrNull()
                     ?.let { PhoneAlarmSync.alarmTimeOnWatch(this, it / 60, it % 60) }
                 // The watchapp's JS checks in every minute and says whether the watch is tracking
@@ -107,6 +112,7 @@ class AlarmBridgeService : Service() {
                     if (hr != null) LiveReadings.note(LiveReadings.Stream.HEART_RATE, hr)
                     val duration = Regex("duration=(\\d+)").find(request)?.groupValues?.get(1)?.toIntOrNull()
                     val isTracking = tracking == "1"
+                    if (isTracking && ChestCapture.needsRestart(this)) Commands.queueChestStart()
                     val wasTracking = WidgetState.tracking(this)
                     WidgetState.note(this, isTracking, since)
                     if (isTracking && !wasTracking) {
@@ -122,8 +128,10 @@ class AlarmBridgeService : Service() {
                         HomeAssistant.publishState(isTracking, stage, hr, duration)
                     }
                     SleepRecorder.onWatchUpdate(this, isTracking, stage, hr)
+                    if (isTracking) CoroutineScope(Dispatchers.IO).launch { SleepRecorder.flushLive(this@AlarmBridgeService) }
                     val quiet = Regex("quiet=(\\d)").find(request)?.groupValues?.get(1)?.let { it == "1" }
-                    BedtimeMode.onTracking(this, isTracking, quiet)
+                    val ratingPending = Regex("rating=(\\d)").find(request)?.groupValues?.get(1)?.let { it == "1" }
+                    BedtimeMode.onTracking(this, isTracking, quiet, ratingPending)
                     if (!isTracking && wasTracking) {
                         CoroutineScope(Dispatchers.IO).launch {
                             val left = SleepRecorder.flush(this@AlarmBridgeService)
@@ -137,6 +145,11 @@ class AlarmBridgeService : Service() {
             request.startsWith("GET /noise/start") -> "200 OK" to noiseStart()
             request.startsWith("GET /noise/stop") -> "200 OK" to noiseStop()
             request.startsWith("GET /noise") -> "200 OK" to noiseStatus()
+            request.startsWith("POST /chest") && contentLength in 1..MAX_BODY -> {
+                val hex = String(readBody(input, contentLength), Charsets.US_ASCII)
+                ChestCapture.addChunk(this, hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray())
+                "200 OK" to """{"ok":true}"""
+            }
             request.startsWith("POST /sessions") && contentLength in 1..MAX_BODY -> {
                 val bytes = ByteArray(contentLength)
                 var read = 0
@@ -167,7 +180,20 @@ class AlarmBridgeService : Service() {
             // The caller went away: a command it was handed must not be lost
             if (body.contains("\"start\"")) Commands.queueStart()
             if (body.contains("\"stop\"")) Commands.queueStop()
+            if (body.contains("chest-start")) Commands.queueChestStart()
+            if (body.contains("chest-stop")) Commands.queueChestStop()
         }
+    }
+
+    private fun readBody(input: java.io.InputStream, length: Int): ByteArray {
+        val bytes = ByteArray(length)
+        var read = 0
+        while (read < length) {
+            val n = input.read(bytes, read, length - read)
+            if (n < 0) break
+            read += n
+        }
+        return bytes.copyOf(read)
     }
 
     // One header line without its CRLF (bytes read raw so a body is never swallowed by a text reader)
@@ -226,6 +252,7 @@ class AlarmBridgeService : Service() {
         """{"listening":${monitor.listening},"db":${monitor.lastDb},"avg":${monitor.avg60},"clips":${NoiseClips.list(this).size}}"""
 
     private fun onTrackingStarted() {
+        ChestCapture.onTrackingStarted(this)
         if (OximeterLog.isEnabled(this)) oximeter.start()
         if (WhiteNoisePrefs.isPlayWhileTracking(this)) {
             WhiteNoisePlayer.start(this)

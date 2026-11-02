@@ -110,6 +110,7 @@ function record(tracking, d, now) {
       s: d.STATUS_STATE,
       l: d.STATUS_LIGHT_LEVEL || 0,
       hr: d.STATUS_HEART_RATE || 0,
+      br: d.STATUS_BREATHING || 0, // chest breathing rate, 0 when there was none
       m: d.STATUS_VMC, // movement; undefined (left out) for watch builds that do not send it
       n: d.STATUS_SOUND_LEVEL || 0
     });
@@ -158,6 +159,7 @@ function bucket(session) {
       s: items[items.length - 1].s,
       l: mode(items.map(function (p) { return p.l; }).filter(function (v) { return v > 0; })),
       hr: averageNonZero(items.map(function (p) { return p.hr; })),
+      br: averageNonZero(items.map(function (p) { return p.br; })),
       n: averageNonZero(items.map(function (p) { return p.n; })),
       m: averageDefined(items.map(function (p) { return p.m; }))
     };

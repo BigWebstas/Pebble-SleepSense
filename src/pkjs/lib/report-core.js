@@ -182,6 +182,7 @@ function reportCore() {
     return '<h3>Sleep stages</h3>' + stepSvg(s, 's', STAGE_ROWS) + alarmLegend(s) +
       '<h3>Movement</h3>' + lineSvg(s, 'm', '#4dabf7', 'movement', true) +
       '<h3>Heart rate</h3>' + lineSvg(s, 'hr', '#ff6b6b', 'bpm') +
+      (s.samples.some(function (p) { return p.br > 0; }) ? '<h3>Breathing rate</h3>' + lineSvg(s, 'br', '#20c997', 'breaths per minute') : '') +
       '<h3>Blood oxygen (SpO2)</h3>' + lineSvg(s, 'o2', '#9775fa', '%') +
       '<h3>Ambient light</h3>' + (hasLight ? stepSvg(s, 'l', LIGHT_ROWS) : '<p class="hint">No light data for this session.</p>') +
       '<h3>Room noise</h3>' + lineSvg(s, 'n', '#e0a800', 'dB');
@@ -290,6 +291,7 @@ function reportCore() {
       out.push(ganttBlock(s), '');
       [chartBlock(s, 'm', 'Movement (accelerometer activity)', 'activity', 0, null, true),
         chartBlock(s, 'hr', 'Heart rate', 'bpm', null, null),
+        chartBlock(s, 'br', 'Breathing rate (chest)', 'breaths/min', null, null),
         chartBlock(s, 'o2', 'Blood oxygen (lowest SpO2 per interval)', '%', null, 100),
         chartBlock(s, 'l', 'Ambient light level (1 dark to 4 bright)', 'level', 0, 4),
         chartBlock(s, 'n', 'Room noise', 'dB', null, null)].forEach(function (block) {

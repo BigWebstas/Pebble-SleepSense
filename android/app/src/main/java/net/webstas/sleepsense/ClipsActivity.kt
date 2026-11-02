@@ -4,7 +4,6 @@ import android.content.Intent
 import android.graphics.Typeface
 import android.media.MediaPlayer
 import android.os.Bundle
-import android.view.Gravity
 import android.view.WindowInsets
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -97,17 +96,20 @@ class ClipsActivity : AppCompatActivity() {
     private fun row(file: File): LinearLayout {
         val buttons = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.START
         }
-        val margin = (8 * resources.displayMetrics.density).toInt()
+        val density = resources.displayMetrics.density
+        val margin = (8 * density).toInt()
+        // Three equal buttons across the whole width
         fun add(label: String, icon: Int, action: () -> Unit) = buttons.addView(
             MaterialButton(this).apply {
                 text = label
                 setIcon(icon)
+                iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+                minimumHeight = (56 * density).toInt()
                 setOnClickListener { action() }
             },
-            LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                marginEnd = margin
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                if (buttons.childCount > 0) marginStart = margin
             }
         )
         add("Play", R.drawable.ic_play_arrow) { play(file) }
@@ -123,6 +125,13 @@ class ClipsActivity : AppCompatActivity() {
                 setTextColor(primaryColor())
             })
             addView(TextView(this@ClipsActivity).apply { text = details(file); textSize = 14f })
+            addView(
+                ClipWaveView(this@ClipsActivity).apply { load(file) },
+                LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (72 * density).toInt()).apply {
+                    topMargin = margin
+                    bottomMargin = margin
+                }
+            )
             addView(buttons)
         }
     }

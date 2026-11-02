@@ -42,10 +42,13 @@ var soundInterval = null;
 var isTracking = false;
 var currentStage = null;
 var currentHr = null;
+var breathingRate = 0; // the chest rate last sent to the watch, and when: kept in the night's history while it is fresh
+var breathingAt = 0;
 var currentVmc = null;   // movement, light and sound: shown live in the Android app
 var currentLight = null;
 var currentSound = null;
 var watchQuietTime = null; // the watch's Quiet Time, as last reported
+var watchRatingPending = null; // whether the end of the night is waiting for a rating on the watch
 var currentDuration = 0;
 
 function getDictValue(dict, strKey, numKey) {
@@ -61,7 +64,8 @@ function sensorEnabled(name) {
 
 function snoozeMinutes() {
   var saved = localStorage.getItem("snooze_min");
-  return saved === null ? 10 : parseInt(saved, 10);
+  var minutes = saved === null ? 10 : parseInt(saved, 10);
+  return minutes === 9 ? 10 : minutes; // 9 minutes is no longer offered
 }
 
 function sensorDict() {
@@ -137,7 +141,9 @@ function trackingStatus() {
     light: currentLight,
     sound: currentSound,
     duration: currentDuration,
-    quiet: watchQuietTime
+    quiet: watchQuietTime,
+    rating: watchRatingPending,
+    window: parseInt(localStorage.getItem("smart_win"), 10) || null
   };
 }
 
@@ -160,8 +166,19 @@ function trackingCommand(key, wantTracking, attempt) {
 }
 
 // Held open by the app until the widget is tapped, so a command arrives within a second
+// The newest breathing rate replaces any still waiting in the outbox (the one being sent stays)
+function sendBreathing(rate) {
+  breathingRate = rate;
+  breathingAt = Date.now();
+  outbox = outbox.filter(function(item, i) {
+    return item.dict.BREATHING_RATE === undefined || (i === 0 && outboxBusy);
+  });
+  sendToWatch({ BREATHING_RATE: rate });
+}
+
 function listenForCommands() {
-  phoneAlarm.waitForCommand(function(cmd) {
+  phoneAlarm.waitForCommand(function(cmd, breathing) {
+    if (typeof breathing === "number") sendBreathing(breathing);
     if (cmd === "stop" && isTracking) {
       console.log("SleepSense PKJS: Stop tracking requested from the phone");
       trackingCommand("COMMAND_STOP_TRACKING", false, 0);
@@ -169,6 +186,10 @@ function listenForCommands() {
     if (cmd === "start" && !isTracking) {
       console.log("SleepSense PKJS: Start tracking requested from the phone");
       trackingCommand("COMMAND_START_TRACKING", true, 0);
+    }
+    if (cmd === "chest-start" || cmd === "chest-stop") {
+      console.log("SleepSense PKJS: Chest test " + cmd.substr(6) + " requested from the phone");
+      sendToWatch({ COMMAND_CHEST_CAPTURE: cmd === "chest-start" ? 1 : 0 });
     }
     if (cmd === "sync") {
       console.log("SleepSense PKJS: Phone alarm sync requested from the phone");
@@ -227,8 +248,8 @@ function updateAlarmPin() {
 // watch is told the new time (or to turn the smart alarm off when the phone has no alarm).
 function syncPhoneAlarm() {
   phoneAlarm.fetchPhoneAlarm(function(a) {
-    if (a && a.snooze !== undefined && a.snooze !== parseInt(localStorage.getItem("snooze_min"), 10)) {
-      // A snooze length chosen in the Android app wins over the watch's
+    if (a && a.snooze !== undefined && a.snooze !== parseInt(localStorage.getItem("watch_snooze"), 10)) {
+      // A snooze length chosen in the Android app wins over the watch's; sent again each minute until the watch reports it
       sendToWatch({ SNOOZE_MINUTES: a.snooze }, function() {
         localStorage.setItem("snooze_min", a.snooze);
       }, function(err) {
@@ -242,10 +263,11 @@ function syncPhoneAlarm() {
     // The Android app counts every alarm change, so even a quick off/on (or re-enabling at the
     // same time) is seen as a change here
     var revChanged = a.rev !== undefined && String(a.rev) !== localStorage.getItem("phone_alarm_rev");
-    var watchOn = localStorage.getItem("alarm_en") !== "false";
+    // What the watch itself last reported, so a time that was acknowledged but not applied is sent again
+    var watchOn = localStorage.getItem("watch_alarm_en") !== "false";
     var differs = a.enabled
-      ? (parseInt(localStorage.getItem("alarm_hour"), 10) !== a.hour ||
-         parseInt(localStorage.getItem("alarm_min"), 10) !== a.min)
+      ? (parseInt(localStorage.getItem("watch_alarm_hour"), 10) !== a.hour ||
+         parseInt(localStorage.getItem("watch_alarm_min"), 10) !== a.min)
       : watchOn; // the phone has no alarm: the watch alarm is turned off to match
     console.log("SleepSense PKJS: phone alarm " + key + " rev " + a.rev + " (last " +
       localStorage.getItem("phone_alarm_last") + "/" + localStorage.getItem("phone_alarm_rev") +
@@ -308,6 +330,12 @@ Pebble.addEventListener("ready", function(e) {
 
 Pebble.addEventListener("appmessage", function(e) {
   var dict = e.payload;
+  // Chest breathing test chunk: straight on to the Android app, nothing else here needs it
+  var chestChunk = getDictValue(dict, "CHEST_SAMPLES", 10031);
+  if (chestChunk !== undefined) {
+    sessionPush.pushChest(chestChunk);
+    return;
+  }
   console.log("SleepSense PKJS: Received message: " + JSON.stringify(dict));
 
   // A tap on Select on the watch: sync everything with the phone now
@@ -347,6 +375,11 @@ Pebble.addEventListener("appmessage", function(e) {
     currentDuration = durVal;
   }
 
+  var ratingPendingVal = getDictValue(dict, "STATUS_RATING_PENDING", 10033);
+  if (ratingPendingVal !== undefined) {
+    watchRatingPending = ratingPendingVal !== 0;
+  }
+
   var quietVal = getDictValue(dict, "STATUS_QUIET_TIME", 10029);
   if (quietVal !== undefined) {
     watchQuietTime = quietVal !== 0;
@@ -354,6 +387,7 @@ Pebble.addEventListener("appmessage", function(e) {
 
   var trackingVal = getDictValue(dict, "TRACKING_ACTIVE", 10011);
   if (trackingVal !== undefined) {
+    dict.STATUS_BREATHING = Date.now() - breathingAt <= 60000 ? breathingRate : 0;
     sleepHistory.record(trackingVal === 1, dict, Date.now());
     pushHistory(trackingVal === 0);
     var wasTracking = isTracking;
@@ -402,6 +436,10 @@ Pebble.addEventListener("appmessage", function(e) {
     }
     localStorage.setItem("alarm_en", alarmOn);
     localStorage.setItem("snooze_min", getDictValue(dict, "SNOOZE_MINUTES", 10020));
+    localStorage.setItem("watch_alarm_hour", alarmHourVal);
+    localStorage.setItem("watch_alarm_min", getDictValue(dict, "ALARM_TARGET_MIN", 10008));
+    localStorage.setItem("watch_alarm_en", alarmOn);
+    localStorage.setItem("watch_snooze", getDictValue(dict, "SNOOZE_MINUTES", 10020));
     updateAlarmPin();
   }
 

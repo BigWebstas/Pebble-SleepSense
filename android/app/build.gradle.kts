@@ -11,8 +11,8 @@ android {
         applicationId = "net.webstas.sleepsense"
         minSdk = 28
         targetSdk = 37
-        versionCode = 9
-        versionName = "0.6.2"
+        versionCode = 10
+        versionName = "0.7.0"
     }
 
     compileOptions {
@@ -41,4 +41,5 @@ dependencies {
     implementation(libs.pebblekit.client)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.paho.mqtt)
+    testImplementation("junit:junit:4.13.2")
 }
