@@ -109,6 +109,7 @@
 
     <string name="oximeter_section">Pulse Oximeter</string>
     <string name="oximeter_label">Record SpO2 from a Wellue finger oximeter while tracking</string>
+    <string name="oximeter_hrv_label">Work out HRV from the oximeter pulse (sent to Health Connect)</string>
     <string name="oximeter_off">Off. Connects over Bluetooth only while the watch is tracking sleep. Switch the oximeter on and clip it on before bed.</string>
     <string name="oximeter_no_device">Choose your oximeter to start.</string>
     <string name="oximeter_needs_permission">Bluetooth permission is needed. Switch this off and on to be asked again.</string>

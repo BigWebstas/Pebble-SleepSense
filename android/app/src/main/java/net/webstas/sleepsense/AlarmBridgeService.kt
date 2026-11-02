@@ -128,6 +128,7 @@ class AlarmBridgeService : Service() {
                         HomeAssistant.publishState(isTracking, stage, hr, duration)
                     }
                     SleepRecorder.onWatchUpdate(this, isTracking, stage, hr)
+                    if (isTracking) CoroutineScope(Dispatchers.IO).launch { SleepRecorder.flushLive(this@AlarmBridgeService) }
                     val quiet = Regex("quiet=(\\d)").find(request)?.groupValues?.get(1)?.let { it == "1" }
                     val ratingPending = Regex("rating=(\\d)").find(request)?.groupValues?.get(1)?.let { it == "1" }
                     BedtimeMode.onTracking(this, isTracking, quiet, ratingPending)

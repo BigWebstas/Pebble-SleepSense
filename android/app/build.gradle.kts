@@ -41,4 +41,5 @@ dependencies {
     implementation(libs.pebblekit.client)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.paho.mqtt)
+    testImplementation("junit:junit:4.13.2")
 }

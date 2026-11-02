@@ -106,12 +106,17 @@ object OximeterLog {
     private const val KEY_ENABLED = "enabled"
     private const val KEY_ADDRESS = "address"
     private const val KEY_NAME = "name"
+    private const val KEY_HRV = "hrv"
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     // Off until the user switches it on and picks a device
     fun isEnabled(context: Context) = prefs(context).getBoolean(KEY_ENABLED, false)
     fun setEnabled(context: Context, on: Boolean) = prefs(context).edit { putBoolean(KEY_ENABLED, on) }
+
+    // Off until switched on: the night's pulse variability is worked out from the waveform and written to Health Connect
+    fun hrvEnabled(context: Context) = prefs(context).getBoolean(KEY_HRV, false)
+    fun setHrvEnabled(context: Context, on: Boolean) = prefs(context).edit { putBoolean(KEY_HRV, on) }
 
     fun address(context: Context): String? = prefs(context).getString(KEY_ADDRESS, null)
     fun name(context: Context): String? = prefs(context).getString(KEY_NAME, null)
@@ -136,7 +141,7 @@ object OximeterLog {
         f.writeText(kept.joinToString("") { it + "\n" } + "S,$now\n")
     }
 
-    private fun waveFile(context: Context) = File(context.filesDir, "oximeter_wave.csv")
+    fun waveFile(context: Context) = File(context.filesDir, "oximeter_wave.csv")
 
     /**
      * The waveform of the latest run, for working out the beat-to-beat intervals: "<millis>,<s1>,..,<s5>" per
