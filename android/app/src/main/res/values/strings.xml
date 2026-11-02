@@ -104,6 +104,20 @@
     <string name="white_noise_pink_desc">Pink noise (soft rainfall)</string>
     <string name="white_noise_white_title">White noise</string>
     <string name="white_noise_white_desc">White noise (crisp static)</string>
+    <string name="white_noise_files_desc">Your own audio files (played in order, repeated)</string>
+    <plurals name="white_noise_files_title">
+        <item quantity="one">%d audio file</item>
+        <item quantity="other">%d audio files</item>
+    </plurals>
+    <string name="white_noise_spotify_title">Spotify playlist</string>
+    <string name="white_noise_spotify_desc">A Spotify playlist (opens Spotify)</string>
+    <string name="white_noise_spotify_message">Paste a playlist link from Spotify (Share, then Copy link). Easiest: tap Open Spotify, find the playlist, tap Share and choose SleepSense. Or paste its link here. The first time, Spotify asks to let SleepSense control it; after that the playlist starts and pauses with the sound, without opening Spotify.</string>
+    <string name="white_noise_spotify_open">Open Spotify</string>
+    <string name="white_noise_spotify_saved">Spotify playlist set as the sleep sound</string>
+    <string name="white_noise_spotify_hint">https://open.spotify.com/playlist/…</string>
+    <string name="white_noise_spotify_connected">Spotify is connected</string>
+    <string name="white_noise_spotify_not_connected">Could not connect to Spotify. Open Spotify once and try again; the app must also be registered with it.</string>
+    <string name="white_noise_spotify_invalid">That is not a Spotify link</string>
     <string name="white_noise_play_button">Play white noise</string>
     <string name="white_noise_stop_button">Stop white noise</string>
 

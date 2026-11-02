@@ -1,11 +1,19 @@
 package net.webstas.sleepsense
 
 import android.content.Context
+import android.content.Intent
 import android.media.AudioAttributes
+import android.media.AudioManager
+import android.view.KeyEvent
 import android.media.AudioFormat
 import android.media.AudioTrack
+import android.media.MediaPlayer
+import android.net.Uri
+import android.os.Handler
+import android.os.HandlerThread
 import android.util.Log
 import androidx.core.content.edit
+import org.json.JSONArray
 import kotlin.math.max
 
 private const val TAG = "WhiteNoisePlayer"
@@ -26,6 +34,10 @@ object WhiteNoisePrefs {
     private const val PREFS = "white_noise"
     private const val KEY_PLAY_WHILE_TRACKING = "play_while_tracking"
     private const val KEY_SOUND = "sound"
+    private const val KEY_FILES = "files"
+    private const val KEY_USE_FILES = "use_files"
+    private const val KEY_SPOTIFY = "spotify"
+    private const val KEY_USE_SPOTIFY = "use_spotify"
 
     fun isPlayWhileTracking(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -46,6 +58,42 @@ object WhiteNoisePrefs {
     fun setSound(context: Context, sound: WhiteNoiseSound) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
             putString(KEY_SOUND, sound.id)
+            putBoolean(KEY_USE_FILES, false)
+            putBoolean(KEY_USE_SPOTIFY, false)
+        }
+    }
+
+    /** The audio files chosen as the sleep sound, played in this order and repeated. */
+    fun files(context: Context): List<Uri> {
+        val saved = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_FILES, null) ?: return emptyList()
+        val array = JSONArray(saved)
+        return (0 until array.length()).map { Uri.parse(array.getString(it)) }
+    }
+
+    /** True when the chosen files, not a synthesized noise, are the sleep sound. */
+    fun useFiles(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_USE_FILES, false) && files(context).isNotEmpty()
+
+    fun setFiles(context: Context, uris: List<Uri>) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+            putString(KEY_FILES, JSONArray(uris.map { it.toString() }).toString())
+            putBoolean(KEY_USE_FILES, uris.isNotEmpty())
+            putBoolean(KEY_USE_SPOTIFY, false)
+        }
+    }
+
+    /** The Spotify address chosen as the sleep sound ("spotify:playlist:..."), or null. */
+    fun spotify(context: Context): String? =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_SPOTIFY, null)
+
+    fun useSpotify(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_USE_SPOTIFY, false) && spotify(context) != null
+
+    fun setSpotify(context: Context, address: String) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+            putString(KEY_SPOTIFY, address)
+            putBoolean(KEY_USE_SPOTIFY, true)
+            putBoolean(KEY_USE_FILES, false)
         }
     }
 }
@@ -66,6 +114,11 @@ object WhiteNoisePlayer {
     private var soundType = WhiteNoiseSound.BROWN
 
     private var worker: Thread? = null
+
+    // Chosen audio files are played by a MediaPlayer on its own thread, one after the other
+    private var mediaThread: HandlerThread? = null
+    private var mediaHandler: Handler? = null
+    private var mediaPlayer: MediaPlayer? = null
     private val listeners = mutableListOf<(Boolean) -> Unit>()
 
     @Synchronized
@@ -97,6 +150,16 @@ object WhiteNoisePlayer {
         isPlaying = true
         notifyListeners()
 
+        if (WhiteNoisePrefs.useSpotify(context)) {
+            startSpotify(context.applicationContext, WhiteNoisePrefs.spotify(context)!!)
+            return
+        }
+        val files = if (WhiteNoisePrefs.useFiles(context)) WhiteNoisePrefs.files(context) else emptyList()
+        if (files.isNotEmpty()) {
+            startFiles(context.applicationContext, files)
+            return
+        }
+
         worker = Thread({ runAudioLoop() }, "white-noise-player").apply {
             isDaemon = true
             start()
@@ -110,6 +173,105 @@ object WhiteNoisePlayer {
         notifyListeners()
         worker?.join(1500)
         worker = null
+        stopFiles()
+        if (spotifyStarted) pauseSpotify()
+    }
+
+    // Spotify plays by itself: it is opened on the playlist, and paused again with a media key
+    private var spotifyStarted = false
+    private var appContext: Context? = null
+
+    private fun startSpotify(context: Context, address: String) {
+        appContext = context
+        spotifyStarted = true
+        // Through Spotify's remote interface when it lets us; otherwise by opening the playlist
+        SpotifyRemote.play(context, address) { ok ->
+            if (!ok && isPlaying) openSpotifyLink(context, address)
+        }
+    }
+
+    private fun openSpotifyLink(context: Context, address: String) {
+        val open = Intent(Intent.ACTION_VIEW, Uri.parse(address))
+            .setPackage("com.spotify.music")
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            // Opened as if from the search app, Spotify starts playing instead of only showing the playlist
+            .putExtra(Intent.EXTRA_REFERRER, Uri.parse("android-app://com.google.android.googlequicksearchbox/https/www.google.com"))
+        try {
+            context.startActivity(open)
+            // Some versions only show the playlist: a play key a moment later starts it
+            Handler(android.os.Looper.getMainLooper()).postDelayed({ if (isPlaying) mediaKey(context, KeyEvent.KEYCODE_MEDIA_PLAY) }, 3000)
+        } catch (e: Exception) {
+            Log.w(TAG, "could not open Spotify: $e")
+            spotifyStarted = false
+            isPlaying = false
+            notifyListeners()
+        }
+    }
+
+    private fun pauseSpotify() {
+        spotifyStarted = false
+        SpotifyRemote.pause()
+        SpotifyRemote.disconnect()
+        appContext?.let { mediaKey(it, KeyEvent.KEYCODE_MEDIA_PAUSE) } // in case it was opened by its link instead
+    }
+
+    private fun mediaKey(context: Context, code: Int) {
+        val audio = context.getSystemService(AudioManager::class.java)
+        audio.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
+        audio.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
+    }
+
+    /** Starts again with whatever is now chosen: the noise and the files are different players. */
+    fun restart(context: Context) {
+        stop()
+        start(context)
+    }
+
+    private fun startFiles(context: Context, files: List<Uri>) {
+        val thread = HandlerThread("sleep-sound-files").apply { start() }
+        mediaThread = thread
+        mediaHandler = Handler(thread.looper).also { it.post { playFile(context, files, 0, 0) } }
+    }
+
+    // Runs on the media thread. A file that will not play is skipped; when none will, it gives up
+    private fun playFile(context: Context, files: List<Uri>, index: Int, failures: Int) {
+        if (!isPlaying) return
+        mediaPlayer?.release()
+        mediaPlayer = null
+        val player = MediaPlayer()
+        try {
+            player.setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build(),
+            )
+            player.setDataSource(context, files[index])
+            player.setOnCompletionListener { playFile(context, files, (index + 1) % files.size, 0) }
+            player.prepare()
+            player.start()
+            mediaPlayer = player
+        } catch (e: Exception) {
+            Log.w(TAG, "could not play ${files[index]}: $e")
+            player.release()
+            if (failures + 1 < files.size) {
+                playFile(context, files, (index + 1) % files.size, failures + 1)
+            } else {
+                isPlaying = false
+                notifyListeners()
+            }
+        }
+    }
+
+    private fun stopFiles() {
+        val thread = mediaThread ?: return
+        mediaHandler?.post {
+            mediaPlayer?.release()
+            mediaPlayer = null
+            thread.quitSafely()
+        }
+        mediaThread = null
+        mediaHandler = null
     }
 
     private fun runAudioLoop() {
