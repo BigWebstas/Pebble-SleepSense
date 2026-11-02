@@ -95,6 +95,11 @@ static void prv_inbox_received(DictionaryIterator *iter, void *context) {
   }
 
   smart_alarm_sync_wakeup(); // the alarm may have changed, and the app may be closed before the next minute
+
+  // Tell the phone what the watch now has, so it can stop sending the settings again
+  if (target_h || smart_win || snooze_min || smart_en) {
+    comm_send_session_update(sleep_engine_get_session());
+  }
 }
 
 static void prv_inbox_dropped(AppMessageResult reason, void *context) {

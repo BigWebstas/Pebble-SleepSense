@@ -244,8 +244,8 @@ function updateAlarmPin() {
 // watch is told the new time (or to turn the smart alarm off when the phone has no alarm).
 function syncPhoneAlarm() {
   phoneAlarm.fetchPhoneAlarm(function(a) {
-    if (a && a.snooze !== undefined && a.snooze !== parseInt(localStorage.getItem("snooze_min"), 10)) {
-      // A snooze length chosen in the Android app wins over the watch's
+    if (a && a.snooze !== undefined && a.snooze !== parseInt(localStorage.getItem("watch_snooze"), 10)) {
+      // A snooze length chosen in the Android app wins over the watch's; sent again each minute until the watch reports it
       sendToWatch({ SNOOZE_MINUTES: a.snooze }, function() {
         localStorage.setItem("snooze_min", a.snooze);
       }, function(err) {
@@ -259,10 +259,11 @@ function syncPhoneAlarm() {
     // The Android app counts every alarm change, so even a quick off/on (or re-enabling at the
     // same time) is seen as a change here
     var revChanged = a.rev !== undefined && String(a.rev) !== localStorage.getItem("phone_alarm_rev");
-    var watchOn = localStorage.getItem("alarm_en") !== "false";
+    // What the watch itself last reported, so a time that was acknowledged but not applied is sent again
+    var watchOn = localStorage.getItem("watch_alarm_en") !== "false";
     var differs = a.enabled
-      ? (parseInt(localStorage.getItem("alarm_hour"), 10) !== a.hour ||
-         parseInt(localStorage.getItem("alarm_min"), 10) !== a.min)
+      ? (parseInt(localStorage.getItem("watch_alarm_hour"), 10) !== a.hour ||
+         parseInt(localStorage.getItem("watch_alarm_min"), 10) !== a.min)
       : watchOn; // the phone has no alarm: the watch alarm is turned off to match
     console.log("SleepSense PKJS: phone alarm " + key + " rev " + a.rev + " (last " +
       localStorage.getItem("phone_alarm_last") + "/" + localStorage.getItem("phone_alarm_rev") +
@@ -430,6 +431,10 @@ Pebble.addEventListener("appmessage", function(e) {
     }
     localStorage.setItem("alarm_en", alarmOn);
     localStorage.setItem("snooze_min", getDictValue(dict, "SNOOZE_MINUTES", 10020));
+    localStorage.setItem("watch_alarm_hour", alarmHourVal);
+    localStorage.setItem("watch_alarm_min", getDictValue(dict, "ALARM_TARGET_MIN", 10008));
+    localStorage.setItem("watch_alarm_en", alarmOn);
+    localStorage.setItem("watch_snooze", getDictValue(dict, "SNOOZE_MINUTES", 10020));
     updateAlarmPin();
   }
 
