@@ -11,6 +11,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.IBinder
@@ -47,6 +48,27 @@ class AlarmBridgeService : Service() {
         }
     }
 
+    // Local webhook (Pebble Index 01, Tasker, ...): /toggle starts tracking or stops the running one
+    private val webhook = WebhookServer(token = { WebhookPrefs.token(this) }, handle = ::handleWebhook)
+    private val webhookPrefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> syncWebhookServer() }
+
+    private fun handleWebhook(method: String, path: String): WebhookServer.Response {
+        val tracking = WidgetState.tracking(this)
+        val nowTracking = when (path) {
+            "/status" -> tracking
+            "/start" -> true.also { if (!tracking) TrackingControl.start(this) }
+            "/stop" -> false.also { if (tracking) TrackingControl.stop(this) }
+            "/toggle" -> !tracking.also { if (it) TrackingControl.stop(this) else TrackingControl.start(this) }
+            else -> return WebhookServer.Response(404, """{"error":"not found"}""")
+        }
+        return WebhookServer.Response(200, """{"tracking":$nowTracking}""")
+    }
+
+    /** Runs the webhook server exactly while the setting is on; called at startup and on every change. */
+    private fun syncWebhookServer() {
+        if (WebhookPrefs.isEnabled(this)) webhook.start(WEBHOOK_PORT) else webhook.stop()
+    }
+
     override fun onCreate() {
         super.onCreate()
         val channel = NotificationChannel("bridge", "Alarm bridge", NotificationManager.IMPORTANCE_MIN)
@@ -59,6 +81,8 @@ class AlarmBridgeService : Service() {
         )
 
         HomeAssistant.start(this)
+        syncWebhookServer()
+        WebhookPrefs.registerListener(this, webhookPrefsListener)
 
         thread(name = "alarm-bridge", isDaemon = true) {
             try {
@@ -318,6 +342,8 @@ class AlarmBridgeService : Service() {
         monitor.stop()
         oximeter.stop()
         unregisterReceiver(alarmChanged)
+        WebhookPrefs.unregisterListener(this, webhookPrefsListener)
+        webhook.stop()
         server?.close()
         super.onDestroy()
     }

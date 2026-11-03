@@ -6,6 +6,8 @@ import android.animation.PropertyValuesHolder
 import android.app.TimePickerDialog
 import android.appwidget.AppWidgetManager
 import android.content.ActivityNotFoundException
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -219,6 +221,7 @@ class MainActivity : AppCompatActivity() {
         }
         WhiteNoisePlayer.addListener(whiteNoiseListener)
 
+        setUpWebhookSettings()
         id<Button>(R.id.home_assistant_button).setOnClickListener { startActivity(Intent(this, HomeAssistantActivity::class.java)) }
         id<MaterialSwitch>(R.id.calendar_sync_switch).apply {
             isChecked = CalendarSync.isEnabled(this@MainActivity)
@@ -512,6 +515,31 @@ class MainActivity : AppCompatActivity() {
             startActivity(open)
         } catch (e: ActivityNotFoundException) {
             Toast.makeText(this, R.string.install_watch_no_handler, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun setUpWebhookSettings() {
+        val details = id<View>(R.id.webhook_details)
+        id<TextView>(R.id.webhook_url_text).text =
+            getString(R.string.webhook_url, "http://127.0.0.1:$WEBHOOK_PORT/toggle")
+        id<MaterialSwitch>(R.id.webhook_switch).apply {
+            isChecked = WebhookPrefs.isEnabled(this@MainActivity)
+            details.visibility = if (isChecked) View.VISIBLE else View.GONE
+            setOnCheckedChangeListener { _, on ->
+                WebhookPrefs.setEnabled(this@MainActivity, on)
+                details.visibility = if (on) View.VISIBLE else View.GONE
+                // The webhook is served by the bridge service, which has to be running
+                if (on) startForegroundService(Intent(this@MainActivity, AlarmBridgeService::class.java))
+            }
+        }
+        id<Button>(R.id.webhook_copy_token_button).setOnClickListener {
+            (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager)
+                .setPrimaryClip(ClipData.newPlainText("webhook token", WebhookPrefs.token(this)))
+            Toast.makeText(this, R.string.webhook_token_copied, Toast.LENGTH_SHORT).show()
+        }
+        id<Button>(R.id.webhook_regenerate_button).setOnClickListener {
+            WebhookPrefs.regenerateToken(this)
+            Toast.makeText(this, R.string.webhook_token_regenerated, Toast.LENGTH_SHORT).show()
         }
     }
 
