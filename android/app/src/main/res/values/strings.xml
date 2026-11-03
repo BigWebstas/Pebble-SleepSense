@@ -48,6 +48,12 @@
     <string name="noise_clips_button">Noise clips</string>
     <string name="connectivity_label">Connectivity</string>
     <string name="home_assistant_button">Home Assistant (MQTT)</string>
+    <string name="webhook_label">Local webhook (Pebble Index)</string>
+    <string name="webhook_url">POST %1$s\nAuthorization: Bearer token\n(/toggle, /start, /stop, /status)</string>
+    <string name="webhook_copy_token">Copy token</string>
+    <string name="webhook_regenerate_token">New token</string>
+    <string name="webhook_token_copied">Token copied</string>
+    <string name="webhook_token_regenerated">New token generated - update your webhook</string>
     <string name="calendar_sync_label">Add nights to a calendar</string>
     <string name="calendar_choose_button">Calendar: %1$s</string>
     <string name="calendar_none">none chosen</string>
