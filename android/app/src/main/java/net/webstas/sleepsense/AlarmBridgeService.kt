@@ -53,7 +53,9 @@ class AlarmBridgeService : Service() {
     private val webhookPrefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> syncWebhookServer() }
 
     private fun handleWebhook(method: String, path: String): WebhookServer.Response {
-        val tracking = WidgetState.tracking(this)
+        // A watch app that has gone quiet still counts as tracking if that is what it last said: a toggle then
+        // stops it (opening the watch app so it can hear that) instead of starting a session that already runs
+        val tracking = WidgetState.tracking(this) || WidgetState.lastReportedTracking(this)
         val nowTracking = when (path) {
             "/status" -> tracking
             "/start" -> true.also { if (!tracking) TrackingControl.start(this) }
@@ -61,6 +63,7 @@ class AlarmBridgeService : Service() {
             "/toggle" -> !tracking.also { if (it) TrackingControl.stop(this) else TrackingControl.start(this) }
             else -> return WebhookServer.Response(404, """{"error":"not found"}""")
         }
+        Log.i(TAG, "webhook $path: watch was tracking=$tracking, now $nowTracking")
         return WebhookServer.Response(200, """{"tracking":$nowTracking}""")
     }
 

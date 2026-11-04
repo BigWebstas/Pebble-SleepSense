@@ -36,6 +36,9 @@ object WidgetState {
     fun watchAppOpen(context: Context, now: Long = System.currentTimeMillis()) =
         now - prefs(context).getLong("seen", 0) < ALIVE_MS
 
+    /** Whether the watch last said it was tracking, even if it has not checked in since (the watch app may be closed). */
+    fun lastReportedTracking(context: Context) = prefs(context).getBoolean("tracking", false)
+
     fun tracking(context: Context, now: Long = System.currentTimeMillis()) =
         watchAppOpen(context, now) && prefs(context).getBoolean("tracking", false)
 

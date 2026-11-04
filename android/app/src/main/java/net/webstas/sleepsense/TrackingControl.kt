@@ -32,7 +32,10 @@ object TrackingControl {
         openWatchApp(context, onDone)
     }
 
-    /** Stops tracking; only possible while the watch app is open (that is when it can hear the request). */
+    /**
+     * Stops tracking. The request is only heard while the watch app is open, so a closed one is asked to
+     * open: the request waits in the queue and goes through as soon as the watch app asks for it.
+     */
     fun stop(context: Context) {
         context.startForegroundService(Intent(context, AlarmBridgeService::class.java))
         Commands.queueStop()
@@ -40,6 +43,7 @@ object TrackingControl {
         if (WhiteNoisePlayer.isPlaying) {
             WhiteNoisePlayer.stop()
         }
+        if (!WidgetState.watchAppOpen(context)) openWatchApp(context) {}
     }
 
     // A broadcast receiver's own context may not bind to other apps, so use the application's, and
