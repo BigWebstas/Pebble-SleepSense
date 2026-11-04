@@ -90,6 +90,7 @@ class HistoryActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         web = WebView(this).apply {
             settings.javaScriptEnabled = true
+            setBackgroundColor(android.graphics.Color.TRANSPARENT) // the theme's night sky shows until the page is up
             // Only our own bundled page is ever loaded here
             settings.allowFileAccess = false
             settings.allowContentAccess = false

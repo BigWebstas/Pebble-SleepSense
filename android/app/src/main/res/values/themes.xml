@@ -38,4 +38,12 @@
         <item name="cardCornerRadius">24dp</item>
         <item name="cardElevation">0dp</item>
     </style>
+
+    <!-- Applied over the dark theme for OLED screens -->
+    <style name="TrueBlack">
+        <item name="android:colorBackground">#000000</item>
+        <item name="colorSurface">#000000</item>
+        <item name="colorSurfaceContainer">#0B111C</item>
+        <item name="colorSurfaceContainerHigh">#131B2A</item>
+    </style>
 </resources>

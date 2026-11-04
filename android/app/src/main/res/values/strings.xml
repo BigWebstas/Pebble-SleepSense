@@ -155,4 +155,14 @@
     <string name="live_light_dark">Dark</string>
     <string name="live_light_light">Light</string>
     <string name="live_light_very_light">Very light</string>
+
+    <string name="strip_elapsed">Tracking</string>
+    <string name="strip_heart">Heart bpm</string>
+    <string name="strip_spo2">SpO2 %</string>
+    <string name="strip_breathing">Breaths/min</string>
+    <string name="last_night_section">Last night</string>
+    <string name="last_night_summary">%1$s asleep</string>
+    <string name="appearance_section">Appearance</string>
+    <string name="true_black_label">True black background (OLED)</string>
+    <string name="nap_active">%1$d min nap\n→ %2$s</string>
 </resources>
