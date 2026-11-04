@@ -1,14 +1,24 @@
 package net.webstas.sleepsense
 
 import android.content.Context
+import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import android.os.PowerManager
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
+import android.media.MediaPlayer
 import android.util.Log
 import androidx.core.content.edit
+import kotlin.math.PI
+import kotlin.math.cos
 import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.sin
 
 private const val TAG = "WhiteNoisePlayer"
+private const val FADE_MS = 12_000L
 
 /** The available synthesized sleep sound types. */
 enum class WhiteNoiseSound(
@@ -19,6 +29,7 @@ enum class WhiteNoiseSound(
     BROWN("brown", R.string.white_noise_brown_title, R.string.white_noise_brown_desc),
     PINK("pink", R.string.white_noise_pink_title, R.string.white_noise_pink_desc),
     WHITE("white", R.string.white_noise_white_title, R.string.white_noise_white_desc),
+    SONG("song", R.string.white_noise_song_title, R.string.white_noise_song_desc),
 }
 
 /** User preferences for white noise playback. */
@@ -26,6 +37,7 @@ object WhiteNoisePrefs {
     private const val PREFS = "white_noise"
     private const val KEY_PLAY_WHILE_TRACKING = "play_while_tracking"
     private const val KEY_SOUND = "sound"
+    private const val KEY_SONG = "song_uri"
 
     fun isPlayWhileTracking(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -48,6 +60,16 @@ object WhiteNoisePrefs {
             putString(KEY_SOUND, sound.id)
         }
     }
+
+    /** The audio file picked for [WhiteNoiseSound.SONG], if any. */
+    fun song(context: Context): Uri? =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_SONG, null)?.let(Uri::parse)
+
+    fun setSong(context: Context, uri: Uri) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+            putString(KEY_SONG, uri.toString())
+        }
+    }
 }
 
 /**
@@ -66,6 +88,7 @@ object WhiteNoisePlayer {
     private var soundType = WhiteNoiseSound.BROWN
 
     private var worker: Thread? = null
+    private var loop: CrossfadeLoop? = null
     private val listeners = mutableListOf<(Boolean) -> Unit>()
 
     @Synchronized
@@ -92,11 +115,19 @@ object WhiteNoisePlayer {
 
     @Synchronized
     fun start(context: Context, sound: WhiteNoiseSound = WhiteNoisePrefs.sound(context)) {
-        soundType = sound
+        val song = WhiteNoisePrefs.song(context)?.takeIf { sound == WhiteNoiseSound.SONG }
+        soundType = if (sound == WhiteNoiseSound.SONG && song == null) WhiteNoiseSound.BROWN else sound
         if (isPlaying) return
         isPlaying = true
         notifyListeners()
 
+        if (song != null) {
+            loop = CrossfadeLoop(context.applicationContext, song) {
+                stop()
+                Log.w(TAG, "could not play $song")
+            }.also { it.start() }
+            return
+        }
         worker = Thread({ runAudioLoop() }, "white-noise-player").apply {
             isDaemon = true
             start()
@@ -108,6 +139,8 @@ object WhiteNoisePlayer {
         if (!isPlaying) return
         isPlaying = false
         notifyListeners()
+        loop?.stop()
+        loop = null
         worker?.join(1500)
         worker = null
     }
@@ -179,7 +212,7 @@ object WhiteNoisePlayer {
                             b6 = white * 0.115926f
                             (p * 0.11f).coerceIn(-1f, 1f)
                         }
-                        WhiteNoiseSound.WHITE -> {
+                        WhiteNoiseSound.WHITE, WhiteNoiseSound.SONG -> { // a song never reaches this loop
                             (white * 0.35f).coerceIn(-1f, 1f)
                         }
                     }
@@ -219,6 +252,126 @@ object WhiteNoisePlayer {
             }
             isPlaying = false
             notifyListeners()
+        }
+    }
+}
+
+/**
+ * Loops one audio file by starting a second copy [FADE_MS] before the first one ends and fading
+ * between them, so the loop point is never an abrupt end. Two [MediaPlayer]s on the main looper, each
+ * holding a wake lock while it plays so the timer keeps running with the screen off; if the timer
+ * is late anyway, the next copy starts as soon as the current one ends. [onFailed] is called if the
+ * file cannot be opened.
+ */
+private class CrossfadeLoop(
+    private val context: Context,
+    private val uri: Uri,
+    private val onFailed: () -> Unit,
+) {
+    private val handler = Handler(Looper.getMainLooper())
+    private var current: MediaPlayer? = null
+    private var next: MediaPlayer? = null // the same file, prepared and waiting
+    private var fadeMs = FADE_MS
+    private var fading = false
+    private var stopped = false
+    private val crossfadeTask = Runnable { crossfade() }
+
+    fun start() {
+        handler.post {
+            open { first ->
+                first.start()
+                begin(first)
+            }
+        }
+    }
+
+    fun stop() {
+        handler.post {
+            stopped = true
+            handler.removeCallbacksAndMessages(null)
+            current?.release()
+            next?.release()
+            current = null
+            next = null
+        }
+    }
+
+    /** Makes [p], already playing, the current player: preloads the next one and schedules the cross fade. */
+    private fun begin(p: MediaPlayer) {
+        current = p
+        fadeMs = min(FADE_MS, p.duration / 2L)
+        p.setOnCompletionListener { if (!stopped && p === current && !fading) advance() }
+        open { next?.release(); next = it }
+        handler.postDelayed(crossfadeTask, (p.duration - fadeMs - p.currentPosition).coerceAtLeast(0))
+    }
+
+    /** The current copy ended before its cross fade started: carry straight on with the next one. */
+    private fun advance() {
+        Log.i(TAG, "song ended before the cross fade, starting it again")
+        handler.removeCallbacks(crossfadeTask)
+        current?.release()
+        val incoming = next
+        if (incoming != null) {
+            next = null
+            incoming.start()
+            begin(incoming)
+        } else {
+            current = null
+            open { it.start(); begin(it) }
+        }
+    }
+
+    private fun crossfade() {
+        val outgoing = current ?: return
+        val incoming = next
+        if (incoming == null) {
+            handler.postDelayed(crossfadeTask, 200) // still preparing
+            return
+        }
+        next = null
+        Log.i(TAG, "cross fading into the start of the song")
+        fading = true
+        incoming.setVolume(0f, 0f)
+        incoming.start()
+        val startedAt = System.nanoTime()
+        object : Runnable {
+            override fun run() {
+                val t = ((System.nanoTime() - startedAt) / 1_000_000f / fadeMs).coerceAtMost(1f)
+                // equal-power curves keep the loudness steady through the overlap
+                outgoing.setVolume(cos(t * PI.toFloat() / 2), cos(t * PI.toFloat() / 2))
+                incoming.setVolume(sin(t * PI.toFloat() / 2), sin(t * PI.toFloat() / 2))
+                if (t < 1f) {
+                    handler.postDelayed(this, 100)
+                } else {
+                    fading = false
+                    outgoing.release()
+                    begin(incoming)
+                }
+            }
+        }.run()
+    }
+
+    private fun open(onReady: (MediaPlayer) -> Unit) {
+        val p = MediaPlayer()
+        try {
+            p.setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build(),
+            )
+            p.setWakeMode(context, PowerManager.PARTIAL_WAKE_LOCK)
+            p.setDataSource(context, uri)
+            p.setOnPreparedListener { if (stopped) it.release() else onReady(it) }
+            p.setOnErrorListener { mp, _, _ ->
+                mp.release()
+                if (!stopped) onFailed()
+                true
+            }
+            p.prepareAsync()
+        } catch (e: Exception) {
+            p.release()
+            if (!stopped) onFailed()
         }
     }
 }

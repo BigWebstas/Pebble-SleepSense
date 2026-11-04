@@ -12,7 +12,6 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import com.google.android.material.button.MaterialButton
-import com.google.android.material.color.DynamicColors
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -25,7 +24,6 @@ class ClipsActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        DynamicColors.applyToActivityIfAvailable(this)
         list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         setContentView(ScrollView(this).apply {
             addView(list)

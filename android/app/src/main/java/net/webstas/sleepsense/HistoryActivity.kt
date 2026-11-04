@@ -12,7 +12,6 @@ import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.result.contract.ActivityResultContracts
-import com.google.android.material.color.DynamicColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 /**
@@ -89,7 +88,6 @@ class HistoryActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        DynamicColors.applyToActivityIfAvailable(this)
         web = WebView(this).apply {
             settings.javaScriptEnabled = true
             // Only our own bundled page is ever loaded here

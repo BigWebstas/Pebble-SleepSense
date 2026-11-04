@@ -101,6 +101,12 @@
     <string name="white_noise_pink_desc">Pink noise (soft rainfall)</string>
     <string name="white_noise_white_title">White noise</string>
     <string name="white_noise_white_desc">White noise (crisp static)</string>
+    <string name="nap_button_30">30 min nap</string>
+    <string name="nap_button_45">45 min nap</string>
+    <string name="nap_button_60">60 min nap</string>
+    <string name="nap_started">Nap: alarm at %1$s</string>
+    <string name="white_noise_song_title">My audio file</string>
+    <string name="white_noise_song_desc">My audio file (loops with a 12 s cross fade)</string>
     <string name="white_noise_play_button">Play white noise</string>
     <string name="white_noise_stop_button">Stop white noise</string>
 

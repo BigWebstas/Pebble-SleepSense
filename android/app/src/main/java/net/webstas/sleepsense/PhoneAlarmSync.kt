@@ -4,6 +4,7 @@ import android.app.AlarmManager
 import android.content.Context
 import androidx.core.content.edit
 import java.time.Instant
+import java.time.LocalTime
 import java.time.ZoneId
 
 /**
@@ -62,6 +63,18 @@ object PhoneAlarmSync {
     fun setCustomAlarm(context: Context, hour: Int, minute: Int) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putInt(KEY_CUSTOM, hour * 60 + minute) }
         noteAlarmChanged(context)
+    }
+
+    /**
+     * A nap: the watch alarm goes off [minutes] from now. Like any alarm chosen in the app it replaces the
+     * phone's alarm while it lasts, so syncing is turned off. Returns the alarm time as (hour, minute).
+     */
+    fun startNap(context: Context, minutes: Int): Pair<Int, Int> {
+        val time = LocalTime.now().plusSeconds(30).plusMinutes(minutes.toLong()) // the watch alarm has minute resolution
+        setEnabled(context, false)
+        setCustomAlarm(context, time.hour, time.minute)
+        setAlarmEnabled(context, true)
+        return time.hour to time.minute
     }
 
     /** Snooze length chosen in this app (0 = snooze off), or null if never chosen. */

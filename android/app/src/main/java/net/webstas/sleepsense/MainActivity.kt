@@ -29,7 +29,6 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.color.DynamicColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.materialswitch.MaterialSwitch
 import kotlinx.coroutines.Dispatchers
@@ -71,6 +70,13 @@ class MainActivity : AppCompatActivity() {
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
             if (oximeterPermissionsGranted(this)) chooseOximeter() else refreshOximeter()
         }
+    private val pickSong =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri == null) return@registerForActivityResult
+            contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            WhiteNoisePrefs.setSong(this, uri)
+            useWhiteNoiseSound(WhiteNoiseSound.SONG)
+        }
     private val requestHealth =
         registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { refreshHealth() }
 
@@ -92,8 +98,6 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
-        DynamicColors.applyToActivityIfAvailable(this)
-        DynamicColors.applyToActivitiesIfAvailable(application)
         handleAlarmIntent(intent)
         startForegroundService(Intent(this, AlarmBridgeService::class.java))
         setContentView(R.layout.activity_main)
@@ -131,6 +135,9 @@ class MainActivity : AppCompatActivity() {
                 PhoneAlarmSync.setAlarmEnabled(this@MainActivity, on)
                 refreshTracking()
             }
+        }
+        mapOf(R.id.nap_30_button to 30, R.id.nap_45_button to 45, R.id.nap_60_button to 60).forEach { (button, minutes) ->
+            id<Button>(button).setOnClickListener { startNap(minutes) }
         }
         id<MaterialSwitch>(R.id.bedtime_switch).setOnCheckedChangeListener { _, on ->
             BedtimeMode.setEnabled(this, on)
@@ -370,6 +377,16 @@ class MainActivity : AppCompatActivity() {
         id<MaterialSwitch>(R.id.alarm_enabled_switch).isChecked = PhoneAlarmSync.isAlarmEnabled(this)
     }
 
+    private fun startNap(minutes: Int) {
+        val (hour, minute) = PhoneAlarmSync.startNap(this, minutes)
+        id<MaterialSwitch>(R.id.alarm_sync_switch).isChecked = false
+        SleepWidgetProvider.refreshAll(this)
+        if (!WidgetState.tracking(this)) TrackingControl.start(this)
+        refreshAlarmSettings()
+        refreshTracking()
+        Toast.makeText(this, getString(R.string.nap_started, "%02d:%02d".format(hour, minute)), Toast.LENGTH_LONG).show()
+    }
+
     private fun chooseAlarmTime() {
         val (hour, minute) = PhoneAlarmSync.customAlarm(this) ?: (7 to 0)
         TimePickerDialog(this, { _, h, m ->
@@ -411,7 +428,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun chooseSnooze() {
-        val lengths = intArrayOf(0, 5, 9, 10, 15, 20)
+        val lengths = intArrayOf(0, 5, 10, 15, 20)
         val labels = lengths.map { if (it == 0) getString(R.string.snooze_off) else getString(R.string.snooze_minutes, it) }
         MaterialAlertDialogBuilder(this)
             .setItems(labels.toTypedArray()) { _, which ->
@@ -582,6 +599,21 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun useWhiteNoiseSound(sound: WhiteNoiseSound) {
+        val was = WhiteNoisePrefs.sound(this)
+        WhiteNoisePrefs.setSound(this, sound)
+        if (WhiteNoisePlayer.isPlaying) {
+            // a song and the synthesized sounds use different players, and a new song needs a fresh start
+            if (sound == WhiteNoiseSound.SONG || was == WhiteNoiseSound.SONG) {
+                WhiteNoisePlayer.stop()
+                WhiteNoisePlayer.start(this, sound)
+            } else {
+                WhiteNoisePlayer.setSound(sound)
+            }
+        }
+        refreshWhiteNoise()
+    }
+
     private fun chooseWhiteNoiseSound() {
         val current = WhiteNoisePrefs.sound(this)
         val sounds = WhiteNoiseSound.entries
@@ -592,11 +624,7 @@ class MainActivity : AppCompatActivity() {
             .setTitle(R.string.white_noise_sound_dialog_title)
             .setSingleChoiceItems(labels, checkedIndex) { dialog, which ->
                 val chosen = sounds[which]
-                WhiteNoisePrefs.setSound(this, chosen)
-                if (WhiteNoisePlayer.isPlaying) {
-                    WhiteNoisePlayer.setSound(chosen)
-                }
-                refreshWhiteNoise()
+                if (chosen == WhiteNoiseSound.SONG) pickSong.launch(arrayOf("audio/*")) else useWhiteNoiseSound(chosen)
                 dialog.dismiss()
             }
             .setNegativeButton(android.R.string.cancel, null)

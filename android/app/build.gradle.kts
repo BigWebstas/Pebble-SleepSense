@@ -11,8 +11,8 @@ android {
         applicationId = "net.webstas.sleepsense"
         minSdk = 28
         targetSdk = 37
-        versionCode = 9
-        versionName = "0.6.2"
+        versionCode = 12
+        versionName = "0.7.2"
     }
 
     compileOptions {
