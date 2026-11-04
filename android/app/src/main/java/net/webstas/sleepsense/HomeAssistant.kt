@@ -24,6 +24,7 @@ private const val TRACKING = "$BASE/tracking"
 private const val TRACKING_SET = "$BASE/tracking/set"
 private const val STAGE = "$BASE/stage"
 private const val HEART_RATE = "$BASE/heart_rate"
+private const val SPO2 = "$BASE/spo2"
 private const val SLEEP_DURATION = "$BASE/sleep_duration"
 private const val ALARM_TIME = "$BASE/alarm_time"
 private const val ALARM_TIME_SET = "$BASE/alarm_time/set"
@@ -76,6 +77,7 @@ object HomeAssistant {
     private var tracking = false
     private var stage = "idle"
     private var heartRate: Int? = null
+    private var spo2: Int? = null // from the finger oximeter; null while it is not reading
     private var asleepMs = 0L // light + deep + REM this session; kept after tracking stops
     private var lastUpdateAt = 0L
     private var publishedNight: String? = null // forgotten on every (re)connect, so the broker gets it again
@@ -138,6 +140,22 @@ object HomeAssistant {
                 this.stage = if (tracking) stage?.let(::stageName) ?: if (this.stage == "idle") "awake" else this.stage else "idle"
                 this.heartRate = if (tracking) heartRate?.takeIf { it > 0 } ?: this.heartRate else null
                 client?.takeIf { it.isConnected }?.let { publishCurrent(it) }
+            }
+        }
+    }
+
+    /** The oximeter's lowest SpO2 of the latest window, or null once it stops reading. */
+    fun publishSpo2(spo2: Int?) {
+        io.execute {
+            synchronized(this) {
+                this.spo2 = spo2
+                client?.takeIf { it.isConnected }?.let { c ->
+                    try {
+                        c.publish(SPO2, retained(spo2?.toString() ?: "unknown"))
+                    } catch (e: Exception) {
+                        Log.w(TAG, "could not publish SpO2: $e")
+                    }
+                }
             }
         }
     }
@@ -342,6 +360,7 @@ object HomeAssistant {
             c.publish(TRACKING, retained(if (tracking) "ON" else "OFF"))
             c.publish(STAGE, retained(stage))
             c.publish(HEART_RATE, retained(heartRate?.takeIf { it > 0 }?.toString() ?: "0"))
+            c.publish(SPO2, retained(spo2?.toString() ?: "unknown"))
             c.publish(SLEEP_DURATION, retained(sleepMinutesToday().toString()))
             appContext?.let { app ->
                 val alarm = PhoneAlarmSync.phoneAlarm(app) ?: PhoneAlarmSync.customAlarm(app) ?: (7 to 0)
@@ -379,6 +398,11 @@ object HomeAssistant {
             put("unit_of_measurement", "bpm")
             put("state_class", "measurement")
             put("icon", "mdi:heart-pulse")
+        }
+        entity("sensor", "spo2", "SpO2") {
+            put("unit_of_measurement", "%")
+            put("state_class", "measurement")
+            put("icon", "mdi:lungs")
         }
         entity("sensor", "sleep_duration", "Sleep duration") {
             put("device_class", "duration")

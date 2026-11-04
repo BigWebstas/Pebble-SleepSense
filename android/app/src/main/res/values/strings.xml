@@ -27,7 +27,7 @@
     <string name="snooze_minutes">%1$d min</string>
     <string name="alarm_sync_label">Sync phone alarm to Pebble</string>
     <string name="alarm_enabled_label">Alarm enabled</string>
-    <string name="tracking_section">Tracking</string>
+    <string name="tracking_section">Sleep tracking</string>
     <string name="alarm_section">Alarm</string>
     <string name="review_section">Review</string>
     <string name="bedtime_section">Sleep Mode</string>
@@ -110,6 +110,10 @@
     <string name="white_noise_pink_desc">Pink noise (soft rainfall)</string>
     <string name="white_noise_white_title">White noise</string>
     <string name="white_noise_white_desc">White noise (crisp static)</string>
+    <string name="nap_button_30">30 min nap</string>
+    <string name="nap_button_45">45 min nap</string>
+    <string name="nap_button_60">60 min nap</string>
+    <string name="nap_started">Nap: alarm at %1$s</string>
     <string name="white_noise_files_desc">Your own audio files (played in order, repeated)</string>
     <plurals name="white_noise_files_title">
         <item quantity="one">%d audio file</item>
@@ -173,4 +177,14 @@
     <string name="live_light_dark">Dark</string>
     <string name="live_light_light">Light</string>
     <string name="live_light_very_light">Very light</string>
+
+    <string name="strip_elapsed">Tracking</string>
+    <string name="strip_heart">Heart bpm</string>
+    <string name="strip_spo2">SpO2 %</string>
+    <string name="strip_breathing">Breaths/min</string>
+    <string name="last_night_section">Last night</string>
+    <string name="last_night_summary">%1$s asleep</string>
+    <string name="appearance_section">Appearance</string>
+    <string name="true_black_label">True black background (OLED)</string>
+    <string name="nap_active">%1$d min nap\n→ %2$s</string>
 </resources>

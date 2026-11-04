@@ -1,39 +1,40 @@
 package net.webstas.sleepsense
 
 import android.content.Intent
-import android.graphics.Typeface
 import android.media.MediaPlayer
 import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
 import android.view.WindowInsets
+import android.view.animation.DecelerateInterpolator
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import com.google.android.material.button.MaterialButton
-import com.google.android.material.color.DynamicColors
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** The noise clips the monitor saved: play, share or delete each one. */
+/** The noise clips the monitor saved, each with its sound level over time: play, share or delete each one. */
 class ClipsActivity : AppCompatActivity() {
+    private class Row(val file: File, val play: MaterialButton)
+
     private lateinit var list: LinearLayout
+    private val rows = mutableListOf<Row>()
     private var player: MediaPlayer? = null
+    private var playing: Row? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        DynamicColors.applyToActivityIfAvailable(this)
-        list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        setContentView(ScrollView(this).apply {
-            addView(list)
-            setOnApplyWindowInsetsListener { view, insets ->
-                val bars = insets.getInsets(WindowInsets.Type.systemBars())
-                view.setPadding(48 + bars.left, 48 + bars.top, 48 + bars.right, 48 + bars.bottom)
-                insets
-            }
-        })
+        setContentView(R.layout.activity_clips)
+        list = findViewById(R.id.clip_list)
+        findViewById<View>(R.id.root).setOnApplyWindowInsetsListener { view, insets ->
+            val bars = insets.getInsets(WindowInsets.Type.systemBars())
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            insets
+        }
     }
 
     override fun onResume() {
@@ -46,29 +47,31 @@ class ClipsActivity : AppCompatActivity() {
         super.onPause()
     }
 
-    // The theme's main text colour, so the headline stands out in both light and dark mode
-    private fun primaryColor(): Int {
-        val value = android.util.TypedValue()
-        theme.resolveAttribute(android.R.attr.textColorPrimary, value, true)
-        return if (value.resourceId != 0) getColor(value.resourceId) else value.data
-    }
-
     private fun stopPlayback() {
         player?.release()
         player = null
+        playing?.let {
+            it.play.setText("Play")
+            it.play.morphPlayStop(false)
+        }
+        playing = null
     }
 
     private fun render() {
-        list.removeAllViews()
-        list.addView(TextView(this).apply { text = "Noise clips"; textSize = 20f; setPadding(0, 0, 0, 16) })
+        stopPlayback()
+        for (i in list.childCount - 1 downTo 0) if (list.getChildAt(i).id == View.NO_ID) list.removeViewAt(i)
+        rows.clear()
         val clips = NoiseClips.list(this)
-        if (clips.isEmpty()) {
-            list.addView(TextView(this).apply {
-                text = "No clips yet. While you track sleep with noise monitoring on, a clip is saved when the room gets suddenly loud."
-            })
-            return
+        findViewById<View>(R.id.clips_empty).visibility = if (clips.isEmpty()) View.VISIBLE else View.GONE
+        val rise = 24 * resources.displayMetrics.density
+        clips.forEachIndexed { i, file ->
+            val card = row(file)
+            list.addView(card)
+            card.alpha = 0f
+            card.translationY = rise
+            card.animate().alpha(1f).translationY(0f).setStartDelay(i * 60L).setDuration(350)
+                .setInterpolator(DecelerateInterpolator()).start()
         }
-        clips.forEach { list.addView(row(it)) }
     }
 
     // clip_<epochMillis>_<peakDb>.wav
@@ -93,57 +96,31 @@ class ClipsActivity : AppCompatActivity() {
         return "SleepSense noise $stamp" + (peakDb(file)?.let { " ($it dB)" } ?: "") + ".wav"
     }
 
-    private fun row(file: File): LinearLayout {
-        val buttons = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-        }
-        val density = resources.displayMetrics.density
-        val margin = (8 * density).toInt()
-        // Three equal buttons across the whole width
-        fun add(label: String, icon: Int, action: () -> Unit) = buttons.addView(
-            MaterialButton(this).apply {
-                text = label
-                setIcon(icon)
-                iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
-                minimumHeight = (56 * density).toInt()
-                setOnClickListener { action() }
-            },
-            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                if (buttons.childCount > 0) marginStart = margin
-            }
-        )
-        add("Play", R.drawable.ic_play_arrow) { play(file) }
-        add("Share", R.drawable.ic_share) { share(file) }
-        add("Delete", R.drawable.ic_delete) { file.delete(); stopPlayback(); render() }
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, 16, 0, 16)
-            addView(TextView(this@ClipsActivity).apply {
-                text = title(file)
-                textSize = 17f
-                setTypeface(typeface, Typeface.BOLD)
-                setTextColor(primaryColor())
-            })
-            addView(TextView(this@ClipsActivity).apply { text = details(file); textSize = 14f })
-            addView(
-                ClipWaveView(this@ClipsActivity).apply { load(file) },
-                LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (72 * density).toInt()).apply {
-                    topMargin = margin
-                    bottomMargin = margin
-                }
-            )
-            addView(buttons)
-        }
+    private fun row(file: File): View {
+        val card = LayoutInflater.from(this).inflate(R.layout.item_clip, list, false)
+        card.findViewById<TextView>(R.id.clip_title).text = title(file)
+        card.findViewById<TextView>(R.id.clip_details).text = details(file)
+        card.findViewById<ClipWaveView>(R.id.clip_levels).load(file)
+        val play = card.findViewById<MaterialButton>(R.id.clip_play)
+        val row = Row(file, play).also { rows += it }
+        play.setOnClickListener { if (playing === row) stopPlayback() else play(row) }
+        card.findViewById<View>(R.id.clip_share).setOnClickListener { share(file) }
+        card.findViewById<View>(R.id.clip_delete).setOnClickListener { file.delete(); render() }
+        attachHaptics(card)
+        return card
     }
 
-    private fun play(file: File) {
+    private fun play(row: Row) {
         stopPlayback()
         player = MediaPlayer().apply {
-            setDataSource(file.absolutePath)
+            setDataSource(row.file.absolutePath)
             setOnCompletionListener { stopPlayback() }
             prepare()
             start()
         }
+        playing = row
+        row.play.setText("Stop")
+        row.play.morphPlayStop(true)
     }
 
     private fun share(file: File) {

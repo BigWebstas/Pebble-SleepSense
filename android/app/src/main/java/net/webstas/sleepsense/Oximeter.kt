@@ -243,6 +243,7 @@ class OximeterMonitor(private val context: Context) {
         OximeterLog.event(context, "stop")
         handler.removeCallbacksAndMessages(null)
         flushWindow()
+        HomeAssistant.publishSpo2(null)
         gatt?.close()
         gatt = null
     }
@@ -348,7 +349,10 @@ class OximeterMonitor(private val context: Context) {
             OximeterLog.addWave(context, wave)
             wave.setLength(0)
         }
-        if (pulseCount > 0) OximeterLog.addSample(context, windowStart, windowMin, pulseSum / pulseCount)
+        if (pulseCount > 0) {
+            OximeterLog.addSample(context, windowStart, windowMin, pulseSum / pulseCount)
+            HomeAssistant.publishSpo2(windowMin)
+        }
         windowStart = 0L
         windowMin = 101
         pulseSum = 0

@@ -4,4 +4,47 @@
     <color name="widget_background">#1A1F24</color>
     <color name="widget_text">#FFFFFF</color>
     <color name="widget_subtitle">#9EA7B0</color>
+
+    <!-- Night sky palette: indigo primary, teal secondary, moonlight amber for highlights -->
+    <color name="sky_primary_light">#3B4BA8</color>
+    <color name="sky_on_primary_light">#FFFFFF</color>
+    <color name="sky_primary_container_light">#DDE1FF</color>
+    <color name="sky_on_primary_container_light">#0A1A5C</color>
+    <color name="sky_secondary_light">#006A6A</color>
+    <color name="sky_on_secondary_light">#FFFFFF</color>
+    <color name="sky_secondary_container_light">#BEEBEA</color>
+    <color name="sky_on_secondary_container_light">#002020</color>
+    <color name="sky_tertiary_light">#7A5900</color>
+    <color name="sky_background_light">#F7F9FF</color>
+    <color name="sky_on_surface_light">#181C24</color>
+    <color name="sky_card_light">#E9EEF9</color>
+    <color name="sky_card_high_light">#E1E7F3</color>
+    <color name="sky_surface_variant_light">#DEE3F0</color>
+    <color name="sky_on_surface_variant_light">#424858</color>
+    <color name="sky_outline_light">#727889</color>
+    <color name="sky_outline_variant_light">#C2C7D6</color>
+
+    <color name="sky_primary_dark">#AEBBFF</color>
+    <color name="sky_on_primary_dark">#14226B</color>
+    <color name="sky_primary_container_dark">#2C3A82</color>
+    <color name="sky_on_primary_container_dark">#DCE1FF</color>
+    <color name="sky_secondary_dark">#7FD6D0</color>
+    <color name="sky_on_secondary_dark">#00373A</color>
+    <color name="sky_secondary_container_dark">#1D4E52</color>
+    <color name="sky_on_secondary_container_dark">#BBF1EC</color>
+    <color name="sky_tertiary_dark">#F3C677</color>
+    <color name="sky_background_dark">#0B1626</color>
+    <color name="sky_on_surface_dark">#E3E8F2</color>
+    <color name="sky_card_dark">#14243B</color>
+    <color name="sky_card_high_dark">#1B2D48</color>
+    <color name="sky_surface_variant_dark">#2A3A52</color>
+    <color name="sky_on_surface_variant_dark">#B4C0D4</color>
+    <color name="sky_outline_dark">#7F8CA3</color>
+    <color name="sky_outline_variant_dark">#34445D</color>
+
+    <!-- Sleep stages on the last-night ribbon -->
+    <color name="stage_awake">#F5A623</color>
+    <color name="stage_light">#4FD1C5</color>
+    <color name="stage_deep">#4C6EF5</color>
+    <color name="stage_rem">#B57EDC</color>
 </resources>

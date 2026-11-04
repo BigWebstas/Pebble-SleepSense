@@ -4,6 +4,7 @@ import android.app.AlarmManager
 import android.content.Context
 import androidx.core.content.edit
 import java.time.Instant
+import java.time.LocalTime
 import java.time.ZoneId
 
 /**
@@ -20,6 +21,7 @@ object PhoneAlarmSync {
     private const val KEY_REVISION = "revision"
     private const val KEY_WINDOW = "smart_window_minutes" // reported by the watch, never sent to it
     private const val KEY_CUSTOM = "custom_alarm" // minutes after midnight; unset until chosen
+    private const val KEY_NAP = "nap" // "minutes:alarmAtMillis:alarmMinuteOfDay" of the latest nap
     private const val KEY_SNOOZE = "snooze_minutes" // unset until chosen, so the watch's own value stands
 
     fun isEnabled(context: Context): Boolean =
@@ -85,6 +87,34 @@ object PhoneAlarmSync {
     fun setCustomAlarm(context: Context, hour: Int, minute: Int) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putInt(KEY_CUSTOM, hour * 60 + minute) }
         noteAlarmChanged(context)
+    }
+
+    /**
+     * A nap: the watch alarm goes off [minutes] from now. Like any alarm chosen in the app it replaces the
+     * phone's alarm while it lasts, so syncing is turned off. Returns the alarm time as (hour, minute).
+     */
+    fun startNap(context: Context, minutes: Int): Pair<Int, Int> {
+        val time = LocalTime.now().plusSeconds(30).plusMinutes(minutes.toLong()) // the watch alarm has minute resolution
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+            putString(KEY_NAP, "$minutes:${System.currentTimeMillis() + minutes * 60_000L}:${time.hour * 60 + time.minute}")
+        }
+        setEnabled(context, false)
+        setCustomAlarm(context, time.hour, time.minute)
+        setAlarmEnabled(context, true)
+        return time.hour to time.minute
+    }
+
+    class Nap(val minutes: Int, val hour: Int, val minute: Int)
+
+    /** The nap whose alarm is still waiting: not yet gone off, and the alarm was not changed or turned off since. */
+    fun activeNap(context: Context): Nap? {
+        val (minutes, until, alarm) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_NAP, null)
+            ?.split(':')?.takeIf { it.size == 3 }?.mapNotNull { it.toLongOrNull() }?.takeIf { it.size == 3 } ?: return null
+        val custom = customAlarm(context)
+        if (System.currentTimeMillis() > until || isEnabled(context) || !isAlarmEnabled(context) ||
+            custom == null || custom.first * 60 + custom.second != alarm.toInt()
+        ) return null
+        return Nap(minutes.toInt(), alarm.toInt() / 60, alarm.toInt() % 60)
     }
 
     /** Snooze length chosen in this app (0 = snooze off), or null if never chosen. */

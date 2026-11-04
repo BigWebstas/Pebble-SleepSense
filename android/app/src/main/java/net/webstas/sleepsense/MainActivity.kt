@@ -24,6 +24,17 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import android.content.res.ColorStateList
+import android.text.SpannableStringBuilder
+import android.text.style.ForegroundColorSpan
+import android.transition.TransitionManager
+import androidx.appcompat.content.res.AppCompatResources
+import androidx.core.content.ContextCompat
+import androidx.core.view.children
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
+import com.google.android.material.color.MaterialColors
+import com.google.android.material.progressindicator.CircularProgressIndicator
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.activity.result.contract.ActivityResultContracts
@@ -31,7 +42,6 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.color.DynamicColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.materialswitch.MaterialSwitch
 import kotlinx.coroutines.Dispatchers
@@ -49,6 +59,7 @@ class MainActivity : AppCompatActivity() {
             refreshTracking()
             id<TextView>(R.id.live_readings_text).text = LiveReadings.describe(this@MainActivity)
             refreshChest()
+            refreshLastNight()
             handler.postDelayed(this, 3000) // the watch checks in about once a minute and on every change
         }
     }
@@ -104,10 +115,9 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
-        DynamicColors.applyToActivityIfAvailable(this)
-        DynamicColors.applyToActivitiesIfAvailable(application)
         handleAlarmIntent(intent)
         startForegroundService(Intent(this, AlarmBridgeService::class.java))
+        UiPrefs.applyTheme(this)
         setContentView(R.layout.activity_main)
 
         // The app draws edge to edge: keep content clear of the status and navigation bars
@@ -143,6 +153,9 @@ class MainActivity : AppCompatActivity() {
                 PhoneAlarmSync.setAlarmEnabled(this@MainActivity, on)
                 refreshTracking()
             }
+        }
+        napTiles.forEach { (button, minutes, _) ->
+            id<Button>(button).setOnClickListener { startNap(minutes) }
         }
         id<MaterialSwitch>(R.id.bedtime_switch).setOnCheckedChangeListener { _, on ->
             BedtimeMode.setEnabled(this, on)
@@ -193,6 +206,7 @@ class MainActivity : AppCompatActivity() {
             setIcon(R.drawable.ic_expand_more)
             setOnClickListener {
                 val show = advancedBox.visibility != View.VISIBLE
+                TransitionManager.beginDelayedTransition(id(R.id.content))
                 advancedBox.visibility = if (show) View.VISIBLE else View.GONE
                 setText(if (show) R.string.hide_advanced_button else R.string.show_advanced_button)
                 setIcon(if (show) R.drawable.ic_expand_less else R.drawable.ic_expand_more)
@@ -255,6 +269,49 @@ class MainActivity : AppCompatActivity() {
         if (UpdateChecker.dueForAutoCheck(this)) checkForUpdate() else refreshUpdate()
         id<TextView>(R.id.version_text).text =
             getString(R.string.version_label, packageManager.getPackageInfo(packageName, 0).versionName)
+
+        id<MaterialSwitch>(R.id.true_black_switch).apply {
+            isChecked = UiPrefs.trueBlack(this@MainActivity)
+            setOnCheckedChangeListener { _, on ->
+                UiPrefs.setTrueBlack(this@MainActivity, on)
+                recreate()
+            }
+        }
+        id<View>(R.id.last_night_body).setOnClickListener { startActivity(Intent(this, HistoryActivity::class.java)) }
+        setupCards()
+        attachHaptics(id(R.id.root))
+    }
+
+    /** Section cards fold up on a tap of their header (remembered), and slide in when the screen opens. */
+    private fun setupCards() {
+        val content = id<LinearLayout>(R.id.content)
+        val cards = (content.children + id<LinearLayout>(R.id.advanced_box).children).filterIsInstance<MaterialCardView>()
+        for (card in cards.filter { it.id != R.id.tracking_card }) {
+            val inner = card.getChildAt(0) as android.view.ViewGroup
+            val header = inner.getChildAt(0) as TextView
+            val body = inner.getChildAt(1)
+            val key = resources.getResourceEntryName(header.id)
+            val icon = header.compoundDrawablesRelative[0]
+            fun render(collapsed: Boolean) {
+                body.visibility = if (collapsed) View.GONE else View.VISIBLE
+                val chevron = AppCompatResources.getDrawable(this, if (collapsed) R.drawable.ic_expand_more else R.drawable.ic_expand_less)
+                header.setCompoundDrawablesRelativeWithIntrinsicBounds(icon, null, chevron, null)
+            }
+            render(UiPrefs.isCollapsed(this, key))
+            header.setOnClickListener {
+                val collapse = body.visibility == View.VISIBLE
+                TransitionManager.beginDelayedTransition(content)
+                render(collapse)
+                UiPrefs.setCollapsed(this, key, collapse)
+            }
+        }
+        val rise = 24 * resources.displayMetrics.density
+        content.children.filterIsInstance<MaterialCardView>().forEachIndexed { i, card ->
+            card.alpha = 0f
+            card.translationY = rise
+            card.animate().alpha(1f).translationY(0f).setStartDelay(i * 60L).setDuration(350)
+                .setInterpolator(android.view.animation.DecelerateInterpolator()).start()
+        }
     }
 
     override fun onResume() {
@@ -266,6 +323,7 @@ class MainActivity : AppCompatActivity() {
         refreshHealth()
         refreshWhiteNoise()
         refreshCalendar()
+        refreshLastNight(force = true)
         handler.post(refreshLoop)
         handler.post(waveformLoop)
     }
@@ -325,12 +383,80 @@ class MainActivity : AppCompatActivity() {
         id<TextView>(R.id.tracking_status_text).text = title
         setTrackingDots(tracking)
         id<TextView>(R.id.alarm_status_text).text = PhoneAlarmSync.describe(this).lineSequence().first()
-        id<Button>(R.id.tracking_button).apply {
-            setText(if (tracking) R.string.stop_tracking_button else R.string.start_tracking_button)
-            setIcon(if (tracking) R.drawable.ic_stop else R.drawable.ic_play_arrow)
+        id<Button>(R.id.tracking_button).setText(if (tracking) R.string.stop_tracking_button else R.string.start_tracking_button)
+        setPlayStopIcon(R.id.tracking_button, tracking)
+        val since = WidgetState.since(this)
+        val elapsed = if (tracking && since > 0) duration((System.currentTimeMillis() - since) / 60_000) else null
+        id<TextView>(R.id.tracking_elapsed_text).apply {
+            visibility = if (elapsed != null) View.VISIBLE else View.GONE
+            text = elapsed
         }
+        refreshStrip(tracking, elapsed)
         refreshAlarmSettings()
         id<TextView>(R.id.home_assistant_status_text).setText(HomeAssistant.statusText(this))
+    }
+
+    private fun duration(minutes: Long) = if (minutes >= 60) "${minutes / 60}h ${minutes % 60}m" else "${minutes}m"
+
+    // The bar pinned above everything while tracking: time so far and the newest readings
+    private fun refreshStrip(tracking: Boolean, elapsed: String?) {
+        val strip = id<View>(R.id.live_strip)
+        val show = tracking && elapsed != null
+        if (show != (strip.visibility == View.VISIBLE)) {
+            TransitionManager.beginDelayedTransition(id(R.id.root))
+            strip.visibility = if (show) View.VISIBLE else View.GONE
+        }
+        if (!show) return
+        val now = System.currentTimeMillis()
+        fun live(stream: LiveReadings.Stream) = LiveReadings.get(stream)?.takeIf { now - it.at < 10 * 60_000 }?.value?.toString()
+        id<TextView>(R.id.strip_elapsed_value).text = elapsed
+        id<TextView>(R.id.strip_heart_value).text = live(LiveReadings.Stream.HEART_RATE) ?: live(LiveReadings.Stream.OXIMETER_PULSE) ?: "--"
+        id<TextView>(R.id.strip_spo2_value).text = live(LiveReadings.Stream.SPO2) ?: "--"
+        id<TextView>(R.id.strip_breathing_value).text = live(LiveReadings.Stream.BREATHING) ?: "--"
+    }
+
+    private var lastNightStamp = -1L
+
+    // The newest finished night: stars as a ring, time asleep, and the stages as a ribbon
+    private fun refreshLastNight(force: Boolean = false) {
+        val stamp = SessionStore.modified(this)
+        if (!force && stamp == lastNightStamp) return
+        lastNightStamp = stamp
+        val night = SessionStore.lastFinishedNight(this)
+        id<View>(R.id.last_night_card).visibility = if (night == null) View.GONE else View.VISIBLE
+        if (night == null) return
+        val rating = night.optInt("rating").coerceIn(0, 5)
+        id<CircularProgressIndicator>(R.id.rating_ring).setProgressCompat(rating * 20, true)
+        id<TextView>(R.id.rating_ring_text).text = if (rating > 0) "$rating★" else "–"
+        id<TextView>(R.id.last_night_summary).text =
+            getString(R.string.last_night_summary, duration(SessionStore.asleepMinutes(night)))
+        id<TextView>(R.id.last_night_times).text = "${clock(night.optLong("start"))} – ${clock(night.optLong("end"))}"
+        id<StageRibbonView>(R.id.stage_ribbon).set(night)
+        id<TextView>(R.id.stage_legend).text = SpannableStringBuilder().apply {
+            listOf(R.string.live_stage_awake to R.color.stage_awake, R.string.live_stage_light to R.color.stage_light,
+                R.string.live_stage_deep to R.color.stage_deep, R.string.live_stage_rem to R.color.stage_rem,
+            ).forEachIndexed { i, (label, color) ->
+                if (i > 0) append("   ")
+                val from = length
+                append("●")
+                setSpan(ForegroundColorSpan(ContextCompat.getColor(this@MainActivity, color)), from, length, 0)
+                append(" ").append(getString(label))
+            }
+        }
+    }
+
+    private val playStopState = mutableMapOf<Int, Boolean>()
+
+    // The play and stop icons morph into each other when a button flips; the first time it is just set
+    private fun setPlayStopIcon(buttonId: Int, playing: Boolean) {
+        val button = id<MaterialButton>(buttonId)
+        val previous = playStopState.put(buttonId, playing)
+        if (previous == playing) return
+        if (previous == null) {
+            button.setIcon(if (playing) R.drawable.ic_stop else R.drawable.ic_play_arrow)
+            return
+        }
+        button.morphPlayStop(playing)
     }
 
     private val dotPulses = mutableListOf<ObjectAnimator>()
@@ -390,6 +516,42 @@ class MainActivity : AppCompatActivity() {
             PhoneAlarmSync.smartWindowMinutes(this)?.let { getString(R.string.smart_window_minutes, it) }
                 ?: getString(R.string.smart_window_unset),
         )
+        refreshNapTiles()
+    }
+
+    private val napTiles = listOf(
+        Triple(R.id.nap_30_button, 30, R.string.nap_button_30),
+        Triple(R.id.nap_45_button, 45, R.string.nap_button_45),
+        Triple(R.id.nap_60_button, 60, R.string.nap_button_60),
+    )
+    private val napNormal = mutableMapOf<Int, Pair<ColorStateList?, ColorStateList>>()
+
+    // The tile of the nap that is waiting turns solid and shows the time it will wake you
+    private fun refreshNapTiles() {
+        val nap = PhoneAlarmSync.activeNap(this)
+        for ((buttonId, minutes, label) in napTiles) {
+            val button = id<MaterialButton>(buttonId)
+            val (tint, text) = napNormal.getOrPut(buttonId) { button.backgroundTintList to button.textColors }
+            if (nap?.minutes == minutes) {
+                button.text = getString(R.string.nap_active, minutes, "%02d:%02d".format(nap.hour, nap.minute))
+                button.backgroundTintList = ColorStateList.valueOf(MaterialColors.getColor(button, androidx.appcompat.R.attr.colorPrimary))
+                button.setTextColor(MaterialColors.getColor(button, com.google.android.material.R.attr.colorOnPrimary))
+            } else {
+                button.setText(label)
+                button.backgroundTintList = tint
+                button.setTextColor(text)
+            }
+        }
+    }
+
+    private fun startNap(minutes: Int) {
+        val (hour, minute) = PhoneAlarmSync.startNap(this, minutes)
+        id<MaterialSwitch>(R.id.alarm_sync_switch).isChecked = false
+        SleepWidgetProvider.refreshAll(this)
+        if (!WidgetState.tracking(this)) TrackingControl.start(this)
+        refreshAlarmSettings()
+        refreshTracking()
+        Toast.makeText(this, getString(R.string.nap_started, "%02d:%02d".format(hour, minute)), Toast.LENGTH_LONG).show()
     }
 
     private fun chooseAlarmTime() {
@@ -631,10 +793,8 @@ class MainActivity : AppCompatActivity() {
         )
 
         val playing = WhiteNoisePlayer.isPlaying
-        id<Button>(R.id.white_noise_play_button).apply {
-            setText(if (playing) R.string.white_noise_stop_button else R.string.white_noise_play_button)
-            setIcon(if (playing) R.drawable.ic_stop else R.drawable.ic_play_arrow)
-        }
+        id<Button>(R.id.white_noise_play_button).setText(if (playing) R.string.white_noise_stop_button else R.string.white_noise_play_button)
+        setPlayStopIcon(R.id.white_noise_play_button, playing)
     }
 
     // The link of a Spotify playlist, offered from the clipboard when it holds one

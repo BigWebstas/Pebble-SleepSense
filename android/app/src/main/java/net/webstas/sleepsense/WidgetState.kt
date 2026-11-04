@@ -30,8 +30,14 @@ object WidgetState {
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
+    /** When the watch started tracking, as it last reported (0 if never). */
+    fun since(context: Context) = prefs(context).getLong("since", 0)
+
     fun watchAppOpen(context: Context, now: Long = System.currentTimeMillis()) =
         now - prefs(context).getLong("seen", 0) < ALIVE_MS
+
+    /** Whether the watch last said it was tracking, even if it has not checked in since (the watch app may be closed). */
+    fun lastReportedTracking(context: Context) = prefs(context).getBoolean("tracking", false)
 
     fun tracking(context: Context, now: Long = System.currentTimeMillis()) =
         watchAppOpen(context, now) && prefs(context).getBoolean("tracking", false)

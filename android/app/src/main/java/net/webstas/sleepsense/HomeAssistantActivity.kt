@@ -11,7 +11,6 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.result.contract.ActivityResultContracts
-import com.google.android.material.color.DynamicColors
 import com.google.android.material.materialswitch.MaterialSwitch
 
 /** Where the MQTT broker for Home Assistant is set up. */
@@ -38,7 +37,6 @@ class HomeAssistantActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        DynamicColors.applyToActivityIfAvailable(this)
         setContentView(R.layout.activity_home_assistant)
         id<android.view.View>(R.id.root).setOnApplyWindowInsetsListener { view, insets ->
             val bars = insets.getInsets(WindowInsets.Type.systemBars())

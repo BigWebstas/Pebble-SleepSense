@@ -1,12 +1,138 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true">
+    android:orientation="vertical">
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/live_strip"
+        style="@style/SectionCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="8dp"
+        android:visibility="gone"
+        app:cardBackgroundColor="?attr/colorPrimaryContainer">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="12dp">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/strip_elapsed_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="--"
+                    android:textColor="?attr/colorOnPrimaryContainer"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:alpha="0.7"
+                    android:text="@string/strip_elapsed"
+                    android:textColor="?attr/colorOnPrimaryContainer"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/strip_heart_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="--"
+                    android:textColor="?attr/colorOnPrimaryContainer"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:alpha="0.7"
+                    android:text="@string/strip_heart"
+                    android:textColor="?attr/colorOnPrimaryContainer"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/strip_spo2_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="--"
+                    android:textColor="?attr/colorOnPrimaryContainer"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:alpha="0.7"
+                    android:text="@string/strip_spo2"
+                    android:textColor="?attr/colorOnPrimaryContainer"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/strip_breathing_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="--"
+                    android:textColor="?attr/colorOnPrimaryContainer"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:alpha="0.7"
+                    android:text="@string/strip_breathing"
+                    android:textColor="?attr/colorOnPrimaryContainer"
+                    android:textSize="11sp" />
+            </LinearLayout>
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
 
     <LinearLayout
+        android:id="@+id/content"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_horizontal"
@@ -26,18 +152,36 @@
             android:gravity="center"
             android:text="@string/main_status_text" />
 
-        <com.google.android.material.divider.MaterialDivider
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/tracking_card"
+            style="@style/SectionCard"
+            app:cardBackgroundColor="?attr/colorPrimaryContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp" />
+            android:layout_marginTop="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:paddingHorizontal="16dp"
+                android:paddingBottom="16dp">
 
         <TextView
             android:id="@+id/tracking_section_label"
             style="@style/SectionHeader"
+            android:drawableStart="@drawable/ic_play_arrow"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="@string/tracking_section" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical">
 
         <LinearLayout
             android:layout_width="wrap_content"
@@ -55,6 +199,7 @@
 
             <TextView
                 android:id="@+id/tracking_status_text"
+                    android:textColor="?attr/colorOnPrimaryContainer"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="12dp"
@@ -71,7 +216,18 @@
         </LinearLayout>
 
         <TextView
+                    android:id="@+id/tracking_elapsed_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="?attr/colorOnPrimaryContainer"
+                    android:textSize="44sp"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
+
+                <TextView
             android:id="@+id/alarm_status_text"
+                    android:textColor="?attr/colorOnPrimaryContainer"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
@@ -79,6 +235,7 @@
 
         <Button
             android:id="@+id/tracking_button"
+                android:minHeight="56dp"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
@@ -88,6 +245,7 @@
             android:text="@string/start_tracking_button" />
 
         <Button
+            style="@style/Widget.Material3.Button.TonalButton"
             android:id="@+id/clock_button"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -97,18 +255,143 @@
             app:iconPadding="8dp"
             android:text="@string/open_clock_button" />
 
-        <com.google.android.material.divider.MaterialDivider
+        </LinearLayout>
+                </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/last_night_card"
+            style="@style/SectionCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="32dp" />
+            android:layout_marginTop="16dp"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:paddingHorizontal="16dp"
+                android:paddingBottom="16dp">
+
+                <TextView
+                    android:id="@+id/last_night_label"
+                    style="@style/SectionHeader"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:drawableStart="@drawable/ic_history"
+                    android:text="@string/last_night_section" />
+
+                <LinearLayout
+                    android:id="@+id/last_night_body"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <FrameLayout
+                            android:layout_width="72dp"
+                            android:layout_height="72dp">
+
+                            <com.google.android.material.progressindicator.CircularProgressIndicator
+                                android:id="@+id/rating_ring"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_gravity="center"
+                                android:max="100"
+                                app:indicatorColor="?attr/colorTertiary"
+                                app:indicatorInset="0dp"
+                                app:indicatorSize="64dp"
+                                app:trackColor="?attr/colorOutlineVariant"
+                                app:trackCornerRadius="4dp"
+                                app:trackThickness="8dp" />
+
+                            <TextView
+                                android:id="@+id/rating_ring_text"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:gravity="center"
+                                android:textSize="18sp"
+                                android:textStyle="bold" />
+                        </FrameLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="16dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/last_night_summary"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textSize="20sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/last_night_times"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:alpha="0.7"
+                                android:textSize="13sp" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <net.webstas.sleepsense.StageRibbonView
+                        android:id="@+id/stage_ribbon"
+                        android:layout_width="match_parent"
+                        android:layout_height="20dp"
+                        android:layout_marginTop="14dp"
+                        android:contentDescription="@string/last_night_section" />
+
+                    <TextView
+                        android:id="@+id/stage_legend"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:textSize="12sp" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            style="@style/SectionCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:paddingHorizontal="16dp"
+                android:paddingBottom="16dp">
 
         <TextView
             android:id="@+id/alarm_section_label"
             style="@style/SectionHeader"
+            android:drawableStart="@drawable/ic_alarm"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="@string/alarm_section" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical">
 
         <com.google.android.material.materialswitch.MaterialSwitch
             android:id="@+id/alarm_sync_switch"
@@ -118,6 +401,7 @@
             android:text="@string/alarm_sync_label" />
 
         <Button
+            style="@style/Widget.Material3.Button.TonalButton"
             android:id="@+id/alarm_time_button"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -132,32 +416,89 @@
             android:text="@string/alarm_enabled_label" />
 
         <Button
+            style="@style/Widget.Material3.Button.TonalButton"
             android:id="@+id/snooze_button"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:minWidth="220dp" />
 
-        <TextView
+<TextView
             android:id="@+id/smart_window_text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp" />
+            android:layout_marginTop="12dp"
+            android:alpha="0.7"
+            android:textSize="13sp" />
 
-        <com.google.android.material.divider.MaterialDivider
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="32dp" />
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <Button
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:id="@+id/nap_30_button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/nap_button_30" />
+
+            <Button
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:id="@+id/nap_45_button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="@string/nap_button_45" />
+
+            <Button
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:id="@+id/nap_60_button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="@string/nap_button_60" />
+        </LinearLayout>
+
+        </LinearLayout>
+                </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            style="@style/SectionCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:paddingHorizontal="16dp"
+                android:paddingBottom="16dp">
 
         <TextView
             android:id="@+id/review_section_label"
             style="@style/SectionHeader"
+            android:drawableStart="@drawable/ic_history"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="@string/review_section" />
 
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical">
+
         <Button
+            style="@style/Widget.Material3.Button.TonalButton"
             android:id="@+id/clips_button"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -168,6 +509,7 @@
             android:text="@string/noise_clips_button" />
 
         <Button
+            style="@style/Widget.Material3.Button.TonalButton"
             android:id="@+id/history_button"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -177,7 +519,12 @@
             app:iconPadding="8dp"
             android:text="@string/history_button" />
 
+        </LinearLayout>
+                </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
         <Button
+            style="@style/Widget.Material3.Button.TonalButton"
             android:id="@+id/advanced_toggle_button"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -196,20 +543,34 @@
             android:visibility="gone">
 
             <!-- Thicker and in the accent colour, so it shows where the basic settings end -->
-            <com.google.android.material.divider.MaterialDivider
+            <com.google.android.material.card.MaterialCardView
+            style="@style/SectionCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp">
+
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                app:dividerColor="?attr/colorPrimary"
-                app:dividerThickness="3dp" />
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:paddingHorizontal="16dp"
+                android:paddingBottom="16dp">
 
             <TextView
                 android:id="@+id/noise_clips_section_label"
                 style="@style/SectionHeader"
+                android:drawableStart="@drawable/ic_mic"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:text="@string/noise_clips_section" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical">
 
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/noise_switch"
@@ -227,6 +588,7 @@
                 android:textSize="13sp" />
 
             <Button
+                style="@style/Widget.Material3.Button.TonalButton"
                 android:id="@+id/noise_sensitivity_button"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -235,18 +597,38 @@
                 app:icon="@drawable/ic_tune"
                 app:iconPadding="8dp" />
 
-            <com.google.android.material.divider.MaterialDivider
+            </LinearLayout>
+                </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            style="@style/SectionCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp">
+
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp" />
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:paddingHorizontal="16dp"
+                android:paddingBottom="16dp">
 
             <TextView
                 android:id="@+id/oximeter_section_label"
                 style="@style/SectionHeader"
+                android:drawableStart="@drawable/ic_favorite"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:text="@string/oximeter_section" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical">
 
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/oximeter_switch"
@@ -271,6 +653,7 @@
                 android:text="@string/oximeter_hrv_label" />
 
             <Button
+                style="@style/Widget.Material3.Button.TonalButton"
                 android:id="@+id/oximeter_choose_button"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -278,18 +661,38 @@
                 android:minWidth="220dp"
                 android:text="@string/oximeter_choose_button" />
 
-            <com.google.android.material.divider.MaterialDivider
+            </LinearLayout>
+                </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            style="@style/SectionCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp">
+
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp" />
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:paddingHorizontal="16dp"
+                android:paddingBottom="16dp">
 
             <TextView
                 android:id="@+id/bedtime_section_label"
                 style="@style/SectionHeader"
+                android:drawableStart="@drawable/ic_alarm"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:text="@string/bedtime_section" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical">
 
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/bedtime_switch"
@@ -298,18 +701,38 @@
                 android:layout_marginTop="8dp"
                 android:text="@string/bedtime_label" />
 
-            <com.google.android.material.divider.MaterialDivider
+            </LinearLayout>
+                </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            style="@style/SectionCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp">
+
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp" />
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:paddingHorizontal="16dp"
+                android:paddingBottom="16dp">
 
             <TextView
                 android:id="@+id/white_noise_section_label"
                 style="@style/SectionHeader"
+                android:drawableStart="@drawable/ic_graphic_eq"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:text="@string/white_noise_section" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical">
 
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/white_noise_tracking_switch"
@@ -319,6 +742,7 @@
                 android:text="@string/white_noise_tracking_label" />
 
             <Button
+                style="@style/Widget.Material3.Button.TonalButton"
                 android:id="@+id/white_noise_sound_button"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -338,20 +762,41 @@
                 app:iconPadding="8dp"
                 android:text="@string/white_noise_play_button" />
 
-            <com.google.android.material.divider.MaterialDivider
+            </LinearLayout>
+                </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            style="@style/SectionCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp">
+
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp" />
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:paddingHorizontal="16dp"
+                android:paddingBottom="16dp">
 
             <TextView
                 android:id="@+id/connectivity_label"
                 style="@style/SectionHeader"
+                android:drawableStart="@drawable/ic_home"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:text="@string/connectivity_label" />
 
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical">
+
             <Button
+                style="@style/Widget.Material3.Button.TonalButton"
                 android:id="@+id/home_assistant_button"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -422,6 +867,7 @@
                 android:text="@string/calendar_sync_label" />
 
             <Button
+                style="@style/Widget.Material3.Button.TonalButton"
                 android:id="@+id/calendar_button"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -432,6 +878,7 @@
                 android:text="@string/calendar_choose_button" />
 
             <Button
+                style="@style/Widget.Material3.Button.TonalButton"
                 android:id="@+id/grant_hc_button"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -448,20 +895,41 @@
                 android:layout_marginTop="4dp"
                 android:gravity="center" />
 
-            <com.google.android.material.divider.MaterialDivider
+            </LinearLayout>
+                </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            style="@style/SectionCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp">
+
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp" />
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:paddingHorizontal="16dp"
+                android:paddingBottom="16dp">
 
             <TextView
                 android:id="@+id/interfacing_label"
                 style="@style/SectionHeader"
+                android:drawableStart="@drawable/ic_widgets"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:text="@string/interfacing_label" />
 
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical">
+
             <Button
+                style="@style/Widget.Material3.Button.TonalButton"
                 android:id="@+id/widget_button"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -472,6 +940,7 @@
                 android:text="@string/add_widget_button" />
 
             <Button
+                style="@style/Widget.Material3.Button.TonalButton"
                 android:id="@+id/install_watch_button"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -482,6 +951,7 @@
                 android:text="@string/install_watch_button" />
 
             <Button
+                style="@style/Widget.Material3.Button.TonalButton"
                 android:id="@+id/update_button"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -498,18 +968,38 @@
                 android:layout_marginTop="4dp"
                 android:gravity="center" />
 
-            <com.google.android.material.divider.MaterialDivider
+            </LinearLayout>
+                </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            style="@style/SectionCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp">
+
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp" />
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:paddingHorizontal="16dp"
+                android:paddingBottom="16dp">
 
             <TextView
                 android:id="@+id/chest_section_label"
                 style="@style/SectionHeader"
+                android:drawableStart="@drawable/ic_tune"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:text="@string/chest_section" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical">
 
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/chest_switch"
@@ -526,18 +1016,38 @@
                 android:gravity="center"
                 android:textSize="13sp" />
 
-            <com.google.android.material.divider.MaterialDivider
+            </LinearLayout>
+                </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            style="@style/SectionCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp">
+
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp" />
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:paddingHorizontal="16dp"
+                android:paddingBottom="16dp">
 
             <TextView
                 android:id="@+id/live_section_label"
                 style="@style/SectionHeader"
+                android:drawableStart="@drawable/ic_graphic_eq"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:text="@string/live_section" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical">
 
             <TextView
                 android:id="@+id/live_readings_text"
@@ -598,6 +1108,50 @@
 
             </LinearLayout>
 
+            </LinearLayout>
+                </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                style="@style/SectionCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="16dp"
+                    android:paddingBottom="16dp">
+
+                    <TextView
+                        android:id="@+id/appearance_section_label"
+                        style="@style/SectionHeader"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:drawableStart="@drawable/ic_tune"
+                        android:text="@string/appearance_section" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical">
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/true_black_switch"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="@string/true_black_label" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+        
+
         </LinearLayout>
 
         <TextView
@@ -609,4 +1163,5 @@
             android:textSize="12sp" />
 
     </LinearLayout>
-</ScrollView>
+    </ScrollView>
+</LinearLayout>

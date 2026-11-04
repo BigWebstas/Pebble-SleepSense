@@ -15,3 +15,10 @@ fun Button.setIcon(@DrawableRes icon: Int) {
         compoundDrawableTintList = textColors
     }
 }
+
+/** Swaps the icon with a quick morph between play and stop (to stop when [playing]). */
+fun MaterialButton.morphPlayStop(playing: Boolean) {
+    val morph = context.getDrawable(if (playing) R.drawable.avd_play_to_stop else R.drawable.avd_stop_to_play) as android.graphics.drawable.AnimatedVectorDrawable
+    icon = morph
+    morph.start()
+}

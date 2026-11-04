@@ -67,6 +67,19 @@ object SessionStore {
         return null
     }
 
+    /** The newest finished session as stored (start, end, samples, rating), or null if there is none. */
+    fun lastFinishedNight(context: Context): JSONObject? {
+        val all = JSONArray(load(context))
+        for (i in all.length() - 1 downTo 0) {
+            val session = all.getJSONObject(i)
+            if (!session.optBoolean("open")) return session
+        }
+        return null
+    }
+
+    /** Changes whenever a new history arrives, so a screen can tell when to read it again. */
+    fun modified(context: Context): Long = file(context).lastModified()
+
     /** Minutes asleep in all finished sessions that ended today (a night and a nap add up). */
     fun asleepMinutesToday(context: Context): Long {
         val all = JSONArray(load(context))
