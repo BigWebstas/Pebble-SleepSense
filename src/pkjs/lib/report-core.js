@@ -56,11 +56,12 @@ function reportCore() {
 
   function summarize(s) {
     var mins = { 0: 0, 1: 0, 2: 0, 3: 0 };
-    var hrSum = 0, hrN = 0, o2Sum = 0, o2N = 0, o2Min = 101, nSum = 0, nN = 0, mSum = 0, mN = 0, mMax = 0;
+    var hrSum = 0, hrN = 0, o2Sum = 0, o2N = 0, o2Min = 101, nSum = 0, nN = 0, brSum = 0, brN = 0, mSum = 0, mN = 0, mMax = 0;
     spans(s).forEach(function (sp) {
       mins[sp.p.s] = (mins[sp.p.s] || 0) + (sp.to - sp.from) / MIN;
       if (sp.p.hr > 0) { hrSum += sp.p.hr; hrN++; }
       if (sp.p.o2 > 0) { o2Sum += sp.p.o2; o2N++; o2Min = Math.min(o2Min, sp.p.o2); }
+      if (sp.p.br > 0) { brSum += sp.p.br; brN++; }
       if (sp.p.n > 0) { nSum += sp.p.n; nN++; }
       if (sp.p.m !== undefined) { mSum += sp.p.m; mN++; mMax = Math.max(mMax, sp.p.m); }
     });
@@ -72,6 +73,7 @@ function reportCore() {
       avgSpo2: o2N ? Math.round(o2Sum / o2N) : 0,
       minSpo2: o2N ? o2Min : 0,
       avgNoise: nN ? Math.round(nSum / nN) : 0,
+      avgBreathing: brN ? Math.round(brSum / brN) : 0,
       avgMove: mN ? Math.round(mSum / mN) : null,
       peakMove: mN ? mMax : null,
       snoozes: s.snoozes || 0,
@@ -118,6 +120,7 @@ function reportCore() {
       ['Awake / Light / Deep / REM', m.awake + ' / ' + m.light + ' / ' + m.deep + ' / ' + m.rem + ' min'],
       ['Average heart rate', m.avgHr ? m.avgHr + ' bpm' : '-'],
       ['Blood oxygen (average / lowest)', m.avgSpo2 ? m.avgSpo2 + '% / ' + m.minSpo2 + '%' : '-'],
+      ['Average breathing rate', m.avgBreathing ? m.avgBreathing + ' /min' : '-'],
       ['Average room noise', m.avgNoise ? m.avgNoise + ' dB' : '-'],
       ['Movement (average / peak)', m.avgMove === null ? '-' : m.avgMove + ' / ' + m.peakMove],
       ['Snoozed', snoozeText(m)],
@@ -182,6 +185,7 @@ function reportCore() {
     return '<h3>Sleep stages</h3>' + stepSvg(s, 's', STAGE_ROWS) + alarmLegend(s) +
       '<h3>Movement</h3>' + lineSvg(s, 'm', '#4dabf7', 'movement', true) +
       '<h3>Heart rate</h3>' + lineSvg(s, 'hr', '#ff6b6b', 'bpm') +
+      (s.samples.some(function (p) { return p.br > 0; }) ? '<h3>Breathing rate</h3>' + lineSvg(s, 'br', '#20c997', 'breaths per minute') : '') +
       '<h3>Blood oxygen (SpO2)</h3>' + lineSvg(s, 'o2', '#9775fa', '%') +
       '<h3>Ambient light</h3>' + (hasLight ? stepSvg(s, 'l', LIGHT_ROWS) : '<p class="hint">No light data for this session.</p>') +
       '<h3>Room noise</h3>' + lineSvg(s, 'n', '#e0a800', 'dB');
@@ -290,6 +294,7 @@ function reportCore() {
       out.push(ganttBlock(s), '');
       [chartBlock(s, 'm', 'Movement (accelerometer activity)', 'activity', 0, null, true),
         chartBlock(s, 'hr', 'Heart rate', 'bpm', null, null),
+        chartBlock(s, 'br', 'Breathing rate (chest)', 'breaths/min', null, null),
         chartBlock(s, 'o2', 'Blood oxygen (lowest SpO2 per interval)', '%', null, 100),
         chartBlock(s, 'l', 'Ambient light level (1 dark to 4 bright)', 'level', 0, 4),
         chartBlock(s, 'n', 'Room noise', 'dB', null, null)].forEach(function (block) {

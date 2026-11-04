@@ -4,12 +4,14 @@ import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.Manifest
 import android.app.Service
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.IBinder
@@ -46,11 +48,32 @@ class AlarmBridgeService : Service() {
         }
     }
 
+    // Local webhook (Pebble Index 01, Tasker, ...): /toggle starts tracking or stops the running one
+    private val webhook = WebhookServer(token = { WebhookPrefs.token(this) }, handle = ::handleWebhook)
+    private val webhookPrefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> syncWebhookServer() }
+
+    private fun handleWebhook(method: String, path: String): WebhookServer.Response {
+        val tracking = WidgetState.tracking(this)
+        val nowTracking = when (path) {
+            "/status" -> tracking
+            "/start" -> true.also { if (!tracking) TrackingControl.start(this) }
+            "/stop" -> false.also { if (tracking) TrackingControl.stop(this) }
+            "/toggle" -> !tracking.also { if (it) TrackingControl.stop(this) else TrackingControl.start(this) }
+            else -> return WebhookServer.Response(404, """{"error":"not found"}""")
+        }
+        return WebhookServer.Response(200, """{"tracking":$nowTracking}""")
+    }
+
+    /** Runs the webhook server exactly while the setting is on; called at startup and on every change. */
+    private fun syncWebhookServer() {
+        if (WebhookPrefs.isEnabled(this)) webhook.start(WEBHOOK_PORT) else webhook.stop()
+    }
+
     override fun onCreate() {
         super.onCreate()
         val channel = NotificationChannel("bridge", "Alarm bridge", NotificationManager.IMPORTANCE_MIN)
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
-        startForeground(1, notification(false), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        startForeground(1, notification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
 
         ContextCompat.registerReceiver(
             this, alarmChanged, IntentFilter(AlarmManager.ACTION_NEXT_ALARM_CLOCK_CHANGED),
@@ -58,6 +81,8 @@ class AlarmBridgeService : Service() {
         )
 
         HomeAssistant.start(this)
+        syncWebhookServer()
+        WebhookPrefs.registerListener(this, webhookPrefsListener)
 
         thread(name = "alarm-bridge", isDaemon = true) {
             try {
@@ -96,6 +121,9 @@ class AlarmBridgeService : Service() {
             request.startsWith("GET /alarm") -> {
                 PhoneAlarmSync.noteRequest(this)
                 Regex("alarm=(\\d)").find(request)?.let { PhoneAlarmSync.alarmEnabledOnWatch(this, it.groupValues[1] == "1") }
+                Regex("window=(\\d+)").find(request)?.groupValues?.get(1)?.toIntOrNull()?.let { PhoneAlarmSync.setSmartWindowMinutes(this, it) }
+                Regex("alarm_time=(\\d+)").find(request)?.groupValues?.get(1)?.toIntOrNull()
+                    ?.let { PhoneAlarmSync.alarmTimeOnWatch(this, it / 60, it % 60) }
                 // The watchapp's JS checks in every minute and says whether the watch is tracking
                 val tracking = Regex("tracking=(\\d)").find(request)?.groupValues?.get(1)
                 if (tracking != null) {
@@ -125,6 +153,11 @@ class AlarmBridgeService : Service() {
                         HomeAssistant.publishState(isTracking, stage, hr, duration)
                     }
                     SleepRecorder.onWatchUpdate(this, isTracking, stage, hr)
+                    trackingSince = if (isTracking) since.takeIf { it > 0 } ?: System.currentTimeMillis() else 0L
+                    trackingStage = stage
+                    trackingHr = hr
+                    refreshNotification()
+                    if (isTracking) CoroutineScope(Dispatchers.IO).launch { SleepRecorder.flushLive(this@AlarmBridgeService) }
                     val quiet = Regex("quiet=(\\d)").find(request)?.groupValues?.get(1)?.let { it == "1" }
                     val ratingPending = Regex("rating=(\\d)").find(request)?.groupValues?.get(1)?.let { it == "1" }
                     BedtimeMode.onTracking(this, isTracking, quiet, ratingPending)
@@ -203,19 +236,55 @@ class AlarmBridgeService : Service() {
         return line.toString(Charsets.UTF_8.name())
     }
 
-    private fun notification(listening: Boolean): Notification =
-        Notification.Builder(this, "bridge")
+    // What the notification says: the night being tracked, or what the service is for
+    private var listening = false
+    private var trackingSince = 0L // millis the tracked night began, 0 when the watch is not tracking
+    private var trackingStage: Int? = null
+    private var trackingHr: Int? = null
+
+    private fun notification(): Notification {
+        val open = PendingIntent.getActivity(
+            this, 0, Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val builder = Notification.Builder(this, "bridge").setContentIntent(open).setOngoing(true)
+        if (trackingSince > 0) {
+            val stage = trackingStage?.let {
+                getString(when (it) {
+                    1 -> R.string.live_stage_light
+                    2 -> R.string.live_stage_deep
+                    3 -> R.string.live_stage_rem
+                    else -> R.string.live_stage_awake
+                })
+            }
+            val details = listOfNotNull(
+                stage,
+                trackingHr?.takeIf { it > 0 }?.let { getString(R.string.live_unit_bpm, it) },
+                if (listening) "listening for noise" else null,
+            )
+            return builder.setContentTitle("Tracking sleep")
+                .setContentText(details.joinToString(" · ").ifEmpty { "Waiting for the first reading" })
+                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                .setUsesChronometer(true) // the time since the night began counts up without more updates
+                .setWhen(trackingSince)
+                .build()
+        }
+        return builder
             .setContentTitle(if (listening) "SleepSense is listening for noise" else "SleepSense alarm bridge")
             .setContentText(if (listening) "Recording a clip if the room gets suddenly loud" else "Shares your next phone alarm with the watch app")
             .setSmallIcon(if (listening) android.R.drawable.ic_btn_speak_now else android.R.drawable.ic_lock_idle_alarm)
-            .setOngoing(true)
             .build()
+    }
+
+    private fun refreshNotification() =
+        getSystemService(NotificationManager::class.java).notify(1, notification())
 
     // The microphone type is added only while listening, to the service that is already in the foreground
     private fun setListening(on: Boolean) {
         val types = ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or
             (if (on) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0)
-        startForeground(1, notification(on), types)
+        listening = on
+        startForeground(1, notification(), types)
     }
 
     private fun noteLive(request: String, key: String, stream: LiveReadings.Stream) {
@@ -273,6 +342,8 @@ class AlarmBridgeService : Service() {
         monitor.stop()
         oximeter.stop()
         unregisterReceiver(alarmChanged)
+        WebhookPrefs.unregisterListener(this, webhookPrefsListener)
+        webhook.stop()
         server?.close()
         super.onDestroy()
     }

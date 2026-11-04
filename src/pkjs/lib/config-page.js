@@ -109,7 +109,7 @@ options([[15, '15 minutes before'], [30, '30 minutes before'], [45, '45 minutes 
 '\n' +
 '  <label for="snoozeMin">Snooze</label>\n' +
 '  <select id="snoozeMin">\n' +
-options([[0, 'Off'], [5, '5 minutes'], [9, '9 minutes'], [10, '10 minutes'], [15, '15 minutes']], alarm.snooze) + '\n' +
+options([[0, 'Off'], [5, '5 minutes'], [10, '10 minutes'], [15, '15 minutes']], alarm.snooze) + '\n' +
 '  </select>\n' +
 '  <p class="hint">While the alarm rings, Select stops it and Down snoozes it for this long. Off makes every button stop it.</p>\n' +
 '\n' +

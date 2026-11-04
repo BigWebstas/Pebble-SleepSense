@@ -3,8 +3,6 @@ package net.webstas.sleepsense
 import android.content.Intent
 import android.media.MediaPlayer
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.WindowInsets
@@ -18,26 +16,15 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlin.concurrent.thread
 
 /** The noise clips the monitor saved, each with its sound level over time: play, share or delete each one. */
 class ClipsActivity : AppCompatActivity() {
-    private class Row(val file: File, val levels: ClipLevelView, val play: MaterialButton)
+    private class Row(val file: File, val play: MaterialButton)
 
     private lateinit var list: LinearLayout
-    private val handler = Handler(Looper.getMainLooper())
     private val rows = mutableListOf<Row>()
     private var player: MediaPlayer? = null
     private var playing: Row? = null
-
-    // Moves the playhead of the clip that is playing
-    private val playhead = object : Runnable {
-        override fun run() {
-            val p = player ?: return
-            playing?.levels?.progress = p.currentPosition / p.duration.coerceAtLeast(1).toFloat()
-            handler.postDelayed(this, 50)
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -61,11 +48,9 @@ class ClipsActivity : AppCompatActivity() {
     }
 
     private fun stopPlayback() {
-        handler.removeCallbacks(playhead)
         player?.release()
         player = null
         playing?.let {
-            it.levels.progress = -1f
             it.play.setText("Play")
             it.play.morphPlayStop(false)
         }
@@ -115,14 +100,9 @@ class ClipsActivity : AppCompatActivity() {
         val card = LayoutInflater.from(this).inflate(R.layout.item_clip, list, false)
         card.findViewById<TextView>(R.id.clip_title).text = title(file)
         card.findViewById<TextView>(R.id.clip_details).text = details(file)
-        val levels = card.findViewById<ClipLevelView>(R.id.clip_levels)
+        card.findViewById<ClipWaveView>(R.id.clip_levels).load(file)
         val play = card.findViewById<MaterialButton>(R.id.clip_play)
-        val row = Row(file, levels, play).also { rows += it }
-        // Reading the whole clip is quick, but not something to do while the card slides in
-        thread {
-            val values = runCatching { ClipLevelView.levels(file) }.getOrNull()
-            runOnUiThread { if (!isDestroyed) levels.levels = values }
-        }
+        val row = Row(file, play).also { rows += it }
         play.setOnClickListener { if (playing === row) stopPlayback() else play(row) }
         card.findViewById<View>(R.id.clip_share).setOnClickListener { share(file) }
         card.findViewById<View>(R.id.clip_delete).setOnClickListener { file.delete(); render() }
@@ -141,7 +121,6 @@ class ClipsActivity : AppCompatActivity() {
         playing = row
         row.play.setText("Stop")
         row.play.morphPlayStop(true)
-        handler.post(playhead)
     }
 
     private fun share(file: File) {

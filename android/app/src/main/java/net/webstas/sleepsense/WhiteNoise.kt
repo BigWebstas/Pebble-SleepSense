@@ -1,16 +1,20 @@
 package net.webstas.sleepsense
 
 import android.content.Context
+import android.content.Intent
+import android.media.AudioAttributes
+import android.media.AudioManager
+import android.view.KeyEvent
+import android.media.AudioFormat
+import android.media.AudioTrack
+import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
-import android.media.AudioAttributes
-import android.media.AudioFormat
-import android.media.AudioTrack
-import android.media.MediaPlayer
 import android.util.Log
 import androidx.core.content.edit
+import org.json.JSONArray
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.max
@@ -29,7 +33,6 @@ enum class WhiteNoiseSound(
     BROWN("brown", R.string.white_noise_brown_title, R.string.white_noise_brown_desc),
     PINK("pink", R.string.white_noise_pink_title, R.string.white_noise_pink_desc),
     WHITE("white", R.string.white_noise_white_title, R.string.white_noise_white_desc),
-    SONG("song", R.string.white_noise_song_title, R.string.white_noise_song_desc),
 }
 
 /** User preferences for white noise playback. */
@@ -37,7 +40,10 @@ object WhiteNoisePrefs {
     private const val PREFS = "white_noise"
     private const val KEY_PLAY_WHILE_TRACKING = "play_while_tracking"
     private const val KEY_SOUND = "sound"
-    private const val KEY_SONG = "song_uri"
+    private const val KEY_FILES = "files"
+    private const val KEY_USE_FILES = "use_files"
+    private const val KEY_SPOTIFY = "spotify"
+    private const val KEY_USE_SPOTIFY = "use_spotify"
 
     fun isPlayWhileTracking(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -58,16 +64,42 @@ object WhiteNoisePrefs {
     fun setSound(context: Context, sound: WhiteNoiseSound) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
             putString(KEY_SOUND, sound.id)
+            putBoolean(KEY_USE_FILES, false)
+            putBoolean(KEY_USE_SPOTIFY, false)
         }
     }
 
-    /** The audio file picked for [WhiteNoiseSound.SONG], if any. */
-    fun song(context: Context): Uri? =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_SONG, null)?.let(Uri::parse)
+    /** The audio files chosen as the sleep sound, played in this order and repeated. */
+    fun files(context: Context): List<Uri> {
+        val saved = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_FILES, null) ?: return emptyList()
+        val array = JSONArray(saved)
+        return (0 until array.length()).map { Uri.parse(array.getString(it)) }
+    }
 
-    fun setSong(context: Context, uri: Uri) {
+    /** True when the chosen files, not a synthesized noise, are the sleep sound. */
+    fun useFiles(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_USE_FILES, false) && files(context).isNotEmpty()
+
+    fun setFiles(context: Context, uris: List<Uri>) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
-            putString(KEY_SONG, uri.toString())
+            putString(KEY_FILES, JSONArray(uris.map { it.toString() }).toString())
+            putBoolean(KEY_USE_FILES, uris.isNotEmpty())
+            putBoolean(KEY_USE_SPOTIFY, false)
+        }
+    }
+
+    /** The Spotify address chosen as the sleep sound ("spotify:playlist:..."), or null. */
+    fun spotify(context: Context): String? =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_SPOTIFY, null)
+
+    fun useSpotify(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_USE_SPOTIFY, false) && spotify(context) != null
+
+    fun setSpotify(context: Context, address: String) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+            putString(KEY_SPOTIFY, address)
+            putBoolean(KEY_USE_SPOTIFY, true)
+            putBoolean(KEY_USE_FILES, false)
         }
     }
 }
@@ -88,6 +120,8 @@ object WhiteNoisePlayer {
     private var soundType = WhiteNoiseSound.BROWN
 
     private var worker: Thread? = null
+
+    // Chosen audio files play one after the other, each fading into the next
     private var loop: CrossfadeLoop? = null
     private val listeners = mutableListOf<(Boolean) -> Unit>()
 
@@ -115,19 +149,21 @@ object WhiteNoisePlayer {
 
     @Synchronized
     fun start(context: Context, sound: WhiteNoiseSound = WhiteNoisePrefs.sound(context)) {
-        val song = WhiteNoisePrefs.song(context)?.takeIf { sound == WhiteNoiseSound.SONG }
-        soundType = if (sound == WhiteNoiseSound.SONG && song == null) WhiteNoiseSound.BROWN else sound
+        soundType = sound
         if (isPlaying) return
         isPlaying = true
         notifyListeners()
 
-        if (song != null) {
-            loop = CrossfadeLoop(context.applicationContext, song) {
-                stop()
-                Log.w(TAG, "could not play $song")
-            }.also { it.start() }
+        if (WhiteNoisePrefs.useSpotify(context)) {
+            startSpotify(context.applicationContext, WhiteNoisePrefs.spotify(context)!!)
             return
         }
+        val files = if (WhiteNoisePrefs.useFiles(context)) WhiteNoisePrefs.files(context) else emptyList()
+        if (files.isNotEmpty()) {
+            startFiles(context.applicationContext, files)
+            return
+        }
+
         worker = Thread({ runAudioLoop() }, "white-noise-player").apply {
             isDaemon = true
             start()
@@ -139,10 +175,73 @@ object WhiteNoisePlayer {
         if (!isPlaying) return
         isPlaying = false
         notifyListeners()
-        loop?.stop()
-        loop = null
         worker?.join(1500)
         worker = null
+        stopFiles()
+        if (spotifyStarted) pauseSpotify()
+    }
+
+    // Spotify plays by itself: it is opened on the playlist, and paused again with a media key
+    private var spotifyStarted = false
+    private var appContext: Context? = null
+
+    private fun startSpotify(context: Context, address: String) {
+        appContext = context
+        spotifyStarted = true
+        // Through Spotify's remote interface when it lets us; otherwise by opening the playlist
+        SpotifyRemote.play(context, address) { ok ->
+            if (!ok && isPlaying) openSpotifyLink(context, address)
+        }
+    }
+
+    private fun openSpotifyLink(context: Context, address: String) {
+        val open = Intent(Intent.ACTION_VIEW, Uri.parse(address))
+            .setPackage("com.spotify.music")
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            // Opened as if from the search app, Spotify starts playing instead of only showing the playlist
+            .putExtra(Intent.EXTRA_REFERRER, Uri.parse("android-app://com.google.android.googlequicksearchbox/https/www.google.com"))
+        try {
+            context.startActivity(open)
+            // Some versions only show the playlist: a play key a moment later starts it
+            Handler(android.os.Looper.getMainLooper()).postDelayed({ if (isPlaying) mediaKey(context, KeyEvent.KEYCODE_MEDIA_PLAY) }, 3000)
+        } catch (e: Exception) {
+            Log.w(TAG, "could not open Spotify: $e")
+            spotifyStarted = false
+            isPlaying = false
+            notifyListeners()
+        }
+    }
+
+    private fun pauseSpotify() {
+        spotifyStarted = false
+        SpotifyRemote.pause()
+        SpotifyRemote.disconnect()
+        appContext?.let { mediaKey(it, KeyEvent.KEYCODE_MEDIA_PAUSE) } // in case it was opened by its link instead
+    }
+
+    private fun mediaKey(context: Context, code: Int) {
+        val audio = context.getSystemService(AudioManager::class.java)
+        audio.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
+        audio.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
+    }
+
+    /** Starts again with whatever is now chosen: the noise and the files are different players. */
+    fun restart(context: Context) {
+        stop()
+        start(context)
+    }
+
+    private fun startFiles(context: Context, files: List<Uri>) {
+        loop = CrossfadeLoop(context, files) {
+            isPlaying = false
+            notifyListeners()
+            stopFiles()
+        }.also { it.start() }
+    }
+
+    private fun stopFiles() {
+        loop?.stop()
+        loop = null
     }
 
     private fun runAudioLoop() {
@@ -212,7 +311,7 @@ object WhiteNoisePlayer {
                             b6 = white * 0.115926f
                             (p * 0.11f).coerceIn(-1f, 1f)
                         }
-                        WhiteNoiseSound.WHITE, WhiteNoiseSound.SONG -> { // a song never reaches this loop
+                        WhiteNoiseSound.WHITE -> {
                             (white * 0.35f).coerceIn(-1f, 1f)
                         }
                     }
@@ -257,20 +356,21 @@ object WhiteNoisePlayer {
 }
 
 /**
- * Loops one audio file by starting a second copy [FADE_MS] before the first one ends and fading
- * between them, so the loop point is never an abrupt end. Two [MediaPlayer]s on the main looper, each
- * holding a wake lock while it plays so the timer keeps running with the screen off; if the timer
- * is late anyway, the next copy starts as soon as the current one ends. [onFailed] is called if the
- * file cannot be opened.
+ * Plays [uris] in order and repeated, starting each one [FADE_MS] before the one before it ends and
+ * fading between them, so no song ends abruptly (a single file fades into itself). Two [MediaPlayer]s
+ * on the main looper, each holding a wake lock while it plays so the timer keeps running with the
+ * screen off; if the timer is late anyway, the next one starts as soon as the current one ends. A file
+ * that will not play is skipped; [onFailed] is called when none will.
  */
 private class CrossfadeLoop(
     private val context: Context,
-    private val uri: Uri,
+    private val uris: List<Uri>,
     private val onFailed: () -> Unit,
 ) {
     private val handler = Handler(Looper.getMainLooper())
     private var current: MediaPlayer? = null
-    private var next: MediaPlayer? = null // the same file, prepared and waiting
+    private var next: MediaPlayer? = null // prepared and waiting
+    private var nextIndex = 0
     private var fadeMs = FADE_MS
     private var fading = false
     private var stopped = false
@@ -278,9 +378,9 @@ private class CrossfadeLoop(
 
     fun start() {
         handler.post {
-            open { first ->
+            open(0) { first, i ->
                 first.start()
-                begin(first)
+                begin(first, i)
             }
         }
     }
@@ -296,28 +396,32 @@ private class CrossfadeLoop(
         }
     }
 
-    /** Makes [p], already playing, the current player: preloads the next one and schedules the cross fade. */
-    private fun begin(p: MediaPlayer) {
+    /** Makes [p], already playing, the current player: preloads the one after it and schedules the cross fade. */
+    private fun begin(p: MediaPlayer, index: Int) {
         current = p
         fadeMs = min(FADE_MS, p.duration / 2L)
         p.setOnCompletionListener { if (!stopped && p === current && !fading) advance() }
-        open { next?.release(); next = it }
+        open((index + 1) % uris.size) { upcoming, i ->
+            next?.release()
+            next = upcoming
+            nextIndex = i
+        }
         handler.postDelayed(crossfadeTask, (p.duration - fadeMs - p.currentPosition).coerceAtLeast(0))
     }
 
-    /** The current copy ended before its cross fade started: carry straight on with the next one. */
+    /** The current one ended before its cross fade started: carry straight on with the next. */
     private fun advance() {
-        Log.i(TAG, "song ended before the cross fade, starting it again")
+        Log.i(TAG, "song ended before the cross fade, starting the next one")
         handler.removeCallbacks(crossfadeTask)
         current?.release()
+        current = null
         val incoming = next
         if (incoming != null) {
             next = null
             incoming.start()
-            begin(incoming)
+            begin(incoming, nextIndex)
         } else {
-            current = null
-            open { it.start(); begin(it) }
+            open(nextIndex) { it, i -> it.start(); begin(it, i) }
         }
     }
 
@@ -329,7 +433,7 @@ private class CrossfadeLoop(
             return
         }
         next = null
-        Log.i(TAG, "cross fading into the start of the song")
+        Log.i(TAG, "cross fading into the next song")
         fading = true
         incoming.setVolume(0f, 0f)
         incoming.start()
@@ -345,14 +449,20 @@ private class CrossfadeLoop(
                 } else {
                     fading = false
                     outgoing.release()
-                    begin(incoming)
+                    begin(incoming, nextIndex)
                 }
             }
         }.run()
     }
 
-    private fun open(onReady: (MediaPlayer) -> Unit) {
+    /** Prepares file [index] (or the first one after it that works) and hands the player over with its index. */
+    private fun open(index: Int, tries: Int = 0, onReady: (MediaPlayer, Int) -> Unit) {
         val p = MediaPlayer()
+        fun skip() {
+            p.release()
+            if (stopped) return
+            if (tries + 1 < uris.size) open((index + 1) % uris.size, tries + 1, onReady) else onFailed()
+        }
         try {
             p.setAudioAttributes(
                 AudioAttributes.Builder()
@@ -361,17 +471,20 @@ private class CrossfadeLoop(
                     .build(),
             )
             p.setWakeMode(context, PowerManager.PARTIAL_WAKE_LOCK)
-            p.setDataSource(context, uri)
-            p.setOnPreparedListener { if (stopped) it.release() else onReady(it) }
-            p.setOnErrorListener { mp, _, _ ->
-                mp.release()
-                if (!stopped) onFailed()
+            p.setDataSource(context, uris[index])
+            p.setOnPreparedListener {
+                it.setOnErrorListener(null) // once it plays, an error ends it and the completion listener moves on
+                if (stopped) it.release() else onReady(it, index)
+            }
+            p.setOnErrorListener { _, _, _ ->
+                Log.w(TAG, "could not play ${uris[index]}")
+                skip()
                 true
             }
             p.prepareAsync()
         } catch (e: Exception) {
-            p.release()
-            if (!stopped) onFailed()
+            Log.w(TAG, "could not play ${uris[index]}: $e")
+            skip()
         }
     }
 }

@@ -106,12 +106,17 @@ object OximeterLog {
     private const val KEY_ENABLED = "enabled"
     private const val KEY_ADDRESS = "address"
     private const val KEY_NAME = "name"
+    private const val KEY_HRV = "hrv"
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     // Off until the user switches it on and picks a device
     fun isEnabled(context: Context) = prefs(context).getBoolean(KEY_ENABLED, false)
     fun setEnabled(context: Context, on: Boolean) = prefs(context).edit { putBoolean(KEY_ENABLED, on) }
+
+    // Off until switched on: the night's pulse variability is worked out from the waveform and written to Health Connect
+    fun hrvEnabled(context: Context) = prefs(context).getBoolean(KEY_HRV, false)
+    fun setHrvEnabled(context: Context, on: Boolean) = prefs(context).edit { putBoolean(KEY_HRV, on) }
 
     fun address(context: Context): String? = prefs(context).getString(KEY_ADDRESS, null)
     fun name(context: Context): String? = prefs(context).getString(KEY_NAME, null)
@@ -135,6 +140,29 @@ object OximeterLog {
         }
         f.writeText(kept.joinToString("") { it + "\n" } + "S,$now\n")
     }
+
+    fun waveFile(context: Context) = File(context.filesDir, "oximeter_wave.csv")
+
+    /**
+     * The waveform of the latest run, for working out the beat-to-beat intervals: "<millis>,<s1>,..,<s5>" per
+     * frame, the five bytes as they came (128 is added on the one spike sample of each beat). Replaced when a run starts.
+     */
+    @Synchronized
+    fun startWave(context: Context) {
+        waveFile(context).writeText("")
+        eventFile(context).writeText("")
+    }
+
+    private fun eventFile(context: Context) = File(context.filesDir, "oximeter_events.csv")
+
+    /** What the connection did, as "<millis>,<what>" lines, so a night with no data can be explained. Replaced with the waveform. */
+    @Synchronized
+    fun event(context: Context, what: String, now: Long = System.currentTimeMillis()) {
+        eventFile(context).appendText("$now,$what\n")
+    }
+
+    @Synchronized
+    fun addWave(context: Context, lines: CharSequence) = waveFile(context).appendText(lines.toString())
 
     @Synchronized
     fun addSample(context: Context, at: Long, spo2: Int, pulse: Int) {
@@ -189,8 +217,10 @@ class OximeterMonitor(private val context: Context) {
     private val handler = Handler(Looper.getMainLooper())
     @Volatile private var gatt: BluetoothGatt? = null
     private var running = false
+    private val wave = StringBuilder() // waveform lines not yet written, written with each window
     private var parser = OximeterParser()
     private var lastActivity = 0L // the last connection attempt or data from the oximeter
+    private var gotData = false // data has come on this connection, which is logged once
 
     private var windowStart = 0L
     private var windowMin = 101
@@ -202,12 +232,15 @@ class OximeterMonitor(private val context: Context) {
         if (running || !oximeterPermissionsGranted(context)) return
         running = true
         OximeterLog.startRun(context)
+        OximeterLog.startWave(context)
+        OximeterLog.event(context, "start")
         poll()
     }
 
     fun stop() {
         if (!running) return
         running = false
+        OximeterLog.event(context, "stop")
         handler.removeCallbacksAndMessages(null)
         flushWindow()
         HomeAssistant.publishSpo2(null)
@@ -225,6 +258,7 @@ class OximeterMonitor(private val context: Context) {
         val now = System.currentTimeMillis()
         if (gatt != null && now - lastActivity > STALE_MS) {
             Log.i(TAG, "no data for ${(now - lastActivity) / 1000} s, reconnecting")
+            OximeterLog.event(context, "quiet for ${(now - lastActivity) / 1000} s, dropped")
             gatt?.close()
             gatt = null
         }
@@ -235,14 +269,20 @@ class OximeterMonitor(private val context: Context) {
     private fun connect() {
         val address = OximeterLog.address(context) ?: return
         val adapter = context.getSystemService(BluetoothManager::class.java)?.adapter
-        if (adapter == null || !adapter.isEnabled) return
+        if (adapter == null || !adapter.isEnabled) {
+            OximeterLog.event(context, "bluetooth off")
+            return
+        }
         parser = OximeterParser()
         lastActivity = System.currentTimeMillis()
+        gotData = false
+        OximeterLog.event(context, "connect")
         gatt = adapter.getRemoteDevice(address).connectGatt(context, false, callback, BluetoothDevice.TRANSPORT_LE)
     }
 
     private val callback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
+            OximeterLog.event(context, "state $newState status $status")
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 g.discoverServices()
             } else {
@@ -255,6 +295,7 @@ class OximeterMonitor(private val context: Context) {
         override fun onServicesDiscovered(g: BluetoothGatt, status: Int) {
             val tx = g.getService(NUS_SERVICE)?.getCharacteristic(NUS_TX)
             if (tx == null) {
+                OximeterLog.event(context, "no UART service")
                 Log.w(TAG, "no Nordic UART service on ${g.device.address}, it has: ${g.services.map { it.uuid }}")
                 g.disconnect()
                 return
@@ -264,6 +305,7 @@ class OximeterMonitor(private val context: Context) {
                 it.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
                 g.writeDescriptor(it)
             }
+            OximeterLog.event(context, "listening")
             Log.i(TAG, "connected to ${g.device.address}")
         }
 
@@ -282,8 +324,15 @@ class OximeterMonitor(private val context: Context) {
             if (!running) return@post
             val now = System.currentTimeMillis()
             lastActivity = now
+            if (!gotData) {
+                gotData = true
+                OximeterLog.event(context, "data")
+            }
             Log.v(TAG, "rx " + data.joinToString(" ") { "%02x".format(it) })
-            for (r in parser.feed(data) { LiveReadings.noteWaveform(it, now) }) {
+            for (r in parser.feed(data) { frame ->
+                LiveReadings.noteWaveform(frame, now)
+                wave.append(now).also { frame.forEach { b -> wave.append(',').append(b.toInt() and 0xFF) } }.append('\n')
+            }) {
                 LiveReadings.note(LiveReadings.Stream.SPO2, r.spo2, now)
                 LiveReadings.note(LiveReadings.Stream.OXIMETER_PULSE, r.pulse, now)
                 if (windowStart == 0L) windowStart = now
@@ -296,6 +345,10 @@ class OximeterMonitor(private val context: Context) {
     }
 
     private fun flushWindow() {
+        if (wave.isNotEmpty()) {
+            OximeterLog.addWave(context, wave)
+            wave.setLength(0)
+        }
         if (pulseCount > 0) {
             OximeterLog.addSample(context, windowStart, windowMin, pulseSum / pulseCount)
             HomeAssistant.publishSpo2(windowMin)

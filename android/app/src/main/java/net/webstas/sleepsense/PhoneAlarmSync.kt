@@ -19,6 +19,7 @@ object PhoneAlarmSync {
     private const val KEY_ALARM_ENABLED = "alarm_enabled"
     private const val KEY_LAST_REQUEST = "last_request"
     private const val KEY_REVISION = "revision"
+    private const val KEY_WINDOW = "smart_window_minutes" // reported by the watch, never sent to it
     private const val KEY_CUSTOM = "custom_alarm" // minutes after midnight; unset until chosen
     private const val KEY_NAP = "nap" // "minutes:alarmAtMillis:alarmMinuteOfDay" of the latest nap
     private const val KEY_SNOOZE = "snooze_minutes" // unset until chosen, so the watch's own value stands
@@ -40,11 +41,33 @@ object PhoneAlarmSync {
         Commands.queueSync()
     }
 
+    /** The smart alarm window set on the watch (minutes), or null until the watch has reported it. */
+    fun smartWindowMinutes(context: Context): Int? =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(KEY_WINDOW, -1).takeIf { it > 0 }
+
+    fun setSmartWindowMinutes(context: Context, minutes: Int) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putInt(KEY_WINDOW, minutes) }
+    }
+
     /** The alarm was switched on or off on the watch: follow it, without sending it back. */
     fun alarmEnabledOnWatch(context: Context, enabled: Boolean) {
         if (enabled == isAlarmEnabled(context)) return
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean(KEY_ALARM_ENABLED, enabled) }
         HomeAssistant.publishAlarmEnabled(context)
+    }
+
+    /**
+     * The alarm time was changed on the watch: it becomes the alarm chosen in this app. Syncing the
+     * phone's alarm is turned off, as it would put the phone's time back on the watch within a minute.
+     * Followed without sending it back, like [alarmEnabledOnWatch].
+     */
+    fun alarmTimeOnWatch(context: Context, hour: Int, minute: Int) {
+        if (!isEnabled(context) && customAlarm(context) == hour to minute) return
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+            putBoolean(KEY_ENABLED, false)
+            putInt(KEY_CUSTOM, hour * 60 + minute)
+        }
+        HomeAssistant.publishAlarmTime(context)
     }
 
     /** The alarm for the watch as (hour, minute), or null if none: the phone's next alarm while syncing, else the one chosen in the app. */
@@ -97,6 +120,7 @@ object PhoneAlarmSync {
     /** Snooze length chosen in this app (0 = snooze off), or null if never chosen. */
     fun snoozeMinutes(context: Context): Int? =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(KEY_SNOOZE, -1).takeIf { it >= 0 }
+            ?.let { if (it == 9) 10 else it } // 9 minutes is no longer offered
 
     fun setSnoozeMinutes(context: Context, minutes: Int) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putInt(KEY_SNOOZE, minutes) }

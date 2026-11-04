@@ -42,6 +42,8 @@ var soundInterval = null;
 var isTracking = false;
 var currentStage = null;
 var currentHr = null;
+var breathingRate = 0; // the chest rate last sent to the watch, and when: kept in the night's history while it is fresh
+var breathingAt = 0;
 var currentVmc = null;   // movement, light and sound: shown live in the Android app
 var currentLight = null;
 var currentSound = null;
@@ -62,7 +64,8 @@ function sensorEnabled(name) {
 
 function snoozeMinutes() {
   var saved = localStorage.getItem("snooze_min");
-  return saved === null ? 9 : parseInt(saved, 10);
+  var minutes = saved === null ? 10 : parseInt(saved, 10);
+  return minutes === 9 ? 10 : minutes; // 9 minutes is no longer offered
 }
 
 function sensorDict() {
@@ -139,7 +142,8 @@ function trackingStatus() {
     sound: currentSound,
     duration: currentDuration,
     quiet: watchQuietTime,
-    rating: watchRatingPending
+    rating: watchRatingPending,
+    window: parseInt(localStorage.getItem("smart_win"), 10) || null
   };
 }
 
@@ -164,6 +168,8 @@ function trackingCommand(key, wantTracking, attempt) {
 // Held open by the app until the widget is tapped, so a command arrives within a second
 // The newest breathing rate replaces any still waiting in the outbox (the one being sent stays)
 function sendBreathing(rate) {
+  breathingRate = rate;
+  breathingAt = Date.now();
   outbox = outbox.filter(function(item, i) {
     return item.dict.BREATHING_RATE === undefined || (i === 0 && outboxBusy);
   });
@@ -242,8 +248,8 @@ function updateAlarmPin() {
 // watch is told the new time (or to turn the smart alarm off when the phone has no alarm).
 function syncPhoneAlarm() {
   phoneAlarm.fetchPhoneAlarm(function(a) {
-    if (a && a.snooze !== undefined && a.snooze !== parseInt(localStorage.getItem("snooze_min"), 10)) {
-      // A snooze length chosen in the Android app wins over the watch's
+    if (a && a.snooze !== undefined && a.snooze !== parseInt(localStorage.getItem("watch_snooze"), 10)) {
+      // A snooze length chosen in the Android app wins over the watch's; sent again each minute until the watch reports it
       sendToWatch({ SNOOZE_MINUTES: a.snooze }, function() {
         localStorage.setItem("snooze_min", a.snooze);
       }, function(err) {
@@ -257,10 +263,11 @@ function syncPhoneAlarm() {
     // The Android app counts every alarm change, so even a quick off/on (or re-enabling at the
     // same time) is seen as a change here
     var revChanged = a.rev !== undefined && String(a.rev) !== localStorage.getItem("phone_alarm_rev");
-    var watchOn = localStorage.getItem("alarm_en") !== "false";
+    // What the watch itself last reported, so a time that was acknowledged but not applied is sent again
+    var watchOn = localStorage.getItem("watch_alarm_en") !== "false";
     var differs = a.enabled
-      ? (parseInt(localStorage.getItem("alarm_hour"), 10) !== a.hour ||
-         parseInt(localStorage.getItem("alarm_min"), 10) !== a.min)
+      ? (parseInt(localStorage.getItem("watch_alarm_hour"), 10) !== a.hour ||
+         parseInt(localStorage.getItem("watch_alarm_min"), 10) !== a.min)
       : watchOn; // the phone has no alarm: the watch alarm is turned off to match
     console.log("SleepSense PKJS: phone alarm " + key + " rev " + a.rev + " (last " +
       localStorage.getItem("phone_alarm_last") + "/" + localStorage.getItem("phone_alarm_rev") +
@@ -380,6 +387,7 @@ Pebble.addEventListener("appmessage", function(e) {
 
   var trackingVal = getDictValue(dict, "TRACKING_ACTIVE", 10011);
   if (trackingVal !== undefined) {
+    dict.STATUS_BREATHING = Date.now() - breathingAt <= 60000 ? breathingRate : 0;
     sleepHistory.record(trackingVal === 1, dict, Date.now());
     pushHistory(trackingVal === 0);
     var wasTracking = isTracking;
@@ -407,19 +415,31 @@ Pebble.addEventListener("appmessage", function(e) {
   var alarmHourVal = getDictValue(dict, "ALARM_TARGET_HOUR", 10007);
   var smartAlarmVal = getDictValue(dict, "SMART_ALARM_ENABLED", 10010);
   if (alarmHourVal !== undefined && smartAlarmVal !== undefined) {
+    var alarmMinVal = getDictValue(dict, "ALARM_TARGET_MIN", 10008);
+    var storedHour = localStorage.getItem("alarm_hour");
+    var storedMin = localStorage.getItem("alarm_min");
     localStorage.setItem("alarm_hour", alarmHourVal);
-    localStorage.setItem("alarm_min", getDictValue(dict, "ALARM_TARGET_MIN", 10008));
+    localStorage.setItem("alarm_min", alarmMinVal);
     localStorage.setItem("smart_win", getDictValue(dict, "SMART_WINDOW_MIN", 10009));
-    // Switched on or off on the watch (the phone's own changes arrive already stored): tell the app
+    // Changed on the watch (the phone's own changes arrive already stored): tell the app
     var alarmOn = smartAlarmVal !== 0;
     var storedAlarmEn = localStorage.getItem("alarm_en");
+    var status = trackingStatus();
     if (storedAlarmEn !== null && (storedAlarmEn !== "false") !== alarmOn) {
-      var status = trackingStatus();
       status.alarm = alarmOn;
+    }
+    if (storedHour !== null && (parseInt(storedHour, 10) !== alarmHourVal || parseInt(storedMin, 10) !== alarmMinVal)) {
+      status.alarmTime = alarmHourVal * 60 + alarmMinVal;
+    }
+    if (status.alarm !== undefined || status.alarmTime !== undefined) {
       phoneAlarm.fetchPhoneAlarm(function() {}, status);
     }
     localStorage.setItem("alarm_en", alarmOn);
     localStorage.setItem("snooze_min", getDictValue(dict, "SNOOZE_MINUTES", 10020));
+    localStorage.setItem("watch_alarm_hour", alarmHourVal);
+    localStorage.setItem("watch_alarm_min", getDictValue(dict, "ALARM_TARGET_MIN", 10008));
+    localStorage.setItem("watch_alarm_en", alarmOn);
+    localStorage.setItem("watch_snooze", getDictValue(dict, "SNOOZE_MINUTES", 10020));
     updateAlarmPin();
   }
 

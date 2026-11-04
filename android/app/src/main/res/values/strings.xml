@@ -20,6 +20,9 @@
     <string name="alarm_time_synced">Watch alarm time: follows the phone alarm</string>
     <string name="snooze_button">Snooze: %1$s</string>
     <string name="snooze_unset">as set on the watch</string>
+    <string name="smart_window">Smart wake window: %1$s</string>
+    <string name="smart_window_unset">not reported by the watch yet</string>
+    <string name="smart_window_minutes">%1$d min (set on the watch)</string>
     <string name="snooze_off">off</string>
     <string name="snooze_minutes">%1$d min</string>
     <string name="alarm_sync_label">Sync phone alarm to Pebble</string>
@@ -45,6 +48,12 @@
     <string name="noise_clips_button">Noise clips</string>
     <string name="connectivity_label">Connectivity</string>
     <string name="home_assistant_button">Home Assistant (MQTT)</string>
+    <string name="webhook_label">Local webhook (Pebble Index)</string>
+    <string name="webhook_url">POST %1$s\nAuthorization: Bearer token\n(/toggle, /start, /stop, /status)</string>
+    <string name="webhook_copy_token">Copy token</string>
+    <string name="webhook_regenerate_token">New token</string>
+    <string name="webhook_token_copied">Token copied</string>
+    <string name="webhook_token_regenerated">New token generated - update your webhook</string>
     <string name="calendar_sync_label">Add nights to a calendar</string>
     <string name="calendar_choose_button">Calendar: %1$s</string>
     <string name="calendar_none">none chosen</string>
@@ -105,13 +114,26 @@
     <string name="nap_button_45">45 min nap</string>
     <string name="nap_button_60">60 min nap</string>
     <string name="nap_started">Nap: alarm at %1$s</string>
-    <string name="white_noise_song_title">My audio file</string>
-    <string name="white_noise_song_desc">My audio file (loops with a 12 s cross fade)</string>
+    <string name="white_noise_files_desc">Your own audio files (played in order, repeated)</string>
+    <plurals name="white_noise_files_title">
+        <item quantity="one">%d audio file</item>
+        <item quantity="other">%d audio files</item>
+    </plurals>
+    <string name="white_noise_spotify_title">Spotify playlist</string>
+    <string name="white_noise_spotify_desc">A Spotify playlist (opens Spotify)</string>
+    <string name="white_noise_spotify_message">Paste a playlist link from Spotify (Share, then Copy link). Easiest: tap Open Spotify, find the playlist, tap Share and choose SleepSense. Or paste its link here. The first time, Spotify asks to let SleepSense control it; after that the playlist starts and pauses with the sound, without opening Spotify.</string>
+    <string name="white_noise_spotify_open">Open Spotify</string>
+    <string name="white_noise_spotify_saved">Spotify playlist set as the sleep sound</string>
+    <string name="white_noise_spotify_hint">https://open.spotify.com/playlist/…</string>
+    <string name="white_noise_spotify_connected">Spotify is connected</string>
+    <string name="white_noise_spotify_not_connected">Could not connect to Spotify. Open Spotify once and try again; the app must also be registered with it.</string>
+    <string name="white_noise_spotify_invalid">That is not a Spotify link</string>
     <string name="white_noise_play_button">Play white noise</string>
     <string name="white_noise_stop_button">Stop white noise</string>
 
     <string name="oximeter_section">Pulse Oximeter</string>
     <string name="oximeter_label">Record SpO2 from a Wellue finger oximeter while tracking</string>
+    <string name="oximeter_hrv_label">Work out HRV from the oximeter pulse (sent to Health Connect)</string>
     <string name="oximeter_off">Off. Connects over Bluetooth only while the watch is tracking sleep. Switch the oximeter on and clip it on before bed.</string>
     <string name="oximeter_no_device">Choose your oximeter to start.</string>
     <string name="oximeter_needs_permission">Bluetooth permission is needed. Switch this off and on to be asked again.</string>

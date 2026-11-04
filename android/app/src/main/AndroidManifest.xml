@@ -4,6 +4,8 @@
     <uses-permission android:name="android.permission.health.WRITE_SLEEP" />
     <uses-permission android:name="android.permission.health.WRITE_HEART_RATE" />
     <uses-permission android:name="android.permission.health.WRITE_OXYGEN_SATURATION" />
+    <uses-permission android:name="android.permission.health.WRITE_RESPIRATORY_RATE" />
+    <uses-permission android:name="android.permission.health.WRITE_HEART_RATE_VARIABILITY" />
     <!-- Alarm bridge: a loopback-only server run as a foreground service -->
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Android 17 blocks connections to other devices on the home network without this (the MQTT broker) -->
@@ -33,6 +35,7 @@
             <action android:name="android.intent.action.SHOW_ALARMS" />
         </intent>
         <package android:name="com.google.android.apps.healthdata" />
+        <package android:name="com.spotify.music" />
     </queries>
 
     <application
@@ -88,6 +91,19 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Spotify's Share button: choosing SleepSense there sets the playlist for the sleep sound -->
+        <activity
+            android:name=".SpotifyShareActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:theme="@style/TranslucentShare">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
 
         <activity
             android:name=".ClipsActivity"

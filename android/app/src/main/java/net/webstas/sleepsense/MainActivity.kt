@@ -6,6 +6,8 @@ import android.animation.PropertyValuesHolder
 import android.app.TimePickerDialog
 import android.appwidget.AppWidgetManager
 import android.content.ActivityNotFoundException
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -82,13 +84,16 @@ class MainActivity : AppCompatActivity() {
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
             if (oximeterPermissionsGranted(this)) chooseOximeter() else refreshOximeter()
         }
-    private val pickSong =
-        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            if (uri == null) return@registerForActivityResult
-            contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            WhiteNoisePrefs.setSong(this, uri)
-            useWhiteNoiseSound(WhiteNoiseSound.SONG)
+    // Audio files for the sleep sound; read access is kept so they can play on a later night
+    private val pickSleepFiles =
+        registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+            if (uris.isEmpty()) return@registerForActivityResult
+            uris.forEach { contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            WhiteNoisePrefs.setFiles(this, uris)
+            if (WhiteNoisePlayer.isPlaying) WhiteNoisePlayer.restart(this)
+            refreshWhiteNoise()
         }
+
     private val requestHealth =
         registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { refreshHealth() }
 
@@ -179,6 +184,10 @@ class MainActivity : AppCompatActivity() {
                 refreshOximeter()
             }
         }
+        id<MaterialSwitch>(R.id.oximeter_hrv_switch).apply {
+            isChecked = OximeterLog.hrvEnabled(this@MainActivity)
+            setOnCheckedChangeListener { _, on -> OximeterLog.setHrvEnabled(this@MainActivity, on) }
+        }
         id<MaterialSwitch>(R.id.chest_switch).apply {
             isChecked = ChestCapture.isEnabled(this@MainActivity)
             setOnCheckedChangeListener { _, on ->
@@ -226,6 +235,7 @@ class MainActivity : AppCompatActivity() {
         }
         WhiteNoisePlayer.addListener(whiteNoiseListener)
 
+        setUpWebhookSettings()
         id<Button>(R.id.home_assistant_button).setOnClickListener { startActivity(Intent(this, HomeAssistantActivity::class.java)) }
         id<MaterialSwitch>(R.id.calendar_sync_switch).apply {
             isChecked = CalendarSync.isEnabled(this@MainActivity)
@@ -238,7 +248,7 @@ class MainActivity : AppCompatActivity() {
         id<Button>(R.id.calendar_button).setOnClickListener {
             if (CalendarSync.hasPermission(this)) chooseCalendar() else requestCalendar.launch(CalendarSync.PERMISSIONS)
         }
-        id<Button>(R.id.grant_hc_button).setOnClickListener { requestHealth.launch(setOf(WRITE_SLEEP, WRITE_HEART_RATE, WRITE_OXYGEN_SATURATION)) }
+        id<Button>(R.id.grant_hc_button).setOnClickListener { requestHealth.launch(setOf(WRITE_SLEEP, WRITE_HEART_RATE, WRITE_OXYGEN_SATURATION, WRITE_RESPIRATORY_RATE, WRITE_HRV)) }
         id<Button>(R.id.widget_button).setOnClickListener {
             val manager = getSystemService(AppWidgetManager::class.java)
             if (manager.isRequestPinAppWidgetSupported) {
@@ -501,6 +511,11 @@ class MainActivity : AppCompatActivity() {
             },
         )
         id<MaterialSwitch>(R.id.alarm_enabled_switch).isChecked = PhoneAlarmSync.isAlarmEnabled(this)
+        id<TextView>(R.id.smart_window_text).text = getString(
+            R.string.smart_window,
+            PhoneAlarmSync.smartWindowMinutes(this)?.let { getString(R.string.smart_window_minutes, it) }
+                ?: getString(R.string.smart_window_unset),
+        )
         refreshNapTiles()
     }
 
@@ -665,6 +680,31 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun setUpWebhookSettings() {
+        val details = id<View>(R.id.webhook_details)
+        id<TextView>(R.id.webhook_url_text).text =
+            getString(R.string.webhook_url, "http://127.0.0.1:$WEBHOOK_PORT/toggle")
+        id<MaterialSwitch>(R.id.webhook_switch).apply {
+            isChecked = WebhookPrefs.isEnabled(this@MainActivity)
+            details.visibility = if (isChecked) View.VISIBLE else View.GONE
+            setOnCheckedChangeListener { _, on ->
+                WebhookPrefs.setEnabled(this@MainActivity, on)
+                details.visibility = if (on) View.VISIBLE else View.GONE
+                // The webhook is served by the bridge service, which has to be running
+                if (on) startForegroundService(Intent(this@MainActivity, AlarmBridgeService::class.java))
+            }
+        }
+        id<Button>(R.id.webhook_copy_token_button).setOnClickListener {
+            (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager)
+                .setPrimaryClip(ClipData.newPlainText("webhook token", WebhookPrefs.token(this)))
+            Toast.makeText(this, R.string.webhook_token_copied, Toast.LENGTH_SHORT).show()
+        }
+        id<Button>(R.id.webhook_regenerate_button).setOnClickListener {
+            WebhookPrefs.regenerateToken(this)
+            Toast.makeText(this, R.string.webhook_token_regenerated, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private fun refreshChest() {
         val rates = ChestCapture.rates(this)
         id<View>(R.id.chest_rate_box).visibility = if (rates.size >= 2) View.VISIBLE else View.GONE
@@ -741,41 +781,88 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshWhiteNoise() {
         val sound = WhiteNoisePrefs.sound(this)
-        id<Button>(R.id.white_noise_sound_button).text =
-            getString(R.string.white_noise_sound_label, getString(sound.titleRes))
+        id<Button>(R.id.white_noise_sound_button).text = getString(
+            R.string.white_noise_sound_label,
+            if (WhiteNoisePrefs.useSpotify(this)) {
+                getString(R.string.white_noise_spotify_title)
+            } else if (WhiteNoisePrefs.useFiles(this)) {
+                resources.getQuantityString(R.plurals.white_noise_files_title, WhiteNoisePrefs.files(this).size, WhiteNoisePrefs.files(this).size)
+            } else {
+                getString(sound.titleRes)
+            },
+        )
 
         val playing = WhiteNoisePlayer.isPlaying
         id<Button>(R.id.white_noise_play_button).setText(if (playing) R.string.white_noise_stop_button else R.string.white_noise_play_button)
         setPlayStopIcon(R.id.white_noise_play_button, playing)
     }
 
-    private fun useWhiteNoiseSound(sound: WhiteNoiseSound) {
-        val was = WhiteNoisePrefs.sound(this)
-        WhiteNoisePrefs.setSound(this, sound)
-        if (WhiteNoisePlayer.isPlaying) {
-            // a song and the synthesized sounds use different players, and a new song needs a fresh start
-            if (sound == WhiteNoiseSound.SONG || was == WhiteNoiseSound.SONG) {
-                WhiteNoisePlayer.stop()
-                WhiteNoisePlayer.start(this, sound)
-            } else {
-                WhiteNoisePlayer.setSound(sound)
-            }
+    // The link of a Spotify playlist, offered from the clipboard when it holds one
+    private fun askSpotifyLink() {
+        val clip = getSystemService(android.content.ClipboardManager::class.java).primaryClip
+            ?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()
+        val input = android.widget.EditText(this).apply {
+            hint = getString(R.string.white_noise_spotify_hint)
+            setText(clip?.takeIf { SpotifyLink.parse(it) != null } ?: WhiteNoisePrefs.spotify(this@MainActivity) ?: "")
+            setSingleLine()
         }
-        refreshWhiteNoise()
+        val spotify = packageManager.getLaunchIntentForPackage("com.spotify.music")
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.white_noise_spotify_title)
+            .setMessage(R.string.white_noise_spotify_message)
+            .setView(input)
+            .apply {
+                // Spotify itself: find the playlist there, then Share it to SleepSense
+                if (spotify != null) setNeutralButton(R.string.white_noise_spotify_open) { _, _ -> startActivity(spotify) }
+            }
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val address = SpotifyLink.parse(input.text.toString())
+                if (address == null) {
+                    Toast.makeText(this, R.string.white_noise_spotify_invalid, Toast.LENGTH_LONG).show()
+                } else {
+                    WhiteNoisePrefs.setSpotify(this, address)
+                    if (WhiteNoisePlayer.isPlaying) WhiteNoisePlayer.restart(this)
+                    refreshWhiteNoise()
+                    // The one-time permission for this app to control Spotify, asked now while it is in front
+                    SpotifyRemote.connect(this, true) { ok ->
+                        runOnUiThread {
+                            Toast.makeText(this, if (ok) R.string.white_noise_spotify_connected else R.string.white_noise_spotify_not_connected, Toast.LENGTH_LONG).show()
+                        }
+                        if (ok) SpotifyRemote.disconnect()
+                    }
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun chooseWhiteNoiseSound() {
         val current = WhiteNoisePrefs.sound(this)
         val sounds = WhiteNoiseSound.entries
-        val labels = sounds.map { getString(it.descRes) }.toTypedArray()
-        val checkedIndex = sounds.indexOf(current).coerceAtLeast(0)
+        // The noises, then one more entry for the phone's own audio files
+        val labels = (sounds.map { getString(it.descRes) } + getString(R.string.white_noise_files_desc) + getString(R.string.white_noise_spotify_desc)).toTypedArray()
+        val checkedIndex = when {
+            WhiteNoisePrefs.useSpotify(this) -> sounds.size + 1
+            WhiteNoisePrefs.useFiles(this) -> sounds.size
+            else -> sounds.indexOf(current).coerceAtLeast(0)
+        }
 
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.white_noise_sound_dialog_title)
             .setSingleChoiceItems(labels, checkedIndex) { dialog, which ->
-                val chosen = sounds[which]
-                if (chosen == WhiteNoiseSound.SONG) pickSong.launch(arrayOf("audio/*")) else useWhiteNoiseSound(chosen)
                 dialog.dismiss()
+                if (which == sounds.size) {
+                    pickSleepFiles.launch(arrayOf("audio/*"))
+                    return@setSingleChoiceItems
+                }
+                if (which == sounds.size + 1) {
+                    askSpotifyLink()
+                    return@setSingleChoiceItems
+                }
+                val chosen = sounds[which]
+                WhiteNoisePrefs.setSound(this, chosen)
+                if (WhiteNoisePlayer.isPlaying) WhiteNoisePlayer.restart(this)
+                refreshWhiteNoise()
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()

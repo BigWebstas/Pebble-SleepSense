@@ -11,7 +11,7 @@
 // still and a few hundred to a few thousand for a turn in bed (daytime medians are 400-1400), so a
 // single busy minute is not waking: judge the average of the last 5 minutes, and let only a very
 // large burst count on its own.
-#define VMC_THRESHOLD_DEEP 30
+#define VMC_THRESHOLD_DEEP 50 // still: this watch's quiet floor is 40 to 50 a minute
 #define VMC_MEAN_AWAKE 400
 #define VMC_BURST_AWAKE 2500
 #define VMC_WINDOW 5
@@ -77,10 +77,65 @@ static AppLightLevel prv_convert_health_light(uint8_t raw_light) {
 }
 #endif
 
+// REM from the body: heart rate and breathing, judged against this night's own deep sleep
+#define REM_WINDOW 5            // minutes looked at, the current one included
+#define REM_BASELINE_MIN 10     // deep minutes with a heart rate before there is a baseline
+#define REM_HR_RISE 3           // bpm above the deep-sleep average that counts as raised
+#define REM_BREATH_SPREAD 3     // breaths a minute between the slowest and fastest that counts as uneven
+#define BREATHING_STALE_SEC 60
+static uint8_t s_breathing;
+static time_t s_breathing_at;
+
+//! Average heart rate of the history's deep minutes, 0 until there are enough of them
+static uint8_t prv_deep_hr_baseline(void) {
+  uint32_t sum = 0, n = 0;
+  for (uint16_t i = 0; i < s_session.epoch_count; i++) {
+    const SleepEpoch *e = &s_session.epochs[i];
+    if (e->stage == SLEEP_STAGE_DEEP && e->heart_rate > 0) {
+      sum += e->heart_rate;
+      n++;
+    }
+  }
+  return (n >= REM_BASELINE_MIN) ? (uint8_t)(sum / n) : 0;
+}
+
+//! Does the body look like REM? Each signal that has data casts a vote and most must agree (both when two have
+//! data). Returns false with `known` false when there is nothing to judge by.
+static bool prv_body_says_rem(uint8_t heart_rate, uint8_t breathing, bool *known) {
+  uint32_t hr_sum = heart_rate, hr_n = heart_rate > 0;
+  uint8_t br_min = breathing ? breathing : 255, br_max = breathing;
+  uint32_t br_n = breathing > 0;
+  for (uint16_t i = 1; i < REM_WINDOW && i <= s_session.epoch_count; i++) {
+    const SleepEpoch *e = &s_session.epochs[(s_session.epoch_head + SLEEP_EPOCH_HISTORY_MAX - i) % SLEEP_EPOCH_HISTORY_MAX];
+    if (e->heart_rate > 0) {
+      hr_sum += e->heart_rate;
+      hr_n++;
+    }
+    if (e->breathing > 0) {
+      if (e->breathing < br_min) br_min = e->breathing;
+      if (e->breathing > br_max) br_max = e->breathing;
+      br_n++;
+    }
+  }
+
+  uint8_t baseline = prv_deep_hr_baseline();
+  uint32_t voters = 0, votes = 0;
+  if (baseline > 0 && hr_n >= 3) {
+    voters++;
+    if (hr_sum / hr_n >= (uint32_t)baseline + REM_HR_RISE) votes++;
+  }
+  if (br_n >= 4) {
+    voters++;
+    if (br_max - br_min >= REM_BREATH_SPREAD) votes++;
+  }
+  *known = voters > 0;
+  return voters > 0 && votes == voters;
+}
+
 //! Classify a 1-minute epoch using sensor fusion:
-//! VMC (movement), Ambient Light, Sound level, and Ultradian cycle position (~90 min)
+//! VMC (movement), Ambient Light, Sound level, heart rate and breathing, with the ~90 minute cycle as the fallback
 static SleepStage prv_classify_epoch(uint16_t vmc, uint32_t mean_vmc, AppLightLevel light, uint8_t sound,
-                                     uint32_t elapsed_sec) {
+                                     uint8_t heart_rate, uint8_t breathing, uint32_t elapsed_sec) {
   // 1. Check for Awakening:
   // Bright lights turned on + moderate movement
   if ((light >= APP_LIGHT_LIGHT) && (vmc > 50)) {
@@ -107,13 +162,16 @@ static SleepStage prv_classify_epoch(uint16_t vmc, uint32_t mean_vmc, AppLightLe
   }
 
   // 4. Low movement in dark environment: Distinguish between Deep Sleep and REM
-  // Standard ultradian sleep cycle is ~90 minutes (5400 sec)
-  uint32_t cycle_min = (elapsed_sec % 5400) / 60;
-
-  // SWS (Slow-Wave Deep Sleep) predominates during the early-to-mid phase of a cycle (min 15-55)
-  // REM sleep recurs at the end of the 90-min cycle (min 65-88)
-  if (elapsed_sec > 1800 && cycle_min >= 65 && cycle_min <= 88) {
-    return SLEEP_STAGE_REM;
+  // REM has a raised, uneven heart rate and uneven breathing. Without that data, fall back on the
+  // standard ~90 minute cycle: REM recurs at its end (min 65-88), deep sleep earlier (min 15-55)
+  if (elapsed_sec > 1800) {
+    bool known;
+    bool rem = prv_body_says_rem(heart_rate, breathing, &known);
+    if (!known) {
+      uint32_t cycle_min = (elapsed_sec % 5400) / 60;
+      rem = cycle_min >= 65 && cycle_min <= 88;
+    }
+    if (rem) return SLEEP_STAGE_REM;
   }
 
   // Sustained stillness early in cycle = Deep Restful Sleep (N3)
@@ -135,10 +193,10 @@ static uint32_t prv_recent_mean_vmc(uint16_t current) {
 }
 
 static void prv_record_epoch(time_t now, uint16_t vmc, AppLightLevel light, uint8_t sound,
-                             uint8_t orientation, uint8_t heart_rate, bool live) {
+                             uint8_t orientation, uint8_t heart_rate, uint8_t breathing, bool live) {
   uint32_t elapsed_sec = (s_session.session_start > 0) ? (now - s_session.session_start) : 0;
 
-  SleepStage stage = prv_classify_epoch(vmc, prv_recent_mean_vmc(vmc), light, sound, elapsed_sec);
+  SleepStage stage = prv_classify_epoch(vmc, prv_recent_mean_vmc(vmc), light, sound, heart_rate, breathing, elapsed_sec);
 
   s_session.current_stage = stage;
   s_session.current_light = light;
@@ -154,6 +212,7 @@ static void prv_record_epoch(time_t now, uint16_t vmc, AppLightLevel light, uint
     .sound_level = sound,
     .orientation = orientation,
     .heart_rate = heart_rate,
+    .breathing = breathing,
     .stage = stage,
   };
 
@@ -224,8 +283,10 @@ static uint32_t prv_isqrt(uint32_t n) {
 
 //! If the app is closed while tracking (the watch can drop back to the watch face overnight),
 //! a wakeup relaunches it. Every live minute pushes the wakeup out, so it only fires once
-//! the app has stopped ticking.
-#define WAKEUP_DELAY_SEC (5 * 60)
+//! the app has stopped ticking: one to two minutes after it was left.
+#define WAKEUP_DELAY_SEC (2 * 60)
+#define WAKEUP_RETRY_SEC 60
+#define WAKEUP_TRIES 4
 #define WAKEUP_COOKIE 1
 
 static WakeupId s_wakeup_id = -1;
@@ -235,8 +296,16 @@ static void prv_schedule_wakeup(void) {
     wakeup_cancel(s_wakeup_id); // only ours: the alarm has its own wakeup
     s_wakeup_id = -1;
   }
-  if (s_session.is_tracking) {
-    s_wakeup_id = wakeup_schedule(time(NULL) + WAKEUP_DELAY_SEC, WAKEUP_COOKIE, false);
+  if (!s_session.is_tracking) {
+    return;
+  }
+  // Wakeups can't sit within a minute of each other (the alarm's may be near), so a refused one is tried a minute later
+  time_t now = time(NULL);
+  for (int i = 0; i < WAKEUP_TRIES && s_wakeup_id < 0; i++) {
+    s_wakeup_id = wakeup_schedule(now + WAKEUP_DELAY_SEC + i * WAKEUP_RETRY_SEC, WAKEUP_COOKIE, false);
+  }
+  if (s_wakeup_id < 0) {
+    APP_LOG(APP_LOG_LEVEL_WARNING, "No tracking wakeup could be scheduled: %d", (int)s_wakeup_id);
   }
 }
 
@@ -266,7 +335,7 @@ static void prv_backfill_gap(void) {
       }
       AppLightLevel light = s_sensors.light ? prv_convert_health_light(records[i].light) : APP_LIGHT_UNKNOWN;
       uint8_t heart_rate = s_sensors.heart_rate ? records[i].heart_rate_bpm : 0;
-      prv_record_epoch(when, records[i].vmc, light, 0, records[i].orientation, heart_rate, false);
+      prv_record_epoch(when, records[i].vmc, light, 0, records[i].orientation, heart_rate, 0, false);
     }
     from += chunk * 60;
   }
@@ -329,6 +398,10 @@ static void prv_accel_handler(AccelData *data, uint32_t num_samples) {
   }
 }
 
+static uint8_t prv_fresh_breathing(void) {
+  return (s_breathing && time(NULL) - s_breathing_at <= BREATHING_STALE_SEC) ? s_breathing : 0;
+}
+
 static void prv_process_minute(void) {
   if (!s_session.is_tracking) {
     return;
@@ -340,17 +413,21 @@ static void prv_process_minute(void) {
   uint8_t heart_rate = 0;
 
 #if defined(PBL_HEALTH)
+  // The minute that has just ended may not be in the Health records yet when this runs at the turn of the
+  // minute, so look at the last few and take the newest valid one
   time_t now = time(NULL);
-  time_t time_start = now - 60;
+  time_t time_start = now - 5 * 60;
   time_t time_end = now;
 
-  HealthMinuteData records[2];
-  uint32_t count = health_service_get_minute_history(records, 2, &time_start, &time_end);
-  if (count > 0 && !records[0].is_invalid) {
-    vmc = records[0].vmc;
-    light = prv_convert_health_light(records[0].light);
-    orientation = records[0].orientation;
-    heart_rate = records[0].heart_rate_bpm;
+  HealthMinuteData records[5];
+  uint32_t count = health_service_get_minute_history(records, 5, &time_start, &time_end);
+  int newest = (int)count - 1;
+  while (newest >= 0 && records[newest].is_invalid) newest--;
+  if (newest >= 0) {
+    vmc = records[newest].vmc;
+    light = prv_convert_health_light(records[newest].light);
+    orientation = records[newest].orientation;
+    heart_rate = records[newest].heart_rate_bpm;
   } else
 #endif
   {
@@ -369,7 +446,7 @@ static void prv_process_minute(void) {
   s_minute_accel_acc = 0;
   s_minute_accel_samples = 0;
 
-  prv_record_epoch(time(NULL), vmc, light, s_session.current_sound, orientation, heart_rate, true);
+  prv_record_epoch(time(NULL), vmc, light, s_session.current_sound, orientation, heart_rate, prv_fresh_breathing(), true);
   prv_schedule_wakeup();
 }
 
@@ -526,6 +603,11 @@ void sleep_engine_add_snooze(uint32_t seconds) {
   if (s_update_cb) {
     s_update_cb(&s_session);
   }
+}
+
+void sleep_engine_set_breathing(uint8_t rate) {
+  s_breathing = rate;
+  s_breathing_at = time(NULL);
 }
 
 void sleep_engine_set_sensors(bool light, bool mic, bool heart_rate) {

@@ -28,7 +28,7 @@
             android:alpha="0.7"
             android:textSize="14sp" />
 
-        <net.webstas.sleepsense.ClipLevelView
+        <net.webstas.sleepsense.ClipWaveView
             android:id="@+id/clip_levels"
             android:layout_width="match_parent"
             android:layout_height="72dp"

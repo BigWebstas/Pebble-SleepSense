@@ -79,9 +79,11 @@ static void prv_window_load(Window *window) {
   s_layer = layer_create(bounds);
   layer_set_update_proc(s_layer, prv_update_proc);
   layer_add_child(window_layer, s_layer);
+  light_enable(true); // keep the screen readable while the night is rated
 }
 
 static void prv_window_unload(Window *window) {
+  light_enable(false); // back to the normal backlight behaviour
   layer_destroy(s_layer);
   gpath_destroy(s_star_path);
   s_layer = NULL;
