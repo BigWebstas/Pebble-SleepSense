@@ -415,21 +415,27 @@
             android:layout_marginTop="8dp"
             android:text="@string/alarm_enabled_label" />
 
-        <Button
-            style="@style/Widget.Material3.Button.TonalButton"
-            android:id="@+id/snooze_button"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:minWidth="220dp" />
+            android:orientation="horizontal">
 
-<Button
-            style="@style/Widget.Material3.Button.TonalButton"
-            android:id="@+id/smart_window_button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:minWidth="220dp" />
+            <Button
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:id="@+id/snooze_button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
+
+            <Button
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:id="@+id/smart_window_button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1" />
+        </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -497,27 +503,33 @@
                     android:gravity="center_horizontal"
                     android:orientation="vertical">
 
-        <Button
-            style="@style/Widget.Material3.Button.TonalButton"
-            android:id="@+id/clips_button"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:minWidth="220dp"
-            app:icon="@drawable/ic_mic"
-            app:iconPadding="8dp"
-            android:text="@string/noise_clips_button" />
+            android:orientation="horizontal">
 
-        <Button
-            style="@style/Widget.Material3.Button.TonalButton"
-            android:id="@+id/history_button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:minWidth="220dp"
-            app:icon="@drawable/ic_history"
-            app:iconPadding="8dp"
-            android:text="@string/history_button" />
+            <Button
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:id="@+id/clips_button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                app:icon="@drawable/ic_mic"
+                app:iconPadding="8dp"
+                android:text="@string/noise_clips_button" />
+
+            <Button
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:id="@+id/history_button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                app:icon="@drawable/ic_history"
+                app:iconPadding="8dp"
+                android:text="@string/history_button" />
+        </LinearLayout>
 
         </LinearLayout>
                 </LinearLayout>
