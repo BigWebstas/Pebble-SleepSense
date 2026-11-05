@@ -176,15 +176,24 @@ function sendBreathing(rate) {
   sendToWatch({ BREATHING_RATE: rate });
 }
 
+// A stop that arrived before the watch had said it is tracking (this code restarts whenever the watch app
+// opens, and starts out not knowing): kept for a minute and carried out as soon as the watch reports tracking
+var stopWantedUntil = 0;
+
 function listenForCommands() {
   phoneAlarm.waitForCommand(function(cmd, breathing) {
     if (typeof breathing === "number") sendBreathing(breathing);
     if (cmd === "stop" && isTracking) {
       console.log("SleepSense PKJS: Stop tracking requested from the phone");
+      stopWantedUntil = 0;
       trackingCommand("COMMAND_STOP_TRACKING", false, 0);
+    } else if (cmd === "stop") {
+      console.log("SleepSense PKJS: Stop requested before the watch reported tracking, holding it");
+      stopWantedUntil = Date.now() + 60000;
     }
     if (cmd === "start" && !isTracking) {
       console.log("SleepSense PKJS: Start tracking requested from the phone");
+      stopWantedUntil = 0; // a later start cancels a stop still being held
       trackingCommand("COMMAND_START_TRACKING", true, 0);
     }
     if (cmd === "chest-start" || cmd === "chest-stop") {
@@ -254,6 +263,15 @@ function syncPhoneAlarm() {
         localStorage.setItem("snooze_min", a.snooze);
       }, function(err) {
         console.log("SleepSense PKJS: Could not send snooze length: " + JSON.stringify(err));
+      });
+    }
+    if (a && a.window !== undefined && a.window !== parseInt(localStorage.getItem("smart_win"), 10)) {
+      // Likewise a smart wake window chosen in the Android app
+      sendToWatch({ SMART_WINDOW_MIN: a.window }, function() {
+        localStorage.setItem("smart_win", a.window);
+        updateAlarmPin();
+      }, function(err) {
+        console.log("SleepSense PKJS: Could not send smart wake window: " + JSON.stringify(err));
       });
     }
     if (a && a.deleted) sleepHistory.removeSessions(a.deleted);
@@ -392,6 +410,11 @@ Pebble.addEventListener("appmessage", function(e) {
     pushHistory(trackingVal === 0);
     var wasTracking = isTracking;
     isTracking = (trackingVal === 1);
+    if (isTracking && Date.now() < stopWantedUntil) {
+      console.log("SleepSense PKJS: Carrying out the held stop request");
+      stopWantedUntil = 0;
+      trackingCommand("COMMAND_STOP_TRACKING", false, 0);
+    }
     if (!isTracking) {
       currentStage = null;
       currentHr = null;

@@ -112,7 +112,7 @@
   function showSession() {
     if (!sessions.length) { return; }
     var s = sessions[parseInt(pick.value, 10)];
-    var parts = ['<h3>Overview</h3>' + report.sessionStats(s)].concat(
+    var parts = ['<h3>Overview</h3>' + report.sessionStats(s)].concat(summaryPart(s)).concat(
       report.sessionGraphs(s).split('<h3>').filter(Boolean).map(function (c) { return '<h3>' + c; }));
     $('graphs').innerHTML = parts.map(function (html, i) {
       return '<div class="card" style="animation-delay:' + (i * 60) + 'ms">' + html + '</div>';
@@ -120,6 +120,30 @@
     renderStars(s);
     $('deleteBtn').disabled = !!s.open; // the night being tracked can't be deleted
   }
+  // ---- AI summary (its own section under Overview) ----
+  function esc(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function summaryPart(s) {
+    if (s.open) return [];
+    var text = Android.summary(s.start);
+    if (text) return ['<h3>AI summary</h3><p style="white-space:pre-wrap;margin:0">' + esc(text) + '</p>'];
+    if (!Android.canSummarize()) return [];
+    return ['<h3>AI summary</h3><button id="sumBtn" data-start="' + s.start + '">Summarize this session</button><p id="sumMsg" class="hint"></p>'];
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('#sumBtn') : null;
+    if (!b) return;
+    b.disabled = true;
+    $('sumMsg').textContent = 'Asking AI...';
+    Android.summarize(parseInt(b.getAttribute('data-start'), 10));
+  });
+  window.onSummary = function (start, ok, text) {
+    var s = sessions[parseInt(pick.value, 10)];
+    if (!s || s.start !== start) return;
+    if (ok) { showSession(); return; }
+    var b = $('sumBtn'); if (b) b.disabled = false;
+    if ($('sumMsg')) $('sumMsg').textContent = text;
+  };
+
   // Five stars for the session on show; tapping the lit last star clears the rating
   function renderStars(s) {
     var box = $('stars');

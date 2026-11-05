@@ -225,14 +225,6 @@
                     android:textStyle="bold"
                     android:visibility="gone" />
 
-                <TextView
-            android:id="@+id/alarm_status_text"
-                    android:textColor="?attr/colorOnPrimaryContainer"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:gravity="center" />
-
         <Button
             android:id="@+id/tracking_button"
                 android:minHeight="56dp"
@@ -243,17 +235,6 @@
             app:icon="@drawable/ic_play_arrow"
             app:iconPadding="8dp"
             android:text="@string/start_tracking_button" />
-
-        <Button
-            style="@style/Widget.Material3.Button.TonalButton"
-            android:id="@+id/clock_button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:minWidth="220dp"
-            app:icon="@drawable/ic_alarm"
-            app:iconPadding="8dp"
-            android:text="@string/open_clock_button" />
 
         </LinearLayout>
                 </LinearLayout>
@@ -393,13 +374,6 @@
                     android:gravity="center_horizontal"
                     android:orientation="vertical">
 
-        <com.google.android.material.materialswitch.MaterialSwitch
-            android:id="@+id/alarm_sync_switch"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/alarm_sync_label" />
-
         <Button
             style="@style/Widget.Material3.Button.TonalButton"
             android:id="@+id/alarm_time_button"
@@ -415,21 +389,67 @@
             android:layout_marginTop="8dp"
             android:text="@string/alarm_enabled_label" />
 
-        <Button
-            style="@style/Widget.Material3.Button.TonalButton"
-            android:id="@+id/snooze_button"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:minWidth="220dp" />
+            android:orientation="horizontal">
 
-<TextView
-            android:id="@+id/smart_window_text"
-            android:layout_width="wrap_content"
+            <Button
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:id="@+id/snooze_button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
+
+            <Button
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:id="@+id/smart_window_button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/snooze_advice_box"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:alpha="0.7"
-            android:textSize="13sp" />
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/snooze_advice_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
+                android:textSize="14sp" />
+
+            <Button
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:id="@+id/snooze_advice_alarm_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:minWidth="220dp" />
+
+            <Button
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:id="@+id/snooze_advice_window_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:minWidth="220dp" />
+
+            <Button
+                style="@style/Widget.Material3.Button.TextButton"
+                android:id="@+id/snooze_advice_dismiss_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/snooze_advice_dismiss" />
+        </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -497,27 +517,33 @@
                     android:gravity="center_horizontal"
                     android:orientation="vertical">
 
-        <Button
-            style="@style/Widget.Material3.Button.TonalButton"
-            android:id="@+id/clips_button"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:minWidth="220dp"
-            app:icon="@drawable/ic_mic"
-            app:iconPadding="8dp"
-            android:text="@string/noise_clips_button" />
+            android:orientation="horizontal">
 
-        <Button
-            style="@style/Widget.Material3.Button.TonalButton"
-            android:id="@+id/history_button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:minWidth="220dp"
-            app:icon="@drawable/ic_history"
-            app:iconPadding="8dp"
-            android:text="@string/history_button" />
+            <Button
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:id="@+id/clips_button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                app:icon="@drawable/ic_mic"
+                app:iconPadding="8dp"
+                android:text="@string/noise_clips_button" />
+
+            <Button
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:id="@+id/history_button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                app:icon="@drawable/ic_history"
+                app:iconPadding="8dp"
+                android:text="@string/history_button" />
+        </LinearLayout>
 
         </LinearLayout>
                 </LinearLayout>
@@ -877,6 +903,22 @@
                 app:iconPadding="8dp"
                 android:text="@string/calendar_choose_button" />
 
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/xdrip_switch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/xdrip_label" />
+
+            <TextView
+                android:id="@+id/xdrip_status_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
             <Button
                 style="@style/Widget.Material3.Button.TonalButton"
                 android:id="@+id/grant_hc_button"
@@ -927,6 +969,24 @@
                     android:layout_height="wrap_content"
                     android:gravity="center_horizontal"
                     android:orientation="vertical">
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/alarm_sync_switch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/alarm_sync_label" />
+
+            <Button
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:id="@+id/clock_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:minWidth="220dp"
+                app:icon="@drawable/ic_alarm"
+                app:iconPadding="8dp"
+                android:text="@string/open_clock_button" />
 
             <Button
                 style="@style/Widget.Material3.Button.TonalButton"
@@ -1020,6 +1080,220 @@
                 </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
+            <com.google.android.material.card.MaterialCardView
+                style="@style/SectionCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="16dp"
+                    android:paddingBottom="16dp">
+
+                    <TextView
+                        android:id="@+id/coach_section_label"
+                        style="@style/SectionHeader"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:drawableStart="@drawable/ic_tune"
+                        android:text="@string/coach_section" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical">
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/coach_switch"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="@string/coach_label" />
+
+                        <LinearLayout
+                            android:id="@+id/coach_details"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_horizontal"
+                            android:orientation="vertical"
+                            android:visibility="gone">
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/coach_auto_switch"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="@string/coach_auto_label" />
+
+                    <Button
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:id="@+id/coach_provider_button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:minWidth="220dp" />
+                    <Button
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:id="@+id/coach_key_button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:minWidth="220dp" />
+                    <Button
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:id="@+id/coach_summarize_button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:minWidth="220dp"
+                        android:text="@string/coach_summarize_button" />
+
+                            <TextView
+                                android:id="@+id/coach_result_text"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="12dp"
+                                android:textIsSelectable="true"
+                                android:textSize="14sp" />
+
+                    <Button
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:id="@+id/coach_apply_button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:minWidth="220dp"
+                        android:text="@string/coach_apply_button" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                style="@style/SectionCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="16dp"
+                    android:paddingBottom="16dp">
+
+                    <TextView
+                        android:id="@+id/appearance_section_label"
+                        style="@style/SectionHeader"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:drawableStart="@drawable/ic_tune"
+                        android:text="@string/appearance_section" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical">
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/true_black_switch"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="@string/true_black_label" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            style="@style/SectionCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:paddingHorizontal="16dp"
+                android:paddingBottom="16dp">
+
+                <TextView
+                    android:id="@+id/backup_section_label"
+                    style="@style/SectionHeader"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:drawableStart="@drawable/ic_file_download"
+                    android:text="@string/backup_section" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/backup_status_text"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:gravity="center_horizontal"
+                        android:textSize="14sp" />
+
+                    <Button
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:id="@+id/backup_folder_button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:minWidth="220dp"
+                        android:text="@string/backup_folder_button" />
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/backup_on_start_switch"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/backup_on_start_label" />
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/backup_on_stop_switch"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/backup_on_stop_label" />
+
+                    <Button
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:id="@+id/backup_now_button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:minWidth="220dp"
+                        android:text="@string/backup_now_button" />
+
+                    <Button
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:id="@+id/backup_restore_button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:minWidth="220dp"
+                        android:text="@string/backup_restore_button" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
         <com.google.android.material.card.MaterialCardView
             style="@style/SectionCard"
             android:layout_width="match_parent"
@@ -1111,45 +1385,6 @@
             </LinearLayout>
                 </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
-
-            <com.google.android.material.card.MaterialCardView
-                style="@style/SectionCard"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_horizontal"
-                    android:orientation="vertical"
-                    android:paddingHorizontal="16dp"
-                    android:paddingBottom="16dp">
-
-                    <TextView
-                        android:id="@+id/appearance_section_label"
-                        style="@style/SectionHeader"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="16dp"
-                        android:drawableStart="@drawable/ic_tune"
-                        android:text="@string/appearance_section" />
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:gravity="center_horizontal"
-                        android:orientation="vertical">
-
-                        <com.google.android.material.materialswitch.MaterialSwitch
-                            android:id="@+id/true_black_switch"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
-                            android:text="@string/true_black_label" />
-                    </LinearLayout>
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
         
 
         </LinearLayout>

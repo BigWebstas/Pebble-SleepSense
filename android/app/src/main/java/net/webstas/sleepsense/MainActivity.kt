@@ -3,7 +3,6 @@ package net.webstas.sleepsense
 import android.Manifest
 import android.animation.ObjectAnimator
 import android.animation.PropertyValuesHolder
-import android.app.TimePickerDialog
 import android.appwidget.AppWidgetManager
 import android.content.ActivityNotFoundException
 import android.content.ClipData
@@ -43,6 +42,8 @@ import androidx.health.connect.client.PermissionController
 import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.timepicker.MaterialTimePicker
+import com.google.android.material.timepicker.TimeFormat
 import com.google.android.material.materialswitch.MaterialSwitch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -93,6 +94,17 @@ class MainActivity : AppCompatActivity() {
             if (WhiteNoisePlayer.isPlaying) WhiteNoisePlayer.restart(this)
             refreshWhiteNoise()
         }
+
+    // The backup folder, and a backup file to restore from
+    private val pickBackupFolder =
+        registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+            if (uri == null) return@registerForActivityResult
+            Backup.keepAccess(this, uri)
+            BackupPrefs.setFolder(this, uri)
+            refreshBackup()
+        }
+    private val pickBackupFile =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) confirmRestore(uri) }
 
     private val requestHealth =
         registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { refreshHealth() }
@@ -164,6 +176,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         id<Button>(R.id.snooze_button).setOnClickListener { chooseSnooze() }
+        id<Button>(R.id.smart_window_button).setOnClickListener { chooseSmartWindow() }
         id<MaterialSwitch>(R.id.noise_switch).apply {
             isChecked = NoiseClips.isEnabled(this@MainActivity)
             setOnCheckedChangeListener { _, on ->
@@ -277,6 +290,15 @@ class MainActivity : AppCompatActivity() {
                 recreate()
             }
         }
+        setUpBackup()
+        setUpCoach()
+        id<MaterialSwitch>(R.id.xdrip_switch).apply {
+            isChecked = GlucoseLog.isEnabled(this@MainActivity)
+            setOnCheckedChangeListener { _, on ->
+                GlucoseLog.setEnabled(this@MainActivity, on)
+                refreshXdrip()
+            }
+        }
         id<View>(R.id.last_night_body).setOnClickListener { startActivity(Intent(this, HistoryActivity::class.java)) }
         setupCards()
         attachHaptics(id(R.id.root))
@@ -297,7 +319,9 @@ class MainActivity : AppCompatActivity() {
                 val chevron = AppCompatResources.getDrawable(this, if (collapsed) R.drawable.ic_expand_more else R.drawable.ic_expand_less)
                 header.setCompoundDrawablesRelativeWithIntrinsicBounds(icon, null, chevron, null)
             }
-            render(UiPrefs.isCollapsed(this, key))
+            // The advanced cards start folded, all but Live Readings
+            val foldedByDefault = card.parent === id<LinearLayout>(R.id.advanced_box) && header.id != R.id.live_section_label
+            render(UiPrefs.isCollapsed(this, key, foldedByDefault))
             header.setOnClickListener {
                 val collapse = body.visibility == View.VISIBLE
                 TransitionManager.beginDelayedTransition(content)
@@ -322,6 +346,9 @@ class MainActivity : AppCompatActivity() {
         refreshOximeter()
         refreshHealth()
         refreshWhiteNoise()
+        refreshBackup()
+        refreshCoach()
+        refreshXdrip()
         refreshCalendar()
         refreshLastNight(force = true)
         handler.post(refreshLoop)
@@ -382,7 +409,6 @@ class MainActivity : AppCompatActivity() {
         val (title, subtitle) = WidgetState.lines(this)
         id<TextView>(R.id.tracking_status_text).text = title
         setTrackingDots(tracking)
-        id<TextView>(R.id.alarm_status_text).text = PhoneAlarmSync.describe(this).lineSequence().first()
         id<Button>(R.id.tracking_button).setText(if (tracking) R.string.stop_tracking_button else R.string.start_tracking_button)
         setPlayStopIcon(R.id.tracking_button, tracking)
         val since = WidgetState.since(this)
@@ -511,12 +537,76 @@ class MainActivity : AppCompatActivity() {
             },
         )
         id<MaterialSwitch>(R.id.alarm_enabled_switch).isChecked = PhoneAlarmSync.isAlarmEnabled(this)
-        id<TextView>(R.id.smart_window_text).text = getString(
+        id<Button>(R.id.smart_window_button).text = getString(
             R.string.smart_window,
             PhoneAlarmSync.smartWindowMinutes(this)?.let { getString(R.string.smart_window_minutes, it) }
                 ?: getString(R.string.smart_window_unset),
         )
         refreshNapTiles()
+        refreshSnoozeAdvice()
+    }
+
+    // Read again only when a new history has arrived, as this runs every few seconds
+    private var adviceFor = -1L
+    private var advice: SnoozeAdvice.Advice? = null
+
+    private fun refreshSnoozeAdvice() {
+        val stamp = SessionStore.modified(this) + PhoneAlarmSync.smartWindowMinutes(this).let { (it ?: 0) * 31L }
+        if (stamp != adviceFor) {
+            adviceFor = stamp
+            advice = SnoozeAdvice.current(this)
+        }
+        val now = advice
+        val alarm = PhoneAlarmSync.phoneAlarm(this)
+        val box = id<View>(R.id.snooze_advice_box)
+        if (now == null || alarm == null) {
+            box.visibility = View.GONE
+            return
+        }
+        val moved = SnoozeAdvice.moved(alarm.first * 60 + alarm.second, now.shiftMin)
+        val time = "%02d:%02d".format(moved / 60, moved % 60)
+        box.visibility = View.VISIBLE
+        id<TextView>(R.id.snooze_advice_text).text = getString(R.string.snooze_advice_text, now.averageSnoozes, now.nights, now.averageSnoozeMin)
+        id<Button>(R.id.snooze_advice_alarm_button).apply {
+            text = getString(R.string.snooze_advice_alarm, time)
+            setOnClickListener { applyAdvice(moved / 60, moved % 60, null) }
+        }
+        id<Button>(R.id.snooze_advice_window_button).apply {
+            visibility = if (now.widerWindow != null) View.VISIBLE else View.GONE
+            text = getString(R.string.snooze_advice_window, now.widerWindow ?: 0)
+            setOnClickListener { applyAdvice(null, null, now.widerWindow) }
+        }
+        id<Button>(R.id.snooze_advice_dismiss_button).setOnClickListener {
+            SnoozeAdvice.putAside(this)
+            adviceFor = -1L
+            refreshSnoozeAdvice()
+        }
+    }
+
+    // Moving the alarm replaces the phone's alarm with a time chosen here, so it asks first if that is being synced
+    private fun applyAdvice(hour: Int?, minute: Int?, window: Int?) {
+        fun apply() {
+            if (hour != null && minute != null) {
+                PhoneAlarmSync.setEnabled(this, false)
+                PhoneAlarmSync.setCustomAlarm(this, hour, minute)
+                PhoneAlarmSync.setAlarmEnabled(this, true)
+                id<MaterialSwitch>(R.id.alarm_sync_switch).isChecked = false
+                Toast.makeText(this, getString(R.string.snooze_advice_moved, "%02d:%02d".format(hour, minute)), Toast.LENGTH_SHORT).show()
+            }
+            if (window != null) PhoneAlarmSync.chooseSmartWindow(this, window)
+            SnoozeAdvice.putAside(this) // the nights so far were with the old settings
+            adviceFor = -1L
+            refreshAlarmSettings()
+        }
+        if (hour != null && PhoneAlarmSync.isEnabled(this)) {
+            MaterialAlertDialogBuilder(this)
+                .setMessage(getString(R.string.snooze_advice_confirm, "%02d:%02d".format(hour, minute)))
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(android.R.string.ok) { _, _ -> apply() }
+                .show()
+        } else {
+            apply()
+        }
     }
 
     private val napTiles = listOf(
@@ -556,10 +646,19 @@ class MainActivity : AppCompatActivity() {
 
     private fun chooseAlarmTime() {
         val (hour, minute) = PhoneAlarmSync.customAlarm(this) ?: (7 to 0)
-        TimePickerDialog(this, { _, h, m ->
-            PhoneAlarmSync.setCustomAlarm(this, h, m)
+        // The Material picker follows the app's theme; the system dialog does not
+        val picker = MaterialTimePicker.Builder()
+            .setTimeFormat(if (DateFormat.is24HourFormat(this)) TimeFormat.CLOCK_24H else TimeFormat.CLOCK_12H)
+            .setHour(hour)
+            .setMinute(minute)
+            .setInputMode(MaterialTimePicker.INPUT_MODE_CLOCK)
+            .setTitleText(R.string.alarm_time_picker_title)
+            .build()
+        picker.addOnPositiveButtonClickListener {
+            PhoneAlarmSync.setCustomAlarm(this, picker.hour, picker.minute)
             refreshAlarmSettings()
-        }, hour, minute, DateFormat.is24HourFormat(this)).show()
+        }
+        picker.show(supportFragmentManager, "alarm_time")
     }
 
     private fun refreshCalendar() {
@@ -602,6 +701,20 @@ class MainActivity : AppCompatActivity() {
                 PhoneAlarmSync.setSnoozeMinutes(this, lengths[which])
                 refreshAlarmSettings()
             }
+            .show()
+    }
+
+    private fun chooseSmartWindow() {
+        val lengths = intArrayOf(15, 30, 45)
+        val labels = lengths.map { getString(R.string.smart_window_minutes, it) }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.smart_window_title)
+            .setSingleChoiceItems(labels.toTypedArray(), lengths.indexOf(PhoneAlarmSync.smartWindowMinutes(this) ?: 0)) { dialog, which ->
+                PhoneAlarmSync.chooseSmartWindow(this, lengths[which])
+                dialog.dismiss()
+                refreshAlarmSettings()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
 
@@ -779,13 +892,229 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
+    private fun setUpBackup() {
+        id<Button>(R.id.backup_folder_button).setOnClickListener { pickBackupFolder.launch(BackupPrefs.folder(this)) }
+        id<MaterialSwitch>(R.id.backup_on_start_switch).apply {
+            isChecked = BackupPrefs.onStart(this@MainActivity)
+            setOnCheckedChangeListener { _, on -> BackupPrefs.setOnStart(this@MainActivity, on) }
+        }
+        id<MaterialSwitch>(R.id.backup_on_stop_switch).apply {
+            isChecked = BackupPrefs.onStop(this@MainActivity)
+            setOnCheckedChangeListener { _, on -> BackupPrefs.setOnStop(this@MainActivity, on) }
+        }
+        id<Button>(R.id.backup_now_button).setOnClickListener {
+            if (BackupPrefs.folder(this) == null) {
+                pickBackupFolder.launch(null)
+                return@setOnClickListener
+            }
+            lifecycleScope.launch {
+                val result = withContext(Dispatchers.IO) { runCatching { Backup.write(this@MainActivity) } }
+                Toast.makeText(
+                    this@MainActivity,
+                    result.getOrNull()?.let { getString(R.string.backup_done, it) } ?: getString(R.string.backup_failed),
+                    Toast.LENGTH_LONG,
+                ).show()
+                refreshBackup()
+            }
+        }
+        id<Button>(R.id.backup_restore_button).setOnClickListener { pickBackupFile.launch(arrayOf("application/zip", "application/octet-stream")) }
+    }
+
+    private fun setUpCoach() {
+        id<MaterialSwitch>(R.id.coach_switch).apply {
+            isChecked = CoachPrefs.isEnabled(this@MainActivity)
+            setOnCheckedChangeListener { button, on ->
+                if (on && !CoachPrefs.isEnabled(this@MainActivity)) {
+                    // Switched on only after being told what is sent
+                    button.isChecked = false
+                    MaterialAlertDialogBuilder(this@MainActivity)
+                        .setTitle(R.string.coach_consent_title)
+                        .setMessage(R.string.coach_consent_message)
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .setPositiveButton(R.string.coach_consent_ok) { _, _ ->
+                            CoachPrefs.setEnabled(this@MainActivity, true)
+                            button.isChecked = true
+                            refreshCoach()
+                        }
+                        .show()
+                } else {
+                    CoachPrefs.setEnabled(this@MainActivity, on)
+                    refreshCoach()
+                }
+            }
+        }
+        id<MaterialSwitch>(R.id.coach_auto_switch).apply {
+            isChecked = CoachPrefs.autoSummary(this@MainActivity)
+            setOnCheckedChangeListener { _, on -> CoachPrefs.setAutoSummary(this@MainActivity, on) }
+        }
+        id<Button>(R.id.coach_provider_button).setOnClickListener {
+            val providers = CoachProvider.entries
+            MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.coach_provider_title)
+                .setSingleChoiceItems(
+                    providers.map { getString(it.titleRes) }.toTypedArray(),
+                    providers.indexOf(CoachPrefs.provider(this)),
+                ) { dialog, which ->
+                    CoachPrefs.setProvider(this, providers[which])
+                    dialog.dismiss()
+                    refreshCoach()
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
+        id<Button>(R.id.coach_key_button).setOnClickListener {
+            val provider = CoachPrefs.provider(this)
+            val input = android.widget.EditText(this).apply {
+                hint = getString(R.string.coach_key_hint)
+                inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+                setSingleLine()
+            }
+            MaterialAlertDialogBuilder(this)
+                .setTitle(getString(R.string.coach_key_title, getString(provider.titleRes)))
+                .setMessage(R.string.coach_key_message)
+                .setView(input)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(android.R.string.ok) { _, _ ->
+                    CoachPrefs.setApiKey(this, provider, input.text.toString())
+                    refreshCoach()
+                }
+                .show()
+        }
+        id<Button>(R.id.coach_summarize_button).setOnClickListener { summarizeSleep() }
+        id<Button>(R.id.coach_apply_button).setOnClickListener { confirmApplyAdvice() }
+    }
+
+    private fun refreshCoach() {
+        val enabled = CoachPrefs.isEnabled(this)
+        id<View>(R.id.coach_details).visibility = if (enabled) View.VISIBLE else View.GONE
+        val provider = CoachPrefs.provider(this)
+        id<Button>(R.id.coach_provider_button).text = getString(R.string.coach_provider_button, getString(provider.titleRes))
+        id<Button>(R.id.coach_key_button).text = getString(
+            R.string.coach_key_button,
+            getString(provider.titleRes),
+            getString(if (CoachPrefs.apiKey(this) != null) R.string.coach_key_set else R.string.coach_key_unset),
+        )
+        val last = CoachPrefs.last(this)
+        id<TextView>(R.id.coach_result_text).apply {
+            visibility = if (last != null) View.VISIBLE else View.GONE
+            if (last != null) text = describeAdvice(last.first, last.second)
+        }
+        id<Button>(R.id.coach_apply_button).visibility =
+            if (last?.second?.alarmTime() != null && last.second.smartWindow != null) View.VISIBLE else View.GONE
+    }
+
+    private fun describeAdvice(at: Long, advice: CoachAdvice): String = buildString {
+        appendLine(getString(R.string.coach_asked, android.text.format.DateUtils.getRelativeTimeSpanString(at)))
+        appendLine()
+        appendLine(advice.summary)
+        if (advice.sleepMinutes != null || advice.alarm != null) {
+            appendLine()
+            appendLine(
+                getString(
+                    R.string.coach_suggestion,
+                    advice.sleepMinutes?.let { duration(it.toLong()) } ?: "-",
+                    advice.bedtime ?: "-",
+                    advice.alarm ?: "-",
+                    advice.smartWindow?.let { getString(R.string.smart_window_minutes, it) } ?: "-",
+                ),
+            )
+        }
+        if (advice.nextAlarms.isNotEmpty()) {
+            appendLine()
+            appendLine(getString(R.string.coach_next_alarms))
+            advice.nextAlarms.forEach { appendLine("• ${it.label}: ${it.time} (${it.reason})") }
+        }
+        if (advice.recommendations.isNotEmpty()) {
+            appendLine()
+            advice.recommendations.forEach { appendLine("• $it") }
+        }
+        appendLine()
+        append(getString(R.string.coach_disclaimer))
+    }
+
+    private fun summarizeSleep() {
+        val button = id<Button>(R.id.coach_summarize_button)
+        val result = id<TextView>(R.id.coach_result_text)
+        button.isEnabled = false
+        result.visibility = View.VISIBLE
+        result.setText(R.string.coach_working)
+        lifecycleScope.launch {
+            val outcome = withContext(Dispatchers.IO) { runCatching { SleepCoach.ask(this@MainActivity) } }
+            button.isEnabled = true
+            outcome.onSuccess { (json, _) -> CoachPrefs.setLast(this@MainActivity, json, System.currentTimeMillis()) }
+            outcome.onFailure { e ->
+                Toast.makeText(this@MainActivity, (e as? CoachException)?.message ?: getString(R.string.coach_failed, e.message ?: ""), Toast.LENGTH_LONG).show()
+            }
+            refreshCoach()
+            if (outcome.isFailure && CoachPrefs.last(this@MainActivity) == null) result.visibility = View.GONE
+        }
+    }
+
+    // The suggested alarm and window replace the ones in the app, like a nap or a time picked here; syncing the phone's alarm goes off
+    private fun confirmApplyAdvice() {
+        val advice = CoachPrefs.last(this)?.second ?: return
+        val (hour, minute) = advice.alarmTime() ?: return
+        val window = advice.smartWindow ?: return
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.coach_apply_button)
+            .setMessage(getString(R.string.coach_applied, "%02d:%02d".format(hour, minute), window))
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                PhoneAlarmSync.setEnabled(this, false)
+                PhoneAlarmSync.setCustomAlarm(this, hour, minute)
+                PhoneAlarmSync.setAlarmEnabled(this, true)
+                PhoneAlarmSync.chooseSmartWindow(this, window)
+                id<MaterialSwitch>(R.id.alarm_sync_switch).isChecked = false
+                refreshAlarmSettings()
+            }
+            .show()
+    }
+
+    private fun refreshXdrip() {
+        val status = id<TextView>(R.id.xdrip_status_text)
+        status.visibility = if (GlucoseLog.isEnabled(this)) View.VISIBLE else View.GONE
+        val last = GlucoseLog.latest(this)
+        status.text = if (last == null) getString(R.string.xdrip_setup) else
+            getString(R.string.xdrip_last, last.second, android.text.format.DateUtils.getRelativeTimeSpanString(last.first))
+    }
+
+    private fun refreshBackup() {
+        val folder = BackupPrefs.folder(this)
+        val last = BackupPrefs.last(this)
+        id<TextView>(R.id.backup_status_text).text = when {
+            folder == null -> getString(R.string.backup_status_none)
+            last == null -> getString(R.string.backup_status_folder, Uri.decode(folder.lastPathSegment ?: folder.toString()))
+            else -> getString(R.string.backup_status_folder, Uri.decode(folder.lastPathSegment ?: folder.toString())) + "\n" +
+                getString(R.string.backup_status_last, android.text.format.DateUtils.getRelativeTimeSpanString(last.first), last.second)
+        }
+    }
+
+    private fun confirmRestore(uri: Uri) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.backup_restore_title)
+            .setMessage(R.string.backup_restore_message)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.backup_restore_confirm) { _, _ ->
+                lifecycleScope.launch {
+                    val count = withContext(Dispatchers.IO) {
+                        runCatching { contentResolver.openInputStream(uri)!!.use { Backup.restore(this@MainActivity, it) } }
+                    }
+                    if (count.isSuccess) {
+                        Toast.makeText(this@MainActivity, getString(R.string.backup_restored, count.getOrThrow()), Toast.LENGTH_LONG).show()
+                        recreate() // every screen reads the restored settings again
+                    } else {
+                        Toast.makeText(this@MainActivity, R.string.backup_restore_failed, Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            .show()
+    }
+
     private fun refreshWhiteNoise() {
         val sound = WhiteNoisePrefs.sound(this)
         id<Button>(R.id.white_noise_sound_button).text = getString(
             R.string.white_noise_sound_label,
-            if (WhiteNoisePrefs.useSpotify(this)) {
-                getString(R.string.white_noise_spotify_title)
-            } else if (WhiteNoisePrefs.useFiles(this)) {
+            if (WhiteNoisePrefs.useFiles(this)) {
                 resources.getQuantityString(R.plurals.white_noise_files_title, WhiteNoisePrefs.files(this).size, WhiteNoisePrefs.files(this).size)
             } else {
                 getString(sound.titleRes)
@@ -797,52 +1126,12 @@ class MainActivity : AppCompatActivity() {
         setPlayStopIcon(R.id.white_noise_play_button, playing)
     }
 
-    // The link of a Spotify playlist, offered from the clipboard when it holds one
-    private fun askSpotifyLink() {
-        val clip = getSystemService(android.content.ClipboardManager::class.java).primaryClip
-            ?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()
-        val input = android.widget.EditText(this).apply {
-            hint = getString(R.string.white_noise_spotify_hint)
-            setText(clip?.takeIf { SpotifyLink.parse(it) != null } ?: WhiteNoisePrefs.spotify(this@MainActivity) ?: "")
-            setSingleLine()
-        }
-        val spotify = packageManager.getLaunchIntentForPackage("com.spotify.music")
-        MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.white_noise_spotify_title)
-            .setMessage(R.string.white_noise_spotify_message)
-            .setView(input)
-            .apply {
-                // Spotify itself: find the playlist there, then Share it to SleepSense
-                if (spotify != null) setNeutralButton(R.string.white_noise_spotify_open) { _, _ -> startActivity(spotify) }
-            }
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                val address = SpotifyLink.parse(input.text.toString())
-                if (address == null) {
-                    Toast.makeText(this, R.string.white_noise_spotify_invalid, Toast.LENGTH_LONG).show()
-                } else {
-                    WhiteNoisePrefs.setSpotify(this, address)
-                    if (WhiteNoisePlayer.isPlaying) WhiteNoisePlayer.restart(this)
-                    refreshWhiteNoise()
-                    // The one-time permission for this app to control Spotify, asked now while it is in front
-                    SpotifyRemote.connect(this, true) { ok ->
-                        runOnUiThread {
-                            Toast.makeText(this, if (ok) R.string.white_noise_spotify_connected else R.string.white_noise_spotify_not_connected, Toast.LENGTH_LONG).show()
-                        }
-                        if (ok) SpotifyRemote.disconnect()
-                    }
-                }
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
     private fun chooseWhiteNoiseSound() {
         val current = WhiteNoisePrefs.sound(this)
         val sounds = WhiteNoiseSound.entries
         // The noises, then one more entry for the phone's own audio files
-        val labels = (sounds.map { getString(it.descRes) } + getString(R.string.white_noise_files_desc) + getString(R.string.white_noise_spotify_desc)).toTypedArray()
+        val labels = (sounds.map { getString(it.descRes) } + getString(R.string.white_noise_files_desc)).toTypedArray()
         val checkedIndex = when {
-            WhiteNoisePrefs.useSpotify(this) -> sounds.size + 1
             WhiteNoisePrefs.useFiles(this) -> sounds.size
             else -> sounds.indexOf(current).coerceAtLeast(0)
         }
@@ -853,10 +1142,6 @@ class MainActivity : AppCompatActivity() {
                 dialog.dismiss()
                 if (which == sounds.size) {
                     pickSleepFiles.launch(arrayOf("audio/*"))
-                    return@setSingleChoiceItems
-                }
-                if (which == sounds.size + 1) {
-                    askSpotifyLink()
                     return@setSingleChoiceItems
                 }
                 val chosen = sounds[which]

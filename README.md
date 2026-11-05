@@ -24,7 +24,7 @@ The watch app works on its own. Everything marked *(Android app)* needs the comp
 
 <table>
   <tr>
-    <td align="center" valign="top"><img src="docs/screenshots/android-main.png" width="260" alt="Main screen: tracking, last night, alarm, review"><br><sub>Main screen</sub></td>
+    <td align="center" valign="top"><img src="docs/screenshots/android-main.png" width="260" alt="Main screen: tracking, last session, alarm, review"><br><sub>Main screen</sub></td>
     <td align="center" valign="top"><img src="docs/screenshots/android-advanced.png" width="260" alt="Advanced: noise clips, pulse oximeter, sleep mode, white noise"><br><sub>Advanced</sub></td>
     <td align="center" valign="top"><img src="docs/screenshots/android-live.png" width="260" alt="Chest breathing rate and live readings with a breathing rate graph"><br><sub>Chest breathing and live readings</sub></td>
   </tr>
@@ -104,7 +104,7 @@ The `android/` folder is a small companion app. The Pebble app will not let an A
 A night-sky look (indigo, teal and amber; light and dark, plus an optional true-black OLED switch under *Appearance*). Each section is a card that folds when you tap its header, and the app remembers which are open.
 
 - **Sleep tracking**: "Tracking sleep since 23:10", "Not tracking" or "Watch app closed", the watch alarm, and the **Start / Stop tracking** button. Start opens SleepSense on the watch first if needed; stopping works while SleepSense is open on the watch, and the app asks the Pebble app to open it if not. While tracking, a strip stays pinned at the top with elapsed time, heart rate, SpO2 and breaths per minute.
-- **Last night**: rating ring, time asleep, and a stage ribbon.
+- **Last session**: rating ring, time asleep, and a stage ribbon.
 - **Alarm**: sync the phone's next alarm, the watch alarm time, alarm on/off, snooze, the smart wake window (set on the watch), and **30 / 45 / 60 minute nap** tiles that set the watch alarm and start tracking. **Open Clock app** is in the tracking card.
 - **Review**: **Noise clips** and **Sleep history and export**.
 - **Show advanced**: Noise Clips, Pulse Oximeter, Sleep Mode, White Noise, Connectivity (Home Assistant, webhook, calendar, Health Connect), Interfacing (widget, **Install on Pebble**, **Check for updates**), Chest Breathing Rate, Live Readings and Appearance.
@@ -116,7 +116,8 @@ A night-sky look (indigo, teal and amber; light and dark, plus an optional true-
 - **Home-screen widget**: logo, tracking status and next alarm. Tap it to open the app. The status comes from the watch's once-a-minute check-in, so it can lag a little. The notification shows the tracked night and opens the app.
 - **Sleep Mode**: while the watch tracks, the phone turns on Do Not Disturb (alarms only) and the watch's **Quiet Time**, through the built-in Quiet Time Toggle app, and undoes only what it did afterwards. Quiet Time stays on after an alarm until you have rated the night, so the rating screen is not dismissed, and goes off at once when you stop tracking by hand. Quiet Time can mute the watch's alarm chime; the vibration still works.
 - **Noise tracking and clips** (opt-in, uses the microphone): while the watch is tracking, the phone listens and keeps a running average of the room level (this is also the noise reading shown on the watch). A loud sound above that average saves a **30-second WAV clip** (5 seconds before the spike, 25 after), at most one every 30 seconds, keeping the 30 newest. **Sensitivity** is Low (56 dB), Medium (48 dB) or High (42 dB). The **Noise clips** screen lists them by capture date, with a loudness graph and playhead for each, peak level, and play, share and delete. Levels are approximate dB: phone microphones are not calibrated. Place the phone near the bed.
-- **White noise**: plays brown, pink or white noise while tracking, or your own audio files (played in order, with a 12 second cross fade), or a **Spotify** playlist (paste a link or share it to SleepSense; it plays through Spotify's App Remote). It stops with the tracking, and clips ignore its own sound.
+- **AI sleep summary** (optional, in Advanced, off by default): with your own Claude or Gemini API key, summarizes your last 14 sessions and suggests sleep duration, alarm time, smart wake window and next alarms, which you can apply with one tap. Only a short text digest is sent, and only when you tap Summarize. The key stays on the phone and is left out of backups.
+- **White noise**: plays brown, pink or white noise while tracking, or your own audio files (played in order, with a 12 second cross fade). It stops with the tracking, and clips ignore its own sound.
 - **Pulse oximeter** (opt-in, Wellue finger oximeters over Bluetooth LE): connects while the watch tracks and reconnects if it drops. The lowest SpO2 and average pulse of each 30 seconds are saved and graphed in History and the export. Optionally works out **HRV** (RMSSD, 5-minute windows) from the pulse waveform. Choose your device under *Pulse Oximeter*.
 - **Chest breathing rate**: with *Show breathing rate* on and the watch resting face-up on your chest, the phone works out your breathing rate from the watch's accelerometer (each axis band-passed to 0.1 to 0.55 Hz, the strongest frequency in the direction with most motion; no reading when the tone is weak or movement dominates). It needs about a minute of still breathing, shows on the watch header and under Live Readings, and is stored with each minute for the History graph, the average in the stats, and REM detection. It is not a medical measurement.
 - **Live Readings**: sleep stage, movement, light, sound, heart rate, SpO2, oximeter pulse and chest breathing with how long ago each came in, a scrolling oximeter pulse waveform, and the breathing-rate graph.
@@ -137,7 +138,7 @@ A night-sky look (indigo, teal and amber; light and dark, plus an optional true-
 | Notification policy (Do Not Disturb access) | Sleep Mode's alarms-only setting |
 | Foreground service (special use, microphone) | The bridge runs all the time; the microphone type is added only while listening |
 | Notifications | The bridge's foreground notification |
-| Internet, Local network | The local socket and webhook on `127.0.0.1`, the MQTT broker, Spotify, and the update check (a single request to `api.github.com`) |
+| Internet, Local network | The local socket and webhook on `127.0.0.1`, the MQTT broker, and the update check (a single request to `api.github.com`) |
 | Wake lock | Keeps a playing sound's cross fade going with the screen off |
 | Receive boot completed | Restart the bridge after a reboot or an app update |
 | Set alarm | Registers the app as an alarm app |
@@ -204,7 +205,7 @@ Pebble-SleepSense/
         │   ├── WebhookServer.kt, WebhookPrefs.kt   # Local webhook
         │   ├── BedtimeMode.kt          # Do Not Disturb and watch Quiet Time while tracking
         │   ├── NoiseMonitor.kt         # Microphone level, spike detection, clips
-        │   ├── WhiteNoise.kt, SpotifyRemote.kt, SpotifyLink.kt   # Sleep sound
+        │   ├── WhiteNoise.kt   # Sleep sound
         │   ├── Oximeter.kt, PulseVariability.kt, WaveformView.kt  # Wellue oximeter: SpO2, pulse, HRV
         │   ├── ChestCapture.kt, BreathingRate.kt, ChestRateView.kt  # Breathing rate from the chest
         │   ├── LiveReadings.kt         # Live readings and graphs

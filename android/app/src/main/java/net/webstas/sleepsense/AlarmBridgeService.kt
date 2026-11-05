@@ -320,6 +320,7 @@ class AlarmBridgeService : Service() {
         """{"listening":${monitor.listening},"db":${monitor.lastDb},"avg":${monitor.avg60},"clips":${NoiseClips.list(this).size}}"""
 
     private fun onTrackingStarted() {
+        Backup.onTracking(this, started = true)
         ChestCapture.onTrackingStarted(this)
         if (OximeterLog.isEnabled(this)) oximeter.start()
         if (WhiteNoisePrefs.isPlayWhileTracking(this)) {
@@ -329,6 +330,9 @@ class AlarmBridgeService : Service() {
     }
 
     private fun onTrackingStopped() {
+        Backup.onTracking(this, started = false)
+        AutoSummary.onTrackingStopped(this)
+        PhoneAlarmSync.endNap(this)
         oximeter.stop()
         if (WhiteNoisePlayer.isPlaying) {
             WhiteNoisePlayer.stop()
