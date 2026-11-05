@@ -156,23 +156,48 @@ function reportCore() {
       '<text class="ax" x="' + (W - 4) + '" y="' + by + '" text-anchor="end">' + fmtTime(s.end) + '</text></svg>';
   }
 
+  // Smoothing for the line graphs: a centered moving average (wider for longer sessions, none for short ones)
+  // and a curve through the points, so the lines are not jagged. The numbers shown still come from the raw data.
+  function smoothValues(vals) {
+    var win = Math.min(7, Math.max(1, Math.round(vals.length / 20) | 1)); // odd
+    var half = (win - 1) / 2;
+    return vals.map(function (v, i) {
+      var sum = 0, n = 0;
+      for (var k = Math.max(0, i - half); k <= Math.min(vals.length - 1, i + half); k++) { sum += vals[k]; n++; }
+      return sum / n;
+    });
+  }
+
+  // Catmull-Rom spline as an SVG path; y stays inside [yMin, yMax] so a curve never overshoots the plot
+  function curvePath(xs, ys, yMin, yMax) {
+    function clampY(y) { return Math.min(yMax, Math.max(yMin, y)); }
+    var d = 'M' + xs[0].toFixed(1) + ',' + ys[0].toFixed(1);
+    for (var i = 0; i < xs.length - 1; i++) {
+      var i0 = Math.max(0, i - 1), i2 = i + 1, i3 = Math.min(xs.length - 1, i + 2);
+      d += ' C' + (xs[i] + (xs[i2] - xs[i0]) / 6).toFixed(1) + ',' + clampY(ys[i] + (ys[i2] - ys[i0]) / 6).toFixed(1) +
+        ' ' + (xs[i2] - (xs[i3] - xs[i]) / 6).toFixed(1) + ',' + clampY(ys[i2] - (ys[i3] - ys[i]) / 6).toFixed(1) +
+        ' ' + xs[i2].toFixed(1) + ',' + ys[i2].toFixed(1);
+    }
+    return d;
+  }
+
   function lineSvg(s, field, color, unit, keepZero) {
     var pts = s.samples.filter(function (p) { return has(p, field, keepZero); });
     if (pts.length < 2) return '<p class="hint">No ' + unit + ' data for this session.</p>';
     var W = 320, H = 110, LEFT = 30, span = Math.max(s.end - s.start, 1);
     var min = Infinity, max = -Infinity, sum = 0;
     pts.forEach(function (p) { min = Math.min(min, p[field]); max = Math.max(max, p[field]); sum += p[field]; });
-    var lo = Math.floor(min / 5) * 5, hi = Math.max(Math.ceil(max / 5) * 5, lo + 5);
-    var line = pts.map(function (p) {
-      var x = LEFT + (p.t - s.start) / span * (W - LEFT - 4);
-      var y = 6 + (1 - (p[field] - lo) / (hi - lo)) * (H - 24);
-      return x.toFixed(1) + ',' + y.toFixed(1);
-    }).join(' ');
+    var smooth = smoothValues(pts.map(function (p) { return p[field]; }));
+    var smin = Math.min.apply(null, smooth), smax = Math.max.apply(null, smooth);
+    var lo = Math.floor(smin / 5) * 5, hi = Math.max(Math.ceil(smax / 5) * 5, lo + 5);
+    var xs = pts.map(function (p) { return LEFT + (p.t - s.start) / span * (W - LEFT - 4); });
+    var ys = smooth.map(function (v) { return 6 + (1 - (v - lo) / (hi - lo)) * (H - 24); });
+    var line = curvePath(xs, ys, 6, H - 18);
     return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%">' +
       '<text class="ax" x="0" y="12">' + hi + '</text>' +
       '<text class="ax" x="0" y="' + (H - 18) + '">' + lo + '</text>' +
       '<rect class="plot" x="' + LEFT + '" y="6" width="' + (W - LEFT - 4) + '" height="' + (H - 24) + '"/>' +
-      '<polyline points="' + line + '" fill="none" stroke="' + color + '" stroke-width="1.5"/>' +
+      '<path d="' + line + '" fill="none" stroke="' + color + '" stroke-width="1.5" stroke-linejoin="round"/>' +
       eventMarks(s, LEFT, W - LEFT - 4, 6, H - 24) +
       '<text class="ax" x="' + LEFT + '" y="' + (H - 4) + '">' + fmtTime(s.start) + '</text>' +
       '<text class="ax" x="' + (W - 4) + '" y="' + (H - 4) + '" text-anchor="end">' + fmtTime(s.end) + '</text></svg>' +
@@ -197,13 +222,12 @@ function reportCore() {
       if (pts.length < 2) return;
       var min = Infinity, max = -Infinity;
       pts.forEach(function (p) { min = Math.min(min, p[o.f]); max = Math.max(max, p[o.f]); });
-      var path = '';
-      pts.forEach(function (p, i) {
-        var x = LEFT + (p.t - s.start) / span * plotW;
-        var y = max === min ? top + plotH / 2 : top + (1 - (p[o.f] - min) / (max - min)) * plotH;
-        path += (i ? ' ' : '') + x.toFixed(1) + ',' + y.toFixed(1);
-      });
-      lines += '<polyline points="' + path + '" fill="none" stroke="' + o.color + '" stroke-width="1.5" opacity="0.9"/>';
+      var smooth = smoothValues(pts.map(function (p) { return p[o.f]; }));
+      var smin = Math.min.apply(null, smooth), smax = Math.max.apply(null, smooth);
+      var xs = pts.map(function (p) { return LEFT + (p.t - s.start) / span * plotW; });
+      var ys = smooth.map(function (v) { return smax === smin ? top + plotH / 2 : top + (1 - (v - smin) / (smax - smin)) * plotH; });
+      lines += '<path d="' + curvePath(xs, ys, top, top + plotH) + '" fill="none" stroke="' + o.color +
+        '" stroke-width="1.5" stroke-linejoin="round" opacity="0.9"/>';
       legend.push('<span style="color:' + o.color + '">&#9679;</span> ' + o.name + ' ' + min + '&ndash;' + max + o.unit);
     });
     if (legend.length < 2) return '<p class="hint">Not enough data to overlay.</p>';
