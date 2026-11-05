@@ -543,6 +543,70 @@ class MainActivity : AppCompatActivity() {
                 ?: getString(R.string.smart_window_unset),
         )
         refreshNapTiles()
+        refreshSnoozeAdvice()
+    }
+
+    // Read again only when a new history has arrived, as this runs every few seconds
+    private var adviceFor = -1L
+    private var advice: SnoozeAdvice.Advice? = null
+
+    private fun refreshSnoozeAdvice() {
+        val stamp = SessionStore.modified(this) + PhoneAlarmSync.smartWindowMinutes(this).let { (it ?: 0) * 31L }
+        if (stamp != adviceFor) {
+            adviceFor = stamp
+            advice = SnoozeAdvice.current(this)
+        }
+        val now = advice
+        val alarm = PhoneAlarmSync.phoneAlarm(this)
+        val box = id<View>(R.id.snooze_advice_box)
+        if (now == null || alarm == null) {
+            box.visibility = View.GONE
+            return
+        }
+        val moved = SnoozeAdvice.moved(alarm.first * 60 + alarm.second, now.shiftMin)
+        val time = "%02d:%02d".format(moved / 60, moved % 60)
+        box.visibility = View.VISIBLE
+        id<TextView>(R.id.snooze_advice_text).text = getString(R.string.snooze_advice_text, now.averageSnoozes, now.nights, now.averageSnoozeMin)
+        id<Button>(R.id.snooze_advice_alarm_button).apply {
+            text = getString(R.string.snooze_advice_alarm, time)
+            setOnClickListener { applyAdvice(moved / 60, moved % 60, null) }
+        }
+        id<Button>(R.id.snooze_advice_window_button).apply {
+            visibility = if (now.widerWindow != null) View.VISIBLE else View.GONE
+            text = getString(R.string.snooze_advice_window, now.widerWindow ?: 0)
+            setOnClickListener { applyAdvice(null, null, now.widerWindow) }
+        }
+        id<Button>(R.id.snooze_advice_dismiss_button).setOnClickListener {
+            SnoozeAdvice.putAside(this)
+            adviceFor = -1L
+            refreshSnoozeAdvice()
+        }
+    }
+
+    // Moving the alarm replaces the phone's alarm with a time chosen here, so it asks first if that is being synced
+    private fun applyAdvice(hour: Int?, minute: Int?, window: Int?) {
+        fun apply() {
+            if (hour != null && minute != null) {
+                PhoneAlarmSync.setEnabled(this, false)
+                PhoneAlarmSync.setCustomAlarm(this, hour, minute)
+                PhoneAlarmSync.setAlarmEnabled(this, true)
+                id<MaterialSwitch>(R.id.alarm_sync_switch).isChecked = false
+                Toast.makeText(this, getString(R.string.snooze_advice_moved, "%02d:%02d".format(hour, minute)), Toast.LENGTH_SHORT).show()
+            }
+            if (window != null) PhoneAlarmSync.chooseSmartWindow(this, window)
+            SnoozeAdvice.putAside(this) // the nights so far were with the old settings
+            adviceFor = -1L
+            refreshAlarmSettings()
+        }
+        if (hour != null && PhoneAlarmSync.isEnabled(this)) {
+            MaterialAlertDialogBuilder(this)
+                .setMessage(getString(R.string.snooze_advice_confirm, "%02d:%02d".format(hour, minute)))
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(android.R.string.ok) { _, _ -> apply() }
+                .show()
+        } else {
+            apply()
+        }
     }
 
     private val napTiles = listOf(

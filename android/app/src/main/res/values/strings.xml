@@ -231,4 +231,10 @@
     <string name="coach_auto_label">Summarize each session when it ends</string>
     <string name="coach_history_title">AI summary</string>
     <string name="coach_history_button">Summarize this session</string>
+    <string name="snooze_advice_text">You snoozed %1$.1f times a night on average over your last %2$d nights, about %3$d min in all. The alarm may be too early.</string>
+    <string name="snooze_advice_alarm">Move the alarm to %s</string>
+    <string name="snooze_advice_window">Widen the smart wake window to %d min</string>
+    <string name="snooze_advice_dismiss">Not now</string>
+    <string name="snooze_advice_moved">Alarm moved to %s</string>
+    <string name="snooze_advice_confirm">This sets the alarm to %s and turns off syncing the phone\'s alarm.</string>
 </resources>
