@@ -316,7 +316,9 @@ class MainActivity : AppCompatActivity() {
                 val chevron = AppCompatResources.getDrawable(this, if (collapsed) R.drawable.ic_expand_more else R.drawable.ic_expand_less)
                 header.setCompoundDrawablesRelativeWithIntrinsicBounds(icon, null, chevron, null)
             }
-            render(UiPrefs.isCollapsed(this, key))
+            // The advanced cards start folded, all but Live Readings
+            val foldedByDefault = card.parent === id<LinearLayout>(R.id.advanced_box) && header.id != R.id.live_section_label
+            render(UiPrefs.isCollapsed(this, key, foldedByDefault))
             header.setOnClickListener {
                 val collapse = body.visibility == View.VISIBLE
                 TransitionManager.beginDelayedTransition(content)

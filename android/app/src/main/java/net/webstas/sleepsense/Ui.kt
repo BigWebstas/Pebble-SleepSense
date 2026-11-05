@@ -15,6 +15,7 @@ object UiPrefs {
     private const val PREFS = "ui"
     private const val KEY_TRUE_BLACK = "true_black"
     private const val KEY_COLLAPSED = "collapsed"
+    private const val KEY_EXPANDED = "expanded" // opened by the user, which beats a card's default of folded
 
     fun trueBlack(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_TRUE_BLACK, false)
 
@@ -31,11 +32,20 @@ object UiPrefs {
     private fun collapsed(context: Context) =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getStringSet(KEY_COLLAPSED, emptySet())!!
 
-    fun isCollapsed(context: Context, card: String) = card in collapsed(context)
+    private fun expanded(context: Context) =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getStringSet(KEY_EXPANDED, emptySet())!!
+
+    /** Whether [card] is folded: as the user left it, or [default] if they never touched it. */
+    fun isCollapsed(context: Context, card: String, default: Boolean = false) =
+        if (card in collapsed(context)) true else if (card in expanded(context)) false else default
 
     fun setCollapsed(context: Context, card: String, collapsed: Boolean) {
-        val now = collapsed(context).toMutableSet().apply { if (collapsed) add(card) else remove(card) }
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putStringSet(KEY_COLLAPSED, now) }
+        val folded = collapsed(context).toMutableSet().apply { if (collapsed) add(card) else remove(card) }
+        val opened = expanded(context).toMutableSet().apply { if (collapsed) remove(card) else add(card) }
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+            putStringSet(KEY_COLLAPSED, folded)
+            putStringSet(KEY_EXPANDED, opened)
+        }
     }
 }
 
