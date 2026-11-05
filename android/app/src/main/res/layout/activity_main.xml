@@ -393,13 +393,6 @@
                     android:gravity="center_horizontal"
                     android:orientation="vertical">
 
-        <com.google.android.material.materialswitch.MaterialSwitch
-            android:id="@+id/alarm_sync_switch"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/alarm_sync_label" />
-
         <Button
             style="@style/Widget.Material3.Button.TonalButton"
             android:id="@+id/alarm_time_button"
@@ -995,6 +988,13 @@
                     android:layout_height="wrap_content"
                     android:gravity="center_horizontal"
                     android:orientation="vertical">
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/alarm_sync_switch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/alarm_sync_label" />
 
             <Button
                 style="@style/Widget.Material3.Button.TonalButton"
