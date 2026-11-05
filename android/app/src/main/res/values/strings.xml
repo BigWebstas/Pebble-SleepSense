@@ -187,4 +187,20 @@
     <string name="appearance_section">Appearance</string>
     <string name="true_black_label">True black background (OLED)</string>
     <string name="nap_active">%1$d min nap\n→ %2$s</string>
+    <string name="backup_section">Backup</string>
+    <string name="backup_status_none">No backup folder chosen</string>
+    <string name="backup_status_folder">Folder: %s</string>
+    <string name="backup_status_last">Last backup: %1$s (%2$s)</string>
+    <string name="backup_folder_button">Choose backup folder</string>
+    <string name="backup_on_start_label">Back up when tracking starts</string>
+    <string name="backup_on_stop_label">Back up when tracking stops</string>
+    <string name="backup_now_button">Back up now</string>
+    <string name="backup_restore_button">Restore from backup</string>
+    <string name="backup_done">Backed up: %s</string>
+    <string name="backup_failed">Backup failed. Choose the folder again.</string>
+    <string name="backup_restore_title">Restore this backup?</string>
+    <string name="backup_restore_message">Settings and sleep history on this phone are replaced by the ones in the backup. Noise clips are not part of it, and the sleep sound files or Spotify link may need choosing again.</string>
+    <string name="backup_restore_confirm">Restore</string>
+    <string name="backup_restored">Restored %d items</string>
+    <string name="backup_restore_failed">Could not restore: that is not a SleepSense backup</string>
 </resources>

@@ -104,6 +104,11 @@ object PhoneAlarmSync {
         return time.hour to time.minute
     }
 
+    /** Forgets the nap, as when tracking is stopped before its alarm: its tile is no longer waiting. */
+    fun endNap(context: Context) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { remove(KEY_NAP) }
+    }
+
     class Nap(val minutes: Int, val hour: Int, val minute: Int)
 
     /** The nap whose alarm is still waiting: not yet gone off, and the alarm was not changed or turned off since. */

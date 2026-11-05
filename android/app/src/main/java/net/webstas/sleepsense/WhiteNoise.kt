@@ -23,6 +23,8 @@ import kotlin.math.sin
 
 private const val TAG = "WhiteNoisePlayer"
 private const val FADE_MS = 12_000L
+private const val FADE_STEP_MS = 20L // small gain steps, so the fade is smooth instead of crackling
+private const val FADE_IN_MS = 1_500L // when a song ended early and there was no overlap to fade in from
 
 /** The available synthesized sleep sound types. */
 enum class WhiteNoiseSound(
@@ -418,11 +420,30 @@ private class CrossfadeLoop(
         val incoming = next
         if (incoming != null) {
             next = null
-            incoming.start()
+            startSoftly(incoming)
             begin(incoming, nextIndex)
         } else {
-            open(nextIndex) { it, i -> it.start(); begin(it, i) }
+            open(nextIndex) { it, i -> startSoftly(it); begin(it, i) }
         }
+    }
+
+    /** Starts [p] from silence over [FADE_IN_MS], so a hard cut from the song before it is not a pop. */
+    private fun startSoftly(p: MediaPlayer) {
+        p.setVolume(0f, 0f)
+        p.start()
+        val startedAt = System.nanoTime()
+        object : Runnable {
+            override fun run() {
+                if (stopped) return
+                val t = ((System.nanoTime() - startedAt) / 1_000_000f / FADE_IN_MS).coerceAtMost(1f)
+                try {
+                    p.setVolume(sin(t * PI.toFloat() / 2), sin(t * PI.toFloat() / 2))
+                } catch (e: IllegalStateException) {
+                    return
+                }
+                if (t < 1f) handler.postDelayed(this, FADE_STEP_MS)
+            }
+        }.run()
     }
 
     private fun crossfade() {
@@ -445,7 +466,7 @@ private class CrossfadeLoop(
                 outgoing.setVolume(cos(t * PI.toFloat() / 2), cos(t * PI.toFloat() / 2))
                 incoming.setVolume(sin(t * PI.toFloat() / 2), sin(t * PI.toFloat() / 2))
                 if (t < 1f) {
-                    handler.postDelayed(this, 100)
+                    handler.postDelayed(this, FADE_STEP_MS)
                 } else {
                     fading = false
                     outgoing.release()

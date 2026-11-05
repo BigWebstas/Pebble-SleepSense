@@ -94,6 +94,17 @@ class MainActivity : AppCompatActivity() {
             refreshWhiteNoise()
         }
 
+    // The backup folder, and a backup file to restore from
+    private val pickBackupFolder =
+        registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+            if (uri == null) return@registerForActivityResult
+            Backup.keepAccess(this, uri)
+            BackupPrefs.setFolder(this, uri)
+            refreshBackup()
+        }
+    private val pickBackupFile =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) confirmRestore(uri) }
+
     private val requestHealth =
         registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { refreshHealth() }
 
@@ -277,6 +288,7 @@ class MainActivity : AppCompatActivity() {
                 recreate()
             }
         }
+        setUpBackup()
         id<View>(R.id.last_night_body).setOnClickListener { startActivity(Intent(this, HistoryActivity::class.java)) }
         setupCards()
         attachHaptics(id(R.id.root))
@@ -322,6 +334,7 @@ class MainActivity : AppCompatActivity() {
         refreshOximeter()
         refreshHealth()
         refreshWhiteNoise()
+        refreshBackup()
         refreshCalendar()
         refreshLastNight(force = true)
         handler.post(refreshLoop)
@@ -776,6 +789,66 @@ class MainActivity : AppCompatActivity() {
                 dialog.dismiss()
             }
             .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun setUpBackup() {
+        id<Button>(R.id.backup_folder_button).setOnClickListener { pickBackupFolder.launch(BackupPrefs.folder(this)) }
+        id<MaterialSwitch>(R.id.backup_on_start_switch).apply {
+            isChecked = BackupPrefs.onStart(this@MainActivity)
+            setOnCheckedChangeListener { _, on -> BackupPrefs.setOnStart(this@MainActivity, on) }
+        }
+        id<MaterialSwitch>(R.id.backup_on_stop_switch).apply {
+            isChecked = BackupPrefs.onStop(this@MainActivity)
+            setOnCheckedChangeListener { _, on -> BackupPrefs.setOnStop(this@MainActivity, on) }
+        }
+        id<Button>(R.id.backup_now_button).setOnClickListener {
+            if (BackupPrefs.folder(this) == null) {
+                pickBackupFolder.launch(null)
+                return@setOnClickListener
+            }
+            lifecycleScope.launch {
+                val result = withContext(Dispatchers.IO) { runCatching { Backup.write(this@MainActivity) } }
+                Toast.makeText(
+                    this@MainActivity,
+                    result.getOrNull()?.let { getString(R.string.backup_done, it) } ?: getString(R.string.backup_failed),
+                    Toast.LENGTH_LONG,
+                ).show()
+                refreshBackup()
+            }
+        }
+        id<Button>(R.id.backup_restore_button).setOnClickListener { pickBackupFile.launch(arrayOf("application/zip", "application/octet-stream")) }
+    }
+
+    private fun refreshBackup() {
+        val folder = BackupPrefs.folder(this)
+        val last = BackupPrefs.last(this)
+        id<TextView>(R.id.backup_status_text).text = when {
+            folder == null -> getString(R.string.backup_status_none)
+            last == null -> getString(R.string.backup_status_folder, Uri.decode(folder.lastPathSegment ?: folder.toString()))
+            else -> getString(R.string.backup_status_folder, Uri.decode(folder.lastPathSegment ?: folder.toString())) + "\n" +
+                getString(R.string.backup_status_last, android.text.format.DateUtils.getRelativeTimeSpanString(last.first), last.second)
+        }
+    }
+
+    private fun confirmRestore(uri: Uri) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.backup_restore_title)
+            .setMessage(R.string.backup_restore_message)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.backup_restore_confirm) { _, _ ->
+                lifecycleScope.launch {
+                    val count = withContext(Dispatchers.IO) {
+                        runCatching { contentResolver.openInputStream(uri)!!.use { Backup.restore(this@MainActivity, it) } }
+                    }
+                    if (count.isSuccess) {
+                        Toast.makeText(this@MainActivity, getString(R.string.backup_restored, count.getOrThrow()), Toast.LENGTH_LONG).show()
+                        recreate() // every screen reads the restored settings again
+                    } else {
+                        Toast.makeText(this@MainActivity, R.string.backup_restore_failed, Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
             .show()
     }
 
