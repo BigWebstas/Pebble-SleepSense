@@ -175,6 +175,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         id<Button>(R.id.snooze_button).setOnClickListener { chooseSnooze() }
+        id<Button>(R.id.smart_window_button).setOnClickListener { chooseSmartWindow() }
         id<MaterialSwitch>(R.id.noise_switch).apply {
             isChecked = NoiseClips.isEnabled(this@MainActivity)
             setOnCheckedChangeListener { _, on ->
@@ -534,7 +535,7 @@ class MainActivity : AppCompatActivity() {
             },
         )
         id<MaterialSwitch>(R.id.alarm_enabled_switch).isChecked = PhoneAlarmSync.isAlarmEnabled(this)
-        id<TextView>(R.id.smart_window_text).text = getString(
+        id<Button>(R.id.smart_window_button).text = getString(
             R.string.smart_window,
             PhoneAlarmSync.smartWindowMinutes(this)?.let { getString(R.string.smart_window_minutes, it) }
                 ?: getString(R.string.smart_window_unset),
@@ -625,6 +626,20 @@ class MainActivity : AppCompatActivity() {
                 PhoneAlarmSync.setSnoozeMinutes(this, lengths[which])
                 refreshAlarmSettings()
             }
+            .show()
+    }
+
+    private fun chooseSmartWindow() {
+        val lengths = intArrayOf(15, 30, 45)
+        val labels = lengths.map { getString(R.string.smart_window_minutes, it) }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.smart_window_title)
+            .setSingleChoiceItems(labels.toTypedArray(), lengths.indexOf(PhoneAlarmSync.smartWindowMinutes(this) ?: 0)) { dialog, which ->
+                PhoneAlarmSync.chooseSmartWindow(this, lengths[which])
+                dialog.dismiss()
+                refreshAlarmSettings()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
 

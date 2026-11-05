@@ -19,7 +19,10 @@ object PhoneAlarmSync {
     private const val KEY_ALARM_ENABLED = "alarm_enabled"
     private const val KEY_LAST_REQUEST = "last_request"
     private const val KEY_REVISION = "revision"
-    private const val KEY_WINDOW = "smart_window_minutes" // reported by the watch, never sent to it
+    private const val KEY_WINDOW = "smart_window_minutes" // as the watch last had it
+    private const val KEY_WINDOW_CHOSEN = "smart_window_chosen" // unset until chosen here, so the watch's own value stands
+    private const val KEY_WINDOW_CHOSEN_AT = "smart_window_chosen_at"
+    private const val WINDOW_PENDING_MS = 3 * 60_000L // how long a choice may take to reach the watch
     private const val KEY_CUSTOM = "custom_alarm" // minutes after midnight; unset until chosen
     private const val KEY_NAP = "nap" // "minutes:alarmAtMillis:alarmMinuteOfDay" of the latest nap
     private const val KEY_BEFORE_NAP = "before_nap" // "syncOn:customMinutes:alarmOn" as they were before the first nap
@@ -46,8 +49,28 @@ object PhoneAlarmSync {
     fun smartWindowMinutes(context: Context): Int? =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(KEY_WINDOW, -1).takeIf { it > 0 }
 
-    fun setSmartWindowMinutes(context: Context, minutes: Int) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putInt(KEY_WINDOW, minutes) }
+    /**
+     * The watch says what its smart wake window is. Until a window chosen here has had time to reach it, an
+     * older value is just the choice on its way; after that, a different one means it was changed on the watch,
+     * and the watch wins.
+     */
+    fun setSmartWindowMinutes(context: Context, minutes: Int, now: Long = System.currentTimeMillis()) {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val chosen = prefs.getInt(KEY_WINDOW_CHOSEN, -1)
+        if (chosen > 0 && minutes != chosen) {
+            if (now - prefs.getLong(KEY_WINDOW_CHOSEN_AT, 0) < WINDOW_PENDING_MS) return
+            prefs.edit { remove(KEY_WINDOW_CHOSEN) }
+        }
+        prefs.edit { putInt(KEY_WINDOW, minutes) }
+    }
+
+    /** A smart wake window (15, 30 or 45 minutes) chosen in this app: shown at once, and sent to the watch by its JS. */
+    fun chooseSmartWindow(context: Context, minutes: Int) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
+            putInt(KEY_WINDOW, minutes)
+            putInt(KEY_WINDOW_CHOSEN, minutes)
+            putLong(KEY_WINDOW_CHOSEN_AT, System.currentTimeMillis())
+        }
     }
 
     /** The alarm was switched on or off on the watch: follow it, without sending it back. */
@@ -167,7 +190,7 @@ object PhoneAlarmSync {
     /**
      * What the watchapp's JS gets: {"sync":true,"rev":3,"enabled":true,"hour":6,"min":45,"snooze":9}.
      * "sync" is false when there is no alarm to apply (syncing is off and none was chosen here);
-     * "snooze" is left out until a length was chosen here. "deleted" lists start times of history
+     * "snooze" and "window" are left out until chosen here. "deleted" lists start times of history
      * sessions deleted in the app, for the JS to drop from its own copy; "ratings" maps session start
      * times to the stars set in the app, for the JS to take over. Both are left out when empty.
      */
@@ -177,10 +200,12 @@ object PhoneAlarmSync {
         val enabled = isAlarmEnabled(context) && alarm != null
         val sync = isEnabled(context) || alarm != null
         val snooze = snoozeMinutes(context)?.let { ""","snooze":$it""" } ?: ""
+        val window = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(KEY_WINDOW_CHOSEN, -1)
+            .takeIf { it > 0 }?.let { ""","window":$it""" } ?: ""
         val deleted = SessionStore.deleted(context).takeIf { it.isNotEmpty() }?.let { ""","deleted":[${it.joinToString(",")}]""" } ?: ""
         val ratings = SessionStore.ratings(context).takeIf { it.isNotEmpty() }
             ?.let { ""","ratings":{${it.entries.joinToString(",") { (start, stars) -> "\"$start\":$stars" }}}""" } ?: ""
-        return """{"sync":$sync,"rev":$rev,"enabled":$enabled,"hour":${alarm?.first ?: 0},"min":${alarm?.second ?: 0}$snooze$deleted$ratings}"""
+        return """{"sync":$sync,"rev":$rev,"enabled":$enabled,"hour":${alarm?.first ?: 0},"min":${alarm?.second ?: 0}$snooze$window$deleted$ratings}"""
     }
 
     fun noteRequest(context: Context, now: Long = System.currentTimeMillis()) {

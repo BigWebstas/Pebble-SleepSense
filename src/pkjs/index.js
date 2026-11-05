@@ -256,6 +256,15 @@ function syncPhoneAlarm() {
         console.log("SleepSense PKJS: Could not send snooze length: " + JSON.stringify(err));
       });
     }
+    if (a && a.window !== undefined && a.window !== parseInt(localStorage.getItem("smart_win"), 10)) {
+      // Likewise a smart wake window chosen in the Android app
+      sendToWatch({ SMART_WINDOW_MIN: a.window }, function() {
+        localStorage.setItem("smart_win", a.window);
+        updateAlarmPin();
+      }, function(err) {
+        console.log("SleepSense PKJS: Could not send smart wake window: " + JSON.stringify(err));
+      });
+    }
     if (a && a.deleted) sleepHistory.removeSessions(a.deleted);
     if (a && a.ratings) sleepHistory.applyRatings(a.ratings);
     if (!a || !a.sync) return;
