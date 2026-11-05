@@ -22,6 +22,7 @@ object PhoneAlarmSync {
     private const val KEY_WINDOW = "smart_window_minutes" // reported by the watch, never sent to it
     private const val KEY_CUSTOM = "custom_alarm" // minutes after midnight; unset until chosen
     private const val KEY_NAP = "nap" // "minutes:alarmAtMillis:alarmMinuteOfDay" of the latest nap
+    private const val KEY_BEFORE_NAP = "before_nap" // "syncOn:customMinutes:alarmOn" as they were before the first nap
     private const val KEY_SNOOZE = "snooze_minutes" // unset until chosen, so the watch's own value stands
 
     fun isEnabled(context: Context): Boolean =
@@ -95,6 +96,12 @@ object PhoneAlarmSync {
      */
     fun startNap(context: Context, minutes: Int): Pair<Int, Int> {
         val time = LocalTime.now().plusSeconds(30).plusMinutes(minutes.toLong()) // the watch alarm has minute resolution
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        // What to put back afterwards; a nap started during a nap keeps the first one's
+        if (!prefs.contains(KEY_BEFORE_NAP)) {
+            val custom = prefs.getInt(KEY_CUSTOM, -1)
+            prefs.edit { putString(KEY_BEFORE_NAP, "${isEnabled(context)}:$custom:${isAlarmEnabled(context)}") }
+        }
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
             putString(KEY_NAP, "$minutes:${System.currentTimeMillis() + minutes * 60_000L}:${time.hour * 60 + time.minute}")
         }
@@ -104,9 +111,27 @@ object PhoneAlarmSync {
         return time.hour to time.minute
     }
 
-    /** Forgets the nap, as when tracking is stopped before its alarm: its tile is no longer waiting. */
+    /**
+     * The nap is over (tracking stopped): its alarm goes and the alarm from before the nap comes back,
+     * unless the alarm was changed during the nap, in which case that choice stands.
+     */
     fun endNap(context: Context) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { remove(KEY_NAP) }
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val before = prefs.getString(KEY_BEFORE_NAP, null)?.split(':')?.takeIf { it.size == 3 }
+        val napAlarm = prefs.getString(KEY_NAP, null)?.split(':')?.getOrNull(2)?.toIntOrNull()
+        prefs.edit { remove(KEY_NAP); remove(KEY_BEFORE_NAP) }
+        if (before == null || napAlarm == null) return
+        if (isEnabled(context) || prefs.getInt(KEY_CUSTOM, -1) != napAlarm) return // changed since the nap began
+        val custom = before[1].toIntOrNull() ?: -1
+        prefs.edit {
+            putBoolean(KEY_ENABLED, before[0].toBoolean())
+            if (custom >= 0) putInt(KEY_CUSTOM, custom) else remove(KEY_CUSTOM)
+            putBoolean(KEY_ALARM_ENABLED, before[2].toBoolean())
+        }
+        noteAlarmChanged(context)
+        Commands.queueSync()
+        HomeAssistant.publishAlarmTime(context)
+        HomeAssistant.publishAlarmEnabled(context)
     }
 
     class Nap(val minutes: Int, val hour: Int, val minute: Int)
