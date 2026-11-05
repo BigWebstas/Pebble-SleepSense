@@ -40,13 +40,11 @@ The watch app works on its own. Everything marked *(Android app)* needs the comp
   </tr>
 </table>
 
-**Noise clips, the home-screen widget, and the watch app's settings page:**
+**Noise clips:**
 
 <table>
   <tr>
     <td align="center" valign="top"><img src="docs/screenshots/android-clips.png" width="260" alt="Noise clips with a loudness graph each"><br><sub>Noise clips</sub></td>
-    <td align="center" valign="top"><img src="docs/screenshots/android-widget.png" width="260" alt="Home-screen widget"><br><sub>Widget</sub></td>
-    <td align="center" valign="top"><img src="docs/screenshots/settings-page.png" width="260" alt="Settings page in the Pebble app"><br><sub>Settings page</sub></td>
   </tr>
 </table>
 
