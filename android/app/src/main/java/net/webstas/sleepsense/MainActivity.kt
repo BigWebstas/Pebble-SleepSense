@@ -3,7 +3,6 @@ package net.webstas.sleepsense
 import android.Manifest
 import android.animation.ObjectAnimator
 import android.animation.PropertyValuesHolder
-import android.app.TimePickerDialog
 import android.appwidget.AppWidgetManager
 import android.content.ActivityNotFoundException
 import android.content.ClipData
@@ -43,6 +42,8 @@ import androidx.health.connect.client.PermissionController
 import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.timepicker.MaterialTimePicker
+import com.google.android.material.timepicker.TimeFormat
 import com.google.android.material.materialswitch.MaterialSwitch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -645,10 +646,19 @@ class MainActivity : AppCompatActivity() {
 
     private fun chooseAlarmTime() {
         val (hour, minute) = PhoneAlarmSync.customAlarm(this) ?: (7 to 0)
-        TimePickerDialog(this, { _, h, m ->
-            PhoneAlarmSync.setCustomAlarm(this, h, m)
+        // The Material picker follows the app's theme; the system dialog does not
+        val picker = MaterialTimePicker.Builder()
+            .setTimeFormat(if (DateFormat.is24HourFormat(this)) TimeFormat.CLOCK_24H else TimeFormat.CLOCK_12H)
+            .setHour(hour)
+            .setMinute(minute)
+            .setInputMode(MaterialTimePicker.INPUT_MODE_CLOCK)
+            .setTitleText(R.string.alarm_time_picker_title)
+            .build()
+        picker.addOnPositiveButtonClickListener {
+            PhoneAlarmSync.setCustomAlarm(this, picker.hour, picker.minute)
             refreshAlarmSettings()
-        }, hour, minute, DateFormat.is24HourFormat(this)).show()
+        }
+        picker.show(supportFragmentManager, "alarm_time")
     }
 
     private fun refreshCalendar() {

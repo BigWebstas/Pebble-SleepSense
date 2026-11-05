@@ -237,4 +237,5 @@
     <string name="snooze_advice_dismiss">Not now</string>
     <string name="snooze_advice_moved">Alarm moved to %s</string>
     <string name="snooze_advice_confirm">This sets the alarm to %s and turns off syncing the phone\'s alarm.</string>
+    <string name="alarm_time_picker_title">Watch alarm time</string>
 </resources>
