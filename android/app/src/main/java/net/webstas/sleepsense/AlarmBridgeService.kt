@@ -331,6 +331,7 @@ class AlarmBridgeService : Service() {
 
     private fun onTrackingStopped() {
         Backup.onTracking(this, started = false)
+        AutoSummary.onTrackingStopped(this)
         PhoneAlarmSync.endNap(this)
         oximeter.stop()
         if (WhiteNoisePlayer.isPlaying) {

@@ -201,7 +201,7 @@
     <string name="coach_section">Sleep coach (AI)</string>
     <string name="coach_label">AI sleep summary</string>
     <string name="coach_consent_title">Send sleep data to an AI?</string>
-    <string name="coach_consent_message">When you tap Summarize, a short text summary of your last 14 sessions (times, stage minutes, heart rate, blood oxygen, noise, breathing, blood sugar if imported, ratings) and your alarm settings is sent to the provider you choose (Claude by Anthropic, or Gemini by Google) with your own API key, and the answer is shown here. Nothing is sent otherwise, and no name, account or location is included.</string>
+    <string name="coach_consent_message">When you tap Summarize (or after each session, if you also turn on automatic summaries), a short text summary of your last 14 sessions (times, stage minutes, heart rate, blood oxygen, noise, breathing, blood sugar if imported, ratings) and your alarm settings is sent to the provider you choose (Claude by Anthropic, or Gemini by Google) with your own API key, and the answer is shown here. Nothing is sent otherwise, and no name, account or location is included.</string>
     <string name="coach_consent_ok">Turn on</string>
     <string name="coach_provider_claude">Claude</string>
     <string name="coach_provider_gemini">Gemini</string>
@@ -228,4 +228,7 @@
     <string name="coach_apply_button">Use suggested alarm and window</string>
     <string name="coach_applied">Set the alarm to %1$s with a %2$d min smart wake window? Syncing the phone\'s alarm will be turned off.</string>
     <string name="coach_disclaimer">Not medical advice.</string>
+    <string name="coach_auto_label">Summarize each session when it ends</string>
+    <string name="coach_history_title">AI summary</string>
+    <string name="coach_history_button">Summarize this session</string>
 </resources>

@@ -12,6 +12,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
+import kotlinx.coroutines.launch
 
 private const val CLAUDE_MODEL = "claude-opus-5-5"
 private const val GEMINI_MODEL = "gemini-2.5-flash"
@@ -28,6 +29,7 @@ object CoachPrefs {
     private const val PREFS = "ai_coach" // not part of backups: it holds the key
     private const val KEY_ENABLED = "enabled"
     private const val KEY_PROVIDER = "provider"
+    private const val KEY_AUTO = "auto_summary"
     private const val KEY_LAST = "last"
     private const val KEY_LAST_AT = "last_at"
 
@@ -35,6 +37,9 @@ object CoachPrefs {
 
     fun isEnabled(context: Context) = prefs(context).getBoolean(KEY_ENABLED, false)
     fun setEnabled(context: Context, on: Boolean) = prefs(context).edit { putBoolean(KEY_ENABLED, on) }
+
+    fun autoSummary(context: Context) = prefs(context).getBoolean(KEY_AUTO, false)
+    fun setAutoSummary(context: Context, on: Boolean) = prefs(context).edit { putBoolean(KEY_AUTO, on) }
 
     fun provider(context: Context): CoachProvider =
         CoachProvider.entries.firstOrNull { it.id == prefs(context).getString(KEY_PROVIDER, null) } ?: CoachProvider.CLAUDE
@@ -118,43 +123,60 @@ object SleepCoach {
         next_alarms lists up to 3 upcoming alarms worth setting, soonest first.
     """.trimIndent()
 
+    private val SESSION_SYSTEM = """
+        You are a sleep coach inside a sleep-tracking app. You get the facts of the session the user just finished (from a consumer
+        smartwatch, sometimes with blood oxygen, room noise, breathing rate, blood sugar in mg/dL and a star rating) and, for
+        comparison, the sessions before it. A session under about 2 hours is a nap. Write 3 to 5 plain sentences, no headings, lists
+        or markdown: how the session went, how it compares with the earlier ones, and one practical tip. Be concrete and use the
+        numbers; say so when the data is too thin to tell. It is a consumer wearable, not a medical device: do not diagnose.
+    """.trimIndent()
+
+    /** Finished sessions, oldest first, with the oximeter and imported blood sugar laid into their samples. */
+    fun finishedSessions(context: Context): List<JSONObject> {
+        val all = JSONArray(SessionStore.loadWithOximeter(context))
+        return (0 until all.length()).map { all.getJSONObject(it) }.filter { !it.optBoolean("open") && it.optLong("end") > it.optLong("start") }
+    }
+
+    /** The facts of one session as one line of text. */
+    private fun line(s: JSONObject): String {
+        val zone = ZoneId.systemDefault()
+        val start = s.optLong("start")
+        val end = s.optLong("end")
+        val samples = s.optJSONArray("samples") ?: JSONArray()
+        val minutes = LongArray(4)
+        var hrSum = 0; var hrN = 0; var o2Min = 101; var noiseSum = 0; var noiseN = 0; var brSum = 0; var brN = 0
+        var gSum = 0; var gN = 0
+        for (i in 0 until samples.length()) {
+            val p = samples.getJSONObject(i)
+            val to = if (i + 1 < samples.length()) samples.getJSONObject(i + 1).optLong("t") else end
+            minutes[p.optInt("s").coerceIn(0, 3)] += (to - p.optLong("t")).coerceIn(0, MAX_HOLD_MS) / 60_000
+            p.optInt("hr").takeIf { it > 0 }?.let { hrSum += it; hrN++ }
+            p.optInt("o2").takeIf { it in 1..100 }?.let { o2Min = minOf(o2Min, it) }
+            p.optInt("n").takeIf { it > 0 }?.let { noiseSum += it; noiseN++ }
+            p.optInt("br").takeIf { it > 0 }?.let { brSum += it; brN++ }
+            p.optInt("g").takeIf { it > 0 }?.let { gSum += it; gN++ }
+        }
+        val from = Instant.ofEpochMilli(start).atZone(zone)
+        val until = Instant.ofEpochMilli(end).atZone(zone)
+        return buildString {
+            append("${from.toLocalDate()} ${from.toLocalTime().withSecond(0).withNano(0)}-${until.toLocalTime().withSecond(0).withNano(0)}")
+            append(" in bed ${(end - start) / 60_000} min, asleep ${SessionStore.asleepMinutes(s)} min")
+            append(" (awake ${minutes[0]}, light ${minutes[1]}, deep ${minutes[2]}, REM ${minutes[3]} min)")
+            if (hrN > 0) append(", avg HR ${hrSum / hrN}")
+            if (o2Min <= 100) append(", lowest SpO2 $o2Min%")
+            if (brN > 0) append(", breathing ${brSum / brN}/min")
+            if (noiseN > 0) append(", noise ${noiseSum / noiseN} dB")
+            if (gN > 0) append(", blood sugar avg ${gSum / gN} mg/dL")
+            s.optInt("snoozes").takeIf { it > 0 }?.let { append(", $it snoozes (${s.optLong("snoozeSec") / 60} min)") }
+            s.optInt("rating").takeIf { it in 1..5 }?.let { append(", rated $it/5") }
+        }
+    }
+
     /** One line of facts per session, newest last, so the request stays small. */
     fun digest(context: Context, now: Long = System.currentTimeMillis()): String {
         val zone = ZoneId.systemDefault()
-        val all = JSONArray(SessionStore.loadWithOximeter(context)) // includes imported blood sugar, if on
-        val finished = (0 until all.length()).map { all.getJSONObject(it) }.filter { !it.optBoolean("open") && it.optLong("end") > it.optLong("start") }
-        val lines = finished.takeLast(NIGHTS).map { s ->
-            val start = s.optLong("start")
-            val end = s.optLong("end")
-            val samples = s.optJSONArray("samples") ?: JSONArray()
-            val minutes = LongArray(4)
-            var hrSum = 0; var hrN = 0; var o2Min = 101; var noiseSum = 0; var noiseN = 0; var brSum = 0; var brN = 0
-            var gSum = 0; var gN = 0
-            for (i in 0 until samples.length()) {
-                val p = samples.getJSONObject(i)
-                val to = if (i + 1 < samples.length()) samples.getJSONObject(i + 1).optLong("t") else end
-                minutes[p.optInt("s").coerceIn(0, 3)] += (to - p.optLong("t")).coerceIn(0, MAX_HOLD_MS) / 60_000
-                p.optInt("hr").takeIf { it > 0 }?.let { hrSum += it; hrN++ }
-                p.optInt("o2").takeIf { it in 1..100 }?.let { o2Min = minOf(o2Min, it) }
-                p.optInt("n").takeIf { it > 0 }?.let { noiseSum += it; noiseN++ }
-                p.optInt("br").takeIf { it > 0 }?.let { brSum += it; brN++ }
-                p.optInt("g").takeIf { it > 0 }?.let { gSum += it; gN++ }
-            }
-            val from = Instant.ofEpochMilli(start).atZone(zone)
-            val until = Instant.ofEpochMilli(end).atZone(zone)
-            buildString {
-                append("${from.toLocalDate()} ${from.toLocalTime().withSecond(0).withNano(0)}-${until.toLocalTime().withSecond(0).withNano(0)}")
-                append(" in bed ${(end - start) / 60_000} min, asleep ${SessionStore.asleepMinutes(s)} min")
-                append(" (awake ${minutes[0]}, light ${minutes[1]}, deep ${minutes[2]}, REM ${minutes[3]} min)")
-                if (hrN > 0) append(", avg HR ${hrSum / hrN}")
-                if (o2Min <= 100) append(", lowest SpO2 $o2Min%")
-                if (brN > 0) append(", breathing ${brSum / brN}/min")
-                if (noiseN > 0) append(", noise ${noiseSum / noiseN} dB")
-                if (gN > 0) append(", blood sugar avg ${gSum / gN} mg/dL")
-                s.optInt("snoozes").takeIf { it > 0 }?.let { append(", $it snoozes (${s.optLong("snoozeSec") / 60} min)") }
-                s.optInt("rating").takeIf { it in 1..5 }?.let { append(", rated $it/5") }
-            }
-        }
+        val finished = finishedSessions(context)
+        val lines = finished.takeLast(NIGHTS).map { line(it) }
         val alarm = PhoneAlarmSync.phoneAlarm(context)?.let { "%02d:%02d".format(it.first, it.second) } ?: "none"
         val window = PhoneAlarmSync.smartWindowMinutes(context)?.let { "$it min" } ?: "unknown"
         val snooze = PhoneAlarmSync.snoozeMinutes(context)?.let { if (it == 0) "off" else "$it min" } ?: "unknown"
@@ -167,28 +189,48 @@ object SleepCoach {
         }
     }
 
-    /** Asks the chosen provider, blocking; run it off the main thread. Throws [CoachException] with a message for the user. */
+    /** Asks the chosen provider for [CoachAdvice], blocking; run it off the main thread. Throws [CoachException] with a message for the user. */
     fun ask(context: Context): Pair<String, CoachAdvice> {
-        val provider = CoachPrefs.provider(context)
-        val key = CoachPrefs.apiKey(context, provider) ?: throw CoachException(context.getString(R.string.coach_no_key))
         val digest = digest(context)
         if (digest.contains("No finished sessions yet.")) throw CoachException(context.getString(R.string.coach_no_data))
-        val text = when (provider) {
-            CoachProvider.CLAUDE -> askClaude(context, key, digest)
-            CoachProvider.GEMINI -> askGemini(context, key, digest)
-        }
-        if (text.isBlank()) throw CoachException(context.getString(R.string.coach_empty))
+        val text = complete(context, SYSTEM, digest, json = true)
         return text to (runCatching { CoachAdvice.parse(text) }.getOrNull() ?: throw CoachException(context.getString(R.string.coach_unreadable)))
     }
 
-    private fun askClaude(context: Context, key: String, digest: String): String {
+    /** A short written summary of one finished session, set against the nights before it. */
+    fun summarizeSession(context: Context, session: JSONObject): String {
+        val earlier = finishedSessions(context).filter { it.optLong("start") < session.optLong("start") }.takeLast(7)
+        val user = buildString {
+            appendLine("This session:")
+            appendLine(line(session))
+            if (earlier.isNotEmpty()) {
+                appendLine()
+                appendLine("The sessions before it, oldest first:")
+                earlier.forEach { appendLine(line(it)) }
+            }
+        }
+        return complete(context, SESSION_SYSTEM, user, json = false).trim()
+    }
+
+    private fun complete(context: Context, system: String, user: String, json: Boolean): String {
+        val provider = CoachPrefs.provider(context)
+        val key = CoachPrefs.apiKey(context, provider) ?: throw CoachException(context.getString(R.string.coach_no_key))
+        val text = when (provider) {
+            CoachProvider.CLAUDE -> askClaude(context, key, system, user)
+            CoachProvider.GEMINI -> askGemini(context, key, system, user, json)
+        }
+        if (text.isBlank()) throw CoachException(context.getString(R.string.coach_empty))
+        return text
+    }
+
+    private fun askClaude(context: Context, key: String, system: String, digest: String): String {
         val client = AnthropicOkHttpClient.builder().apiKey(key).timeout(Duration.ofSeconds(120)).maxRetries(1).build()
         try {
             val response = client.messages().create(
                 MessageCreateParams.builder()
                     .model(CLAUDE_MODEL)
                     .maxTokens(4000L)
-                    .system(SYSTEM)
+                    .system(system)
                     .outputConfig(OutputConfig.builder().effort(OutputConfig.Effort.MEDIUM).build())
                     .addUserMessage(digest)
                     .build(),
@@ -206,11 +248,11 @@ object SleepCoach {
     }
 
     // Gemini has no SDK in the app: one POST to the REST API, which answers JSON when asked to
-    private fun askGemini(context: Context, key: String, digest: String): String {
+    private fun askGemini(context: Context, key: String, system: String, digest: String, json: Boolean): String {
         val body = JSONObject()
-            .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", SYSTEM))))
+            .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", system))))
             .put("contents", JSONArray().put(JSONObject().put("role", "user").put("parts", JSONArray().put(JSONObject().put("text", digest)))))
-            .put("generationConfig", JSONObject().put("responseMimeType", "application/json").put("maxOutputTokens", 8000))
+            .put("generationConfig", JSONObject().apply { if (json) put("responseMimeType", "application/json"); put("maxOutputTokens", 8000) })
         val url = java.net.URL("https://generativelanguage.googleapis.com/v1beta/models/$GEMINI_MODEL:generateContent")
         val connection = url.openConnection() as java.net.HttpURLConnection
         try {
@@ -238,6 +280,69 @@ object SleepCoach {
         } finally {
             connection.disconnect()
         }
+    }
+}
+
+/** The written summary of each session, kept by the session's start time. */
+object SessionSummaries {
+    private const val MAX = 60
+
+    private fun file(context: Context) = java.io.File(context.filesDir, "coach_summaries.json")
+
+    @Synchronized
+    private fun all(context: Context): JSONObject =
+        runCatching { JSONObject(file(context).readText()) }.getOrDefault(JSONObject())
+
+    /** The summary of the session that started at [start] as (text, when it was written), or null. */
+    fun get(context: Context, start: Long): Pair<String, Long>? =
+        all(context).optJSONObject(start.toString())?.let { it.optString("text") to it.optLong("at") }
+
+    @Synchronized
+    fun put(context: Context, start: Long, text: String, at: Long = System.currentTimeMillis()) {
+        val json = all(context)
+        json.put(start.toString(), JSONObject().put("text", text).put("at", at))
+        // Only the newest are kept
+        json.keys().asSequence().map { it.toLong() }.sortedDescending().drop(MAX).forEach { json.remove(it.toString()) }
+        val tmp = java.io.File(context.filesDir, "coach_summaries.json.tmp")
+        tmp.writeText(json.toString())
+        tmp.renameTo(file(context))
+    }
+}
+
+object AutoSummary {
+    private val busy = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /** Whether finished sessions are summarized on their own: switched on, with a key for the chosen provider. */
+    fun active(context: Context) = CoachPrefs.isEnabled(context) && CoachPrefs.autoSummary(context) && CoachPrefs.apiKey(context) != null
+
+    /**
+     * Tracking just stopped: once the watch has pushed the finished session (it can take a few minutes),
+     * summarize it, unless it has a summary already. Gives up quietly after a few tries.
+     */
+    fun onTrackingStopped(context: Context, stoppedAt: Long = System.currentTimeMillis()) {
+        val app = context.applicationContext
+        if (!active(app) || !busy.compareAndSet(false, true)) return
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            try {
+                for (wait in listOf(45_000L, 90_000L, 180_000L)) {
+                    kotlinx.coroutines.delay(wait)
+                    val session = SleepCoach.finishedSessions(app).lastOrNull { it.optLong("end") >= stoppedAt - 10 * 60_000 } ?: continue
+                    if (SessionSummaries.get(app, session.optLong("start")) == null) summarize(app, session)
+                    return@launch
+                }
+            } finally {
+                busy.set(false)
+            }
+        }
+    }
+
+    /** Summarizes [session] and keeps the text; false (and a log line) if it could not. */
+    fun summarize(context: Context, session: JSONObject): Boolean = try {
+        SessionSummaries.put(context, session.optLong("start"), SleepCoach.summarizeSession(context, session))
+        true
+    } catch (e: Exception) {
+        android.util.Log.w("AutoSummary", "no summary: ${e.message}")
+        false
     }
 }
 

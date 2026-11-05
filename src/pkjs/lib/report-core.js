@@ -179,10 +179,52 @@ function reportCore() {
       '<p class="hint">min ' + min + ' &middot; avg ' + Math.round(sum / pts.length) + ' &middot; max ' + max + ' ' + unit + '</p>';
   }
 
+  // Every measured series on one plot, each scaled to its own range so the shapes line up in time
+  var OVERLAY = [
+    { f: 's', name: 'Sleep stage', color: '#adb5bd', unit: '', keepZero: true, step: true },
+    { f: 'm', name: 'Movement', color: '#4dabf7', unit: '', keepZero: true },
+    { f: 'hr', name: 'Heart rate', color: '#ff6b6b', unit: ' bpm' },
+    { f: 'br', name: 'Breathing', color: '#20c997', unit: '/min' },
+    { f: 'o2', name: 'SpO2', color: '#9775fa', unit: '%' },
+    { f: 'n', name: 'Noise', color: '#e0a800', unit: ' dB' },
+    { f: 'g', name: 'Blood sugar', color: '#f783ac', unit: ' mg/dL' }
+  ];
+
+  function overlaySvg(s) {
+    var W = 320, H = 130, LEFT = 6, plotW = W - LEFT - 4, top = 6, plotH = H - 24;
+    var span = Math.max(s.end - s.start, 1), lines = '', legend = [];
+    OVERLAY.forEach(function (o) {
+      var pts = s.samples.filter(function (p) { return has(p, o.f, o.keepZero); });
+      if (pts.length < 2) return;
+      var min = Infinity, max = -Infinity;
+      pts.forEach(function (p) { min = Math.min(min, p[o.f]); max = Math.max(max, p[o.f]); });
+      var path = '';
+      pts.forEach(function (p, i) {
+        var x = LEFT + (p.t - s.start) / span * plotW;
+        var y = max === min ? top + plotH / 2 : top + (1 - (p[o.f] - min) / (max - min)) * plotH;
+        // A stage holds until the next sample, so it is drawn as steps
+        if (o.step && i) path += ' ' + x.toFixed(1) + ',' + path.split(' ').pop().split(',')[1];
+        path += (i ? ' ' : '') + x.toFixed(1) + ',' + y.toFixed(1);
+      });
+      lines += '<polyline points="' + path + '" fill="none" stroke="' + o.color + '" stroke-width="' + (o.step ? 1 : 1.5) +
+        '" opacity="' + (o.step ? 0.6 : 0.9) + '"/>';
+      legend.push('<span style="color:' + o.color + '">&#9679;</span> ' + o.name +
+        (o.step ? '' : ' ' + min + '&ndash;' + max + o.unit));
+    });
+    if (legend.length < 2) return '<p class="hint">Not enough data to overlay.</p>';
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%">' +
+      '<rect class="plot" x="' + LEFT + '" y="' + top + '" width="' + plotW + '" height="' + plotH + '"/>' + lines +
+      eventMarks(s, LEFT, plotW, top, plotH) +
+      '<text class="ax" x="' + LEFT + '" y="' + (H - 4) + '">' + fmtTime(s.start) + '</text>' +
+      '<text class="ax" x="' + (W - 4) + '" y="' + (H - 4) + '" text-anchor="end">' + fmtTime(s.end) + '</text></svg>' +
+      '<p class="hint">' + legend.join(' &nbsp; ') + '<br>Each line is scaled to its own range.</p>';
+  }
+
   // Settings-page graphs for one session
   function sessionGraphs(s) {
     var hasLight = s.samples.some(function (p) { return p.l > 0; });
     return '<h3>Sleep stages</h3>' + stepSvg(s, 's', STAGE_ROWS) + alarmLegend(s) +
+      '<h3>All graphs together</h3>' + overlaySvg(s) +
       '<h3>Movement</h3>' + lineSvg(s, 'm', '#4dabf7', 'movement', true) +
       '<h3>Heart rate</h3>' + lineSvg(s, 'hr', '#ff6b6b', 'bpm') +
       (s.samples.some(function (p) { return p.br > 0; }) ? '<h3>Breathing rate</h3>' + lineSvg(s, 'br', '#20c997', 'breaths per minute') : '') +

@@ -870,6 +870,10 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+        id<MaterialSwitch>(R.id.coach_auto_switch).apply {
+            isChecked = CoachPrefs.autoSummary(this@MainActivity)
+            setOnCheckedChangeListener { _, on -> CoachPrefs.setAutoSummary(this@MainActivity, on) }
+        }
         id<Button>(R.id.coach_provider_button).setOnClickListener {
             val providers = CoachProvider.entries
             MaterialAlertDialogBuilder(this)

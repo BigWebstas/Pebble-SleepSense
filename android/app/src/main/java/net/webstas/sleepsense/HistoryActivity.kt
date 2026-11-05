@@ -60,6 +60,25 @@ class HistoryActivity : AppCompatActivity() {
         @JavascriptInterface fun rateSession(start: Long, stars: Int) =
             SessionStore.setRating(this@HistoryActivity, start, stars.coerceIn(0, 5))
 
+        // The AI summary of a session: its text ("" if none), whether one can be asked for, and asking for it.
+        // The page hears the answer through window.onSummary
+        @JavascriptInterface fun summary(start: Long): String = SessionSummaries.get(this@HistoryActivity, start)?.first ?: ""
+
+        @JavascriptInterface fun canSummarize(): Boolean =
+            CoachPrefs.isEnabled(this@HistoryActivity) && CoachPrefs.apiKey(this@HistoryActivity) != null
+
+        @JavascriptInterface fun summarize(start: Long) {
+            Thread {
+                val session = SleepCoach.finishedSessions(this@HistoryActivity).firstOrNull { it.optLong("start") == start }
+                val outcome = runCatching {
+                    val s = session ?: throw CoachException(getString(R.string.coach_no_data))
+                    SleepCoach.summarizeSession(this@HistoryActivity, s).also { SessionSummaries.put(this@HistoryActivity, start, it) }
+                }
+                val text = outcome.getOrNull() ?: ((outcome.exceptionOrNull() as? CoachException)?.message ?: getString(R.string.coach_failed, outcome.exceptionOrNull()?.message ?: ""))
+                runOnUiThread { web.evaluateJavascript("window.onSummary($start, ${outcome.isSuccess}, ${org.json.JSONObject.quote(text)})", null) }
+            }.start()
+        }
+
         @JavascriptInterface fun copy(text: String) {
             runOnUiThread {
                 getSystemService(ClipboardManager::class.java)
