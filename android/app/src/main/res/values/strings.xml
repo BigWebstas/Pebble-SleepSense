@@ -138,7 +138,7 @@
     <string name="oximeter_no_device">Choose your oximeter to start.</string>
     <string name="oximeter_needs_permission">Bluetooth permission is needed. Switch this off and on to be asked again.</string>
     <string name="oximeter_ready">Will connect to %1$s when you start tracking.</string>
-    <string name="oximeter_last_run">Last night: average %1$d%%, lowest %2$d%%, %3$d min below 90%%.</string>
+    <string name="oximeter_last_run">Last session: average %1$d%%, lowest %2$d%%, %3$d min below 90%%.</string>
     <string name="oximeter_choose_button">Choose oximeter</string>
     <string name="oximeter_scanning">Looking for oximeters… switch yours on.</string>
     <string name="oximeter_choose_title">Choose your oximeter</string>
@@ -182,7 +182,7 @@
     <string name="strip_heart">Heart bpm</string>
     <string name="strip_spo2">SpO2 %</string>
     <string name="strip_breathing">Breaths/min</string>
-    <string name="last_night_section">Last night</string>
+    <string name="last_night_section">Last session</string>
     <string name="last_night_summary">%1$s asleep</string>
     <string name="appearance_section">Appearance</string>
     <string name="true_black_label">True black background (OLED)</string>

@@ -24,7 +24,7 @@ The watch app works on its own. Everything marked *(Android app)* needs the comp
 
 <table>
   <tr>
-    <td align="center" valign="top"><img src="docs/screenshots/android-main.png" width="260" alt="Main screen: tracking, last night, alarm, review"><br><sub>Main screen</sub></td>
+    <td align="center" valign="top"><img src="docs/screenshots/android-main.png" width="260" alt="Main screen: tracking, last session, alarm, review"><br><sub>Main screen</sub></td>
     <td align="center" valign="top"><img src="docs/screenshots/android-advanced.png" width="260" alt="Advanced: noise clips, pulse oximeter, sleep mode, white noise"><br><sub>Advanced</sub></td>
     <td align="center" valign="top"><img src="docs/screenshots/android-live.png" width="260" alt="Chest breathing rate and live readings with a breathing rate graph"><br><sub>Chest breathing and live readings</sub></td>
   </tr>
@@ -104,7 +104,7 @@ The `android/` folder is a small companion app. The Pebble app will not let an A
 A night-sky look (indigo, teal and amber; light and dark, plus an optional true-black OLED switch under *Appearance*). Each section is a card that folds when you tap its header, and the app remembers which are open.
 
 - **Sleep tracking**: "Tracking sleep since 23:10", "Not tracking" or "Watch app closed", the watch alarm, and the **Start / Stop tracking** button. Start opens SleepSense on the watch first if needed; stopping works while SleepSense is open on the watch, and the app asks the Pebble app to open it if not. While tracking, a strip stays pinned at the top with elapsed time, heart rate, SpO2 and breaths per minute.
-- **Last night**: rating ring, time asleep, and a stage ribbon.
+- **Last session**: rating ring, time asleep, and a stage ribbon.
 - **Alarm**: sync the phone's next alarm, the watch alarm time, alarm on/off, snooze, the smart wake window (set on the watch), and **30 / 45 / 60 minute nap** tiles that set the watch alarm and start tracking. **Open Clock app** is in the tracking card.
 - **Review**: **Noise clips** and **Sleep history and export**.
 - **Show advanced**: Noise Clips, Pulse Oximeter, Sleep Mode, White Noise, Connectivity (Home Assistant, webhook, calendar, Health Connect), Interfacing (widget, **Install on Pebble**, **Check for updates**), Chest Breathing Rate, Live Readings and Appearance.
