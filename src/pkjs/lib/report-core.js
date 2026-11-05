@@ -181,7 +181,6 @@ function reportCore() {
 
   // Every measured series on one plot, each scaled to its own range so the shapes line up in time
   var OVERLAY = [
-    { f: 's', name: 'Sleep stage', color: '#adb5bd', unit: '', keepZero: true, step: true },
     { f: 'm', name: 'Movement', color: '#4dabf7', unit: '', keepZero: true },
     { f: 'hr', name: 'Heart rate', color: '#ff6b6b', unit: ' bpm' },
     { f: 'br', name: 'Breathing', color: '#20c997', unit: '/min' },
@@ -202,14 +201,10 @@ function reportCore() {
       pts.forEach(function (p, i) {
         var x = LEFT + (p.t - s.start) / span * plotW;
         var y = max === min ? top + plotH / 2 : top + (1 - (p[o.f] - min) / (max - min)) * plotH;
-        // A stage holds until the next sample, so it is drawn as steps
-        if (o.step && i) path += ' ' + x.toFixed(1) + ',' + path.split(' ').pop().split(',')[1];
         path += (i ? ' ' : '') + x.toFixed(1) + ',' + y.toFixed(1);
       });
-      lines += '<polyline points="' + path + '" fill="none" stroke="' + o.color + '" stroke-width="' + (o.step ? 1 : 1.5) +
-        '" opacity="' + (o.step ? 0.6 : 0.9) + '"/>';
-      legend.push('<span style="color:' + o.color + '">&#9679;</span> ' + o.name +
-        (o.step ? '' : ' ' + min + '&ndash;' + max + o.unit));
+      lines += '<polyline points="' + path + '" fill="none" stroke="' + o.color + '" stroke-width="1.5" opacity="0.9"/>';
+      legend.push('<span style="color:' + o.color + '">&#9679;</span> ' + o.name + ' ' + min + '&ndash;' + max + o.unit);
     });
     if (legend.length < 2) return '<p class="hint">Not enough data to overlay.</p>';
     return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%">' +
