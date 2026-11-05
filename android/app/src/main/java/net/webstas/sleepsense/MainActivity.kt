@@ -874,9 +874,7 @@ class MainActivity : AppCompatActivity() {
         val sound = WhiteNoisePrefs.sound(this)
         id<Button>(R.id.white_noise_sound_button).text = getString(
             R.string.white_noise_sound_label,
-            if (WhiteNoisePrefs.useSpotify(this)) {
-                getString(R.string.white_noise_spotify_title)
-            } else if (WhiteNoisePrefs.useFiles(this)) {
+            if (WhiteNoisePrefs.useFiles(this)) {
                 resources.getQuantityString(R.plurals.white_noise_files_title, WhiteNoisePrefs.files(this).size, WhiteNoisePrefs.files(this).size)
             } else {
                 getString(sound.titleRes)
@@ -888,52 +886,12 @@ class MainActivity : AppCompatActivity() {
         setPlayStopIcon(R.id.white_noise_play_button, playing)
     }
 
-    // The link of a Spotify playlist, offered from the clipboard when it holds one
-    private fun askSpotifyLink() {
-        val clip = getSystemService(android.content.ClipboardManager::class.java).primaryClip
-            ?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()
-        val input = android.widget.EditText(this).apply {
-            hint = getString(R.string.white_noise_spotify_hint)
-            setText(clip?.takeIf { SpotifyLink.parse(it) != null } ?: WhiteNoisePrefs.spotify(this@MainActivity) ?: "")
-            setSingleLine()
-        }
-        val spotify = packageManager.getLaunchIntentForPackage("com.spotify.music")
-        MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.white_noise_spotify_title)
-            .setMessage(R.string.white_noise_spotify_message)
-            .setView(input)
-            .apply {
-                // Spotify itself: find the playlist there, then Share it to SleepSense
-                if (spotify != null) setNeutralButton(R.string.white_noise_spotify_open) { _, _ -> startActivity(spotify) }
-            }
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                val address = SpotifyLink.parse(input.text.toString())
-                if (address == null) {
-                    Toast.makeText(this, R.string.white_noise_spotify_invalid, Toast.LENGTH_LONG).show()
-                } else {
-                    WhiteNoisePrefs.setSpotify(this, address)
-                    if (WhiteNoisePlayer.isPlaying) WhiteNoisePlayer.restart(this)
-                    refreshWhiteNoise()
-                    // The one-time permission for this app to control Spotify, asked now while it is in front
-                    SpotifyRemote.connect(this, true) { ok ->
-                        runOnUiThread {
-                            Toast.makeText(this, if (ok) R.string.white_noise_spotify_connected else R.string.white_noise_spotify_not_connected, Toast.LENGTH_LONG).show()
-                        }
-                        if (ok) SpotifyRemote.disconnect()
-                    }
-                }
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
     private fun chooseWhiteNoiseSound() {
         val current = WhiteNoisePrefs.sound(this)
         val sounds = WhiteNoiseSound.entries
         // The noises, then one more entry for the phone's own audio files
-        val labels = (sounds.map { getString(it.descRes) } + getString(R.string.white_noise_files_desc) + getString(R.string.white_noise_spotify_desc)).toTypedArray()
+        val labels = (sounds.map { getString(it.descRes) } + getString(R.string.white_noise_files_desc)).toTypedArray()
         val checkedIndex = when {
-            WhiteNoisePrefs.useSpotify(this) -> sounds.size + 1
             WhiteNoisePrefs.useFiles(this) -> sounds.size
             else -> sounds.indexOf(current).coerceAtLeast(0)
         }
@@ -944,10 +902,6 @@ class MainActivity : AppCompatActivity() {
                 dialog.dismiss()
                 if (which == sounds.size) {
                     pickSleepFiles.launch(arrayOf("audio/*"))
-                    return@setSingleChoiceItems
-                }
-                if (which == sounds.size + 1) {
-                    askSpotifyLink()
                     return@setSingleChoiceItems
                 }
                 val chosen = sounds[which]

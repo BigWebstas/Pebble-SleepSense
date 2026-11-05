@@ -119,15 +119,6 @@
         <item quantity="one">%d audio file</item>
         <item quantity="other">%d audio files</item>
     </plurals>
-    <string name="white_noise_spotify_title">Spotify playlist</string>
-    <string name="white_noise_spotify_desc">A Spotify playlist (opens Spotify)</string>
-    <string name="white_noise_spotify_message">Paste a playlist link from Spotify (Share, then Copy link). Easiest: tap Open Spotify, find the playlist, tap Share and choose SleepSense. Or paste its link here. The first time, Spotify asks to let SleepSense control it; after that the playlist starts and pauses with the sound, without opening Spotify.</string>
-    <string name="white_noise_spotify_open">Open Spotify</string>
-    <string name="white_noise_spotify_saved">Spotify playlist set as the sleep sound</string>
-    <string name="white_noise_spotify_hint">https://open.spotify.com/playlist/…</string>
-    <string name="white_noise_spotify_connected">Spotify is connected</string>
-    <string name="white_noise_spotify_not_connected">Could not connect to Spotify. Open Spotify once and try again; the app must also be registered with it.</string>
-    <string name="white_noise_spotify_invalid">That is not a Spotify link</string>
     <string name="white_noise_play_button">Play white noise</string>
     <string name="white_noise_stop_button">Stop white noise</string>
 
@@ -199,7 +190,7 @@
     <string name="backup_done">Backed up: %s</string>
     <string name="backup_failed">Backup failed. Choose the folder again.</string>
     <string name="backup_restore_title">Restore this backup?</string>
-    <string name="backup_restore_message">Settings and sleep history on this phone are replaced by the ones in the backup. Noise clips are not part of it, and the sleep sound files or Spotify link may need choosing again.</string>
+    <string name="backup_restore_message">Settings and sleep history on this phone are replaced by the ones in the backup. Noise clips are not part of it, and the sleep sound files may need choosing again.</string>
     <string name="backup_restore_confirm">Restore</string>
     <string name="backup_restored">Restored %d items</string>
     <string name="backup_restore_failed">Could not restore: that is not a SleepSense backup</string>

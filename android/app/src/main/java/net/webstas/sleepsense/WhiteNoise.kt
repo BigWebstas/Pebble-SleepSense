@@ -1,10 +1,7 @@
 package net.webstas.sleepsense
 
 import android.content.Context
-import android.content.Intent
 import android.media.AudioAttributes
-import android.media.AudioManager
-import android.view.KeyEvent
 import android.media.AudioFormat
 import android.media.AudioTrack
 import android.media.MediaPlayer
@@ -44,8 +41,6 @@ object WhiteNoisePrefs {
     private const val KEY_SOUND = "sound"
     private const val KEY_FILES = "files"
     private const val KEY_USE_FILES = "use_files"
-    private const val KEY_SPOTIFY = "spotify"
-    private const val KEY_USE_SPOTIFY = "use_spotify"
 
     fun isPlayWhileTracking(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -67,7 +62,6 @@ object WhiteNoisePrefs {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
             putString(KEY_SOUND, sound.id)
             putBoolean(KEY_USE_FILES, false)
-            putBoolean(KEY_USE_SPOTIFY, false)
         }
     }
 
@@ -86,22 +80,6 @@ object WhiteNoisePrefs {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
             putString(KEY_FILES, JSONArray(uris.map { it.toString() }).toString())
             putBoolean(KEY_USE_FILES, uris.isNotEmpty())
-            putBoolean(KEY_USE_SPOTIFY, false)
-        }
-    }
-
-    /** The Spotify address chosen as the sleep sound ("spotify:playlist:..."), or null. */
-    fun spotify(context: Context): String? =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_SPOTIFY, null)
-
-    fun useSpotify(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_USE_SPOTIFY, false) && spotify(context) != null
-
-    fun setSpotify(context: Context, address: String) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
-            putString(KEY_SPOTIFY, address)
-            putBoolean(KEY_USE_SPOTIFY, true)
-            putBoolean(KEY_USE_FILES, false)
         }
     }
 }
@@ -156,10 +134,6 @@ object WhiteNoisePlayer {
         isPlaying = true
         notifyListeners()
 
-        if (WhiteNoisePrefs.useSpotify(context)) {
-            startSpotify(context.applicationContext, WhiteNoisePrefs.spotify(context)!!)
-            return
-        }
         val files = if (WhiteNoisePrefs.useFiles(context)) WhiteNoisePrefs.files(context) else emptyList()
         if (files.isNotEmpty()) {
             startFiles(context.applicationContext, files)
@@ -180,51 +154,6 @@ object WhiteNoisePlayer {
         worker?.join(1500)
         worker = null
         stopFiles()
-        if (spotifyStarted) pauseSpotify()
-    }
-
-    // Spotify plays by itself: it is opened on the playlist, and paused again with a media key
-    private var spotifyStarted = false
-    private var appContext: Context? = null
-
-    private fun startSpotify(context: Context, address: String) {
-        appContext = context
-        spotifyStarted = true
-        // Through Spotify's remote interface when it lets us; otherwise by opening the playlist
-        SpotifyRemote.play(context, address) { ok ->
-            if (!ok && isPlaying) openSpotifyLink(context, address)
-        }
-    }
-
-    private fun openSpotifyLink(context: Context, address: String) {
-        val open = Intent(Intent.ACTION_VIEW, Uri.parse(address))
-            .setPackage("com.spotify.music")
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            // Opened as if from the search app, Spotify starts playing instead of only showing the playlist
-            .putExtra(Intent.EXTRA_REFERRER, Uri.parse("android-app://com.google.android.googlequicksearchbox/https/www.google.com"))
-        try {
-            context.startActivity(open)
-            // Some versions only show the playlist: a play key a moment later starts it
-            Handler(android.os.Looper.getMainLooper()).postDelayed({ if (isPlaying) mediaKey(context, KeyEvent.KEYCODE_MEDIA_PLAY) }, 3000)
-        } catch (e: Exception) {
-            Log.w(TAG, "could not open Spotify: $e")
-            spotifyStarted = false
-            isPlaying = false
-            notifyListeners()
-        }
-    }
-
-    private fun pauseSpotify() {
-        spotifyStarted = false
-        SpotifyRemote.pause()
-        SpotifyRemote.disconnect()
-        appContext?.let { mediaKey(it, KeyEvent.KEYCODE_MEDIA_PAUSE) } // in case it was opened by its link instead
-    }
-
-    private fun mediaKey(context: Context, code: Int) {
-        val audio = context.getSystemService(AudioManager::class.java)
-        audio.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
-        audio.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
     }
 
     /** Starts again with whatever is now chosen: the noise and the files are different players. */

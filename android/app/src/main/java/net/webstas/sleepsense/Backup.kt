@@ -57,7 +57,7 @@ object BackupPrefs {
 /**
  * A backup is one zip with the app's settings (every preference file but the transient ones) and its
  * data files (sleep history, oximeter and chest logs; not the noise clips, which can be large). The
- * Spotify link and the sleep sound files are only references and may need choosing again on a new phone.
+ * sleep sound files are only references and may need choosing again on a new phone.
  * Settings include the Home Assistant and webhook details, so keep the folder private.
  */
 object Backup {
