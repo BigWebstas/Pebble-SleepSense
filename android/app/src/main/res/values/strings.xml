@@ -200,7 +200,7 @@
     <string name="xdrip_last">Last reading: %1$d mg/dL, %2$s</string>
     <string name="coach_section">Sleep coach (AI)</string>
     <string name="coach_label">AI sleep summary</string>
-    <string name="coach_consent_title">Send sleep data to Claude?</string>
+    <string name="coach_consent_title">Send sleep data to an AI?</string>
     <string name="coach_consent_message">When you tap Summarize, a short text summary of your last 14 sessions (times, stage minutes, heart rate, blood oxygen, noise, breathing, blood sugar if imported, ratings) and your alarm settings is sent to the provider you choose (Claude by Anthropic, or Gemini by Google) with your own API key, and the answer is shown here. Nothing is sent otherwise, and no name, account or location is included.</string>
     <string name="coach_consent_ok">Turn on</string>
     <string name="coach_provider_claude">Claude</string>
@@ -214,7 +214,7 @@
     <string name="coach_key_hint">API key</string>
     <string name="coach_key_message">Claude: create a key at console.anthropic.com. Gemini: create one at aistudio.google.com. It is kept on this phone only, and is not part of backups.</string>
     <string name="coach_summarize_button">Summarize my sleep</string>
-    <string name="coach_working">Asking Claude…</string>
+    <string name="coach_working">Asking AI…</string>
     <string name="coach_no_key">Set your API key first.</string>
     <string name="coach_no_data">There are no finished sessions to summarize yet.</string>
     <string name="coach_empty">The answer was empty. Try again.</string>
