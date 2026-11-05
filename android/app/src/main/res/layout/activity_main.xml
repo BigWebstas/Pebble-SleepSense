@@ -1063,6 +1063,94 @@
                     android:paddingBottom="16dp">
 
                     <TextView
+                        android:id="@+id/coach_section_label"
+                        style="@style/SectionHeader"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:drawableStart="@drawable/ic_tune"
+                        android:text="@string/coach_section" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical">
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/coach_switch"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="@string/coach_label" />
+
+                        <LinearLayout
+                            android:id="@+id/coach_details"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_horizontal"
+                            android:orientation="vertical"
+                            android:visibility="gone">
+
+                    <Button
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:id="@+id/coach_provider_button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:minWidth="220dp" />
+                    <Button
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:id="@+id/coach_key_button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:minWidth="220dp" />
+                    <Button
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:id="@+id/coach_summarize_button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:minWidth="220dp"
+                        android:text="@string/coach_summarize_button" />
+
+                            <TextView
+                                android:id="@+id/coach_result_text"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="12dp"
+                                android:textIsSelectable="true"
+                                android:textSize="14sp" />
+
+                    <Button
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        android:id="@+id/coach_apply_button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:minWidth="220dp"
+                        android:text="@string/coach_apply_button" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                style="@style/SectionCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="16dp"
+                    android:paddingBottom="16dp">
+
+                    <TextView
                         android:id="@+id/appearance_section_label"
                         style="@style/SectionHeader"
                         android:layout_width="wrap_content"

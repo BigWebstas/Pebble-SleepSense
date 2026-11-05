@@ -41,5 +41,6 @@ dependencies {
     implementation(libs.pebblekit.client)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.paho.mqtt)
+    implementation("com.anthropic:anthropic-java:3.2.0") // the optional AI sleep summary
     testImplementation("junit:junit:4.13.2")
 }

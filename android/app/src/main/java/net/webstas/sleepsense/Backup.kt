@@ -66,8 +66,8 @@ object Backup {
     private const val KEEP_AUTO = 10
     private const val AFTER_STOP_MS = 30_000L // the finished night's history is pushed shortly after the stop
 
-    // State of the moment, not settings; and this screen's own choice of folder stays where it is
-    private val SKIP_PREFS = setOf("widget_state", "update", "sleep_state", "backup")
+    // State of the moment, not settings; this screen's own choice of folder stays where it is; the AI key stays on the phone
+    private val SKIP_PREFS = setOf("widget_state", "update", "sleep_state", "backup", "ai_coach")
     private val DATA_FILES = listOf("sessions.json", "oximeter.csv", "oximeter_wave.csv", "oximeter_events.csv", "chest_rate.csv", "glucose.csv")
 
     /** Called when the watch starts or stops tracking, to back up if that was asked for. */

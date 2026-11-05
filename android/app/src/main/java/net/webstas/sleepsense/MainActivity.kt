@@ -290,6 +290,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         setUpBackup()
+        setUpCoach()
         id<MaterialSwitch>(R.id.xdrip_switch).apply {
             isChecked = GlucoseLog.isEnabled(this@MainActivity)
             setOnCheckedChangeListener { _, on ->
@@ -345,6 +346,7 @@ class MainActivity : AppCompatActivity() {
         refreshHealth()
         refreshWhiteNoise()
         refreshBackup()
+        refreshCoach()
         refreshXdrip()
         refreshCalendar()
         refreshLastNight(force = true)
@@ -843,6 +845,152 @@ class MainActivity : AppCompatActivity() {
             }
         }
         id<Button>(R.id.backup_restore_button).setOnClickListener { pickBackupFile.launch(arrayOf("application/zip", "application/octet-stream")) }
+    }
+
+    private fun setUpCoach() {
+        id<MaterialSwitch>(R.id.coach_switch).apply {
+            isChecked = CoachPrefs.isEnabled(this@MainActivity)
+            setOnCheckedChangeListener { button, on ->
+                if (on && !CoachPrefs.isEnabled(this@MainActivity)) {
+                    // Switched on only after being told what is sent
+                    button.isChecked = false
+                    MaterialAlertDialogBuilder(this@MainActivity)
+                        .setTitle(R.string.coach_consent_title)
+                        .setMessage(R.string.coach_consent_message)
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .setPositiveButton(R.string.coach_consent_ok) { _, _ ->
+                            CoachPrefs.setEnabled(this@MainActivity, true)
+                            button.isChecked = true
+                            refreshCoach()
+                        }
+                        .show()
+                } else {
+                    CoachPrefs.setEnabled(this@MainActivity, on)
+                    refreshCoach()
+                }
+            }
+        }
+        id<Button>(R.id.coach_provider_button).setOnClickListener {
+            val providers = CoachProvider.entries
+            MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.coach_provider_title)
+                .setSingleChoiceItems(
+                    providers.map { getString(it.titleRes) }.toTypedArray(),
+                    providers.indexOf(CoachPrefs.provider(this)),
+                ) { dialog, which ->
+                    CoachPrefs.setProvider(this, providers[which])
+                    dialog.dismiss()
+                    refreshCoach()
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
+        id<Button>(R.id.coach_key_button).setOnClickListener {
+            val provider = CoachPrefs.provider(this)
+            val input = android.widget.EditText(this).apply {
+                hint = getString(R.string.coach_key_hint)
+                inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+                setSingleLine()
+            }
+            MaterialAlertDialogBuilder(this)
+                .setTitle(getString(R.string.coach_key_title, getString(provider.titleRes)))
+                .setMessage(R.string.coach_key_message)
+                .setView(input)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(android.R.string.ok) { _, _ ->
+                    CoachPrefs.setApiKey(this, provider, input.text.toString())
+                    refreshCoach()
+                }
+                .show()
+        }
+        id<Button>(R.id.coach_summarize_button).setOnClickListener { summarizeSleep() }
+        id<Button>(R.id.coach_apply_button).setOnClickListener { confirmApplyAdvice() }
+    }
+
+    private fun refreshCoach() {
+        val enabled = CoachPrefs.isEnabled(this)
+        id<View>(R.id.coach_details).visibility = if (enabled) View.VISIBLE else View.GONE
+        val provider = CoachPrefs.provider(this)
+        id<Button>(R.id.coach_provider_button).text = getString(R.string.coach_provider_button, getString(provider.titleRes))
+        id<Button>(R.id.coach_key_button).text = getString(
+            R.string.coach_key_button,
+            getString(provider.titleRes),
+            getString(if (CoachPrefs.apiKey(this) != null) R.string.coach_key_set else R.string.coach_key_unset),
+        )
+        val last = CoachPrefs.last(this)
+        id<TextView>(R.id.coach_result_text).apply {
+            visibility = if (last != null) View.VISIBLE else View.GONE
+            if (last != null) text = describeAdvice(last.first, last.second)
+        }
+        id<Button>(R.id.coach_apply_button).visibility =
+            if (last?.second?.alarmTime() != null && last.second.smartWindow != null) View.VISIBLE else View.GONE
+    }
+
+    private fun describeAdvice(at: Long, advice: CoachAdvice): String = buildString {
+        appendLine(getString(R.string.coach_asked, android.text.format.DateUtils.getRelativeTimeSpanString(at)))
+        appendLine()
+        appendLine(advice.summary)
+        if (advice.sleepMinutes != null || advice.alarm != null) {
+            appendLine()
+            appendLine(
+                getString(
+                    R.string.coach_suggestion,
+                    advice.sleepMinutes?.let { duration(it.toLong()) } ?: "-",
+                    advice.bedtime ?: "-",
+                    advice.alarm ?: "-",
+                    advice.smartWindow?.let { getString(R.string.smart_window_minutes, it) } ?: "-",
+                ),
+            )
+        }
+        if (advice.nextAlarms.isNotEmpty()) {
+            appendLine()
+            appendLine(getString(R.string.coach_next_alarms))
+            advice.nextAlarms.forEach { appendLine("• ${it.label}: ${it.time} (${it.reason})") }
+        }
+        if (advice.recommendations.isNotEmpty()) {
+            appendLine()
+            advice.recommendations.forEach { appendLine("• $it") }
+        }
+        appendLine()
+        append(getString(R.string.coach_disclaimer))
+    }
+
+    private fun summarizeSleep() {
+        val button = id<Button>(R.id.coach_summarize_button)
+        val result = id<TextView>(R.id.coach_result_text)
+        button.isEnabled = false
+        result.visibility = View.VISIBLE
+        result.setText(R.string.coach_working)
+        lifecycleScope.launch {
+            val outcome = withContext(Dispatchers.IO) { runCatching { SleepCoach.ask(this@MainActivity) } }
+            button.isEnabled = true
+            outcome.onSuccess { (json, _) -> CoachPrefs.setLast(this@MainActivity, json, System.currentTimeMillis()) }
+            outcome.onFailure { e ->
+                Toast.makeText(this@MainActivity, (e as? CoachException)?.message ?: getString(R.string.coach_failed, e.message ?: ""), Toast.LENGTH_LONG).show()
+            }
+            refreshCoach()
+            if (outcome.isFailure && CoachPrefs.last(this@MainActivity) == null) result.visibility = View.GONE
+        }
+    }
+
+    // The suggested alarm and window replace the ones in the app, like a nap or a time picked here; syncing the phone's alarm goes off
+    private fun confirmApplyAdvice() {
+        val advice = CoachPrefs.last(this)?.second ?: return
+        val (hour, minute) = advice.alarmTime() ?: return
+        val window = advice.smartWindow ?: return
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.coach_apply_button)
+            .setMessage(getString(R.string.coach_applied, "%02d:%02d".format(hour, minute), window))
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                PhoneAlarmSync.setEnabled(this, false)
+                PhoneAlarmSync.setCustomAlarm(this, hour, minute)
+                PhoneAlarmSync.setAlarmEnabled(this, true)
+                PhoneAlarmSync.chooseSmartWindow(this, window)
+                id<MaterialSwitch>(R.id.alarm_sync_switch).isChecked = false
+                refreshAlarmSettings()
+            }
+            .show()
     }
 
     private fun refreshXdrip() {
