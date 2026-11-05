@@ -7,8 +7,9 @@ import android.media.AudioTrack
 import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Handler
-import android.os.Looper
+import android.os.HandlerThread
 import android.os.PowerManager
+import android.os.Process
 import android.util.Log
 import androidx.core.content.edit
 import org.json.JSONArray
@@ -20,7 +21,7 @@ import kotlin.math.sin
 
 private const val TAG = "WhiteNoisePlayer"
 private const val FADE_MS = 12_000L
-private const val FADE_STEP_MS = 20L // small gain steps, so the fade is smooth instead of crackling
+private const val FADE_STEP_MS = 40L // small gain steps, so the fade is smooth instead of crackling
 private const val FADE_IN_MS = 1_500L // when a song ended early and there was no overlap to fade in from
 
 /** The available synthesized sleep sound types. */
@@ -298,7 +299,9 @@ private class CrossfadeLoop(
     private val uris: List<Uri>,
     private val onFailed: () -> Unit,
 ) {
-    private val handler = Handler(Looper.getMainLooper())
+    // Its own thread, so a busy screen (its refreshes run on the main thread) cannot hold up the fade's volume steps
+    private val thread = HandlerThread("crossfade", Process.THREAD_PRIORITY_AUDIO).apply { start() }
+    private val handler = Handler(thread.looper)
     private var current: MediaPlayer? = null
     private var next: MediaPlayer? = null // prepared and waiting
     private var nextIndex = 0
@@ -324,6 +327,7 @@ private class CrossfadeLoop(
             next?.release()
             current = null
             next = null
+            thread.quitSafely()
         }
     }
 
@@ -386,17 +390,25 @@ private class CrossfadeLoop(
         Log.i(TAG, "cross fading into the next song")
         fading = true
         incoming.setVolume(0f, 0f)
+        val beforeStart = System.nanoTime()
         incoming.start()
         val startedAt = System.nanoTime()
+        Log.i(TAG, "cross fade: start() took ${(startedAt - beforeStart) / 1_000_000} ms")
+        var lastStep = startedAt
+        var worstGap = 0L
         object : Runnable {
             override fun run() {
-                val t = ((System.nanoTime() - startedAt) / 1_000_000f / fadeMs).coerceAtMost(1f)
+                val now = System.nanoTime()
+                worstGap = max(worstGap, (now - lastStep) / 1_000_000)
+                lastStep = now
+                val t = ((now - startedAt) / 1_000_000f / fadeMs).coerceAtMost(1f)
                 // equal-power curves keep the loudness steady through the overlap
                 outgoing.setVolume(cos(t * PI.toFloat() / 2), cos(t * PI.toFloat() / 2))
                 incoming.setVolume(sin(t * PI.toFloat() / 2), sin(t * PI.toFloat() / 2))
                 if (t < 1f) {
                     handler.postDelayed(this, FADE_STEP_MS)
                 } else {
+                    Log.i(TAG, "cross fade done, longest wait between volume steps $worstGap ms")
                     fading = false
                     outgoing.release()
                     begin(incoming, nextIndex)
