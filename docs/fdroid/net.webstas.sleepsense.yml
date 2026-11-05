@@ -1,0 +1,30 @@
+# Draft metadata for F-Droid (copy to metadata/net.webstas.sleepsense.yml in a fork of
+# https://gitlab.com/fdroid/fdroiddata and open a merge request). Store text and screenshots
+# come from fastlane/metadata in this repository.
+Categories:
+  - Sports & Health
+License: GPL-3.0-or-later
+AuthorName: BigWebstas
+WebSite: https://github.com/BigWebstas/Pebble-SleepSense
+SourceCode: https://github.com/BigWebstas/Pebble-SleepSense
+IssueTracker: https://github.com/BigWebstas/Pebble-SleepSense/issues
+
+AntiFeatures:
+  NonFreeNet:
+    en-US: The optional AI sleep summary sends a text digest of your recent sleep to Anthropic's or Google's services, with your own API key. It is off by default.
+
+RepoType: git
+Repo: https://github.com/BigWebstas/Pebble-SleepSense.git
+
+Builds:
+  - versionName: 0.8.0
+    versionCode: 13
+    commit: v0.8.0
+    subdir: android/app
+    gradle:
+      - yes
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: 0.8.0
+CurrentVersionCode: 13

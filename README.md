@@ -259,3 +259,9 @@ adb forward --remove tcp:9000
 - **History** reaches the Android app only while SleepSense is open on the watch.
 - **The alarm sync is one-way** (phone to watch) on purpose, and a time set on the watch turns it off: Android has no safe way to switch a Clock-app alarm back on, and turning one off disables the whole repeating alarm.
 - **Health Connect** export is experimental (see above).
+
+---
+
+## License
+
+SleepSense is free software under the **GNU General Public License, version 3 or later**. See [LICENSE](LICENSE).
