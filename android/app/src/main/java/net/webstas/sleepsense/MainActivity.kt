@@ -408,7 +408,6 @@ class MainActivity : AppCompatActivity() {
         val (title, subtitle) = WidgetState.lines(this)
         id<TextView>(R.id.tracking_status_text).text = title
         setTrackingDots(tracking)
-        id<TextView>(R.id.alarm_status_text).text = PhoneAlarmSync.describe(this).lineSequence().first()
         id<Button>(R.id.tracking_button).setText(if (tracking) R.string.stop_tracking_button else R.string.start_tracking_button)
         setPlayStopIcon(R.id.tracking_button, tracking)
         val since = WidgetState.since(this)

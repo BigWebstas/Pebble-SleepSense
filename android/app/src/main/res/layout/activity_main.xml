@@ -225,14 +225,6 @@
                     android:textStyle="bold"
                     android:visibility="gone" />
 
-                <TextView
-            android:id="@+id/alarm_status_text"
-                    android:textColor="?attr/colorOnPrimaryContainer"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:gravity="center" />
-
         <Button
             android:id="@+id/tracking_button"
                 android:minHeight="56dp"
@@ -243,17 +235,6 @@
             app:icon="@drawable/ic_play_arrow"
             app:iconPadding="8dp"
             android:text="@string/start_tracking_button" />
-
-        <Button
-            style="@style/Widget.Material3.Button.TonalButton"
-            android:id="@+id/clock_button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:minWidth="220dp"
-            app:icon="@drawable/ic_alarm"
-            app:iconPadding="8dp"
-            android:text="@string/open_clock_button" />
 
         </LinearLayout>
                 </LinearLayout>
@@ -995,6 +976,17 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="@string/alarm_sync_label" />
+
+            <Button
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:id="@+id/clock_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:minWidth="220dp"
+                app:icon="@drawable/ic_alarm"
+                app:iconPadding="8dp"
+                android:text="@string/open_clock_button" />
 
             <Button
                 style="@style/Widget.Material3.Button.TonalButton"
