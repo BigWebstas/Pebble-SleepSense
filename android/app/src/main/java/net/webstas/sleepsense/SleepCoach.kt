@@ -2,13 +2,8 @@ package net.webstas.sleepsense
 
 import android.content.Context
 import androidx.core.content.edit
-import com.anthropic.client.okhttp.AnthropicOkHttpClient
-import com.anthropic.errors.AnthropicException
-import com.anthropic.models.messages.MessageCreateParams
-import com.anthropic.models.messages.OutputConfig
 import org.json.JSONArray
 import org.json.JSONObject
-import java.time.Duration
 import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
@@ -223,63 +218,67 @@ object SleepCoach {
         return text
     }
 
-    private fun askClaude(context: Context, key: String, system: String, digest: String): String {
-        val client = AnthropicOkHttpClient.builder().apiKey(key).timeout(Duration.ofSeconds(120)).maxRetries(1).build()
-        try {
-            val response = client.messages().create(
-                MessageCreateParams.builder()
-                    .model(CLAUDE_MODEL)
-                    .maxTokens(4000L)
-                    .system(system)
-                    .outputConfig(OutputConfig.builder().effort(OutputConfig.Effort.MEDIUM).build())
-                    .addUserMessage(digest)
-                    .build(),
-            )
-            return response.content().mapNotNull { it.text().orElse(null)?.text() }.joinToString("")
-        } catch (e: com.anthropic.errors.UnauthorizedException) {
-            throw CoachException(context.getString(R.string.coach_bad_key))
-        } catch (e: com.anthropic.errors.RateLimitException) {
-            throw CoachException(context.getString(R.string.coach_rate_limited))
-        } catch (e: AnthropicException) {
-            throw CoachException(context.getString(R.string.coach_failed, e.message ?: e.javaClass.simpleName))
-        } finally {
-            client.close()
-        }
-    }
+    // Both providers are one POST each, so the app carries no SDK for either
+    private class HttpReply(val code: Int, val body: String)
 
-    // Gemini has no SDK in the app: one POST to the REST API, which answers JSON when asked to
-    private fun askGemini(context: Context, key: String, system: String, digest: String, json: Boolean): String {
-        val body = JSONObject()
-            .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", system))))
-            .put("contents", JSONArray().put(JSONObject().put("role", "user").put("parts", JSONArray().put(JSONObject().put("text", digest)))))
-            .put("generationConfig", JSONObject().apply { if (json) put("responseMimeType", "application/json"); put("maxOutputTokens", 8000) })
-        val url = java.net.URL("https://generativelanguage.googleapis.com/v1beta/models/$GEMINI_MODEL:generateContent")
-        val connection = url.openConnection() as java.net.HttpURLConnection
+    private fun postJson(context: Context, url: String, headers: Map<String, String>, body: JSONObject): HttpReply {
+        val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
         try {
             connection.requestMethod = "POST"
             connection.connectTimeout = 15_000
             connection.readTimeout = 120_000
             connection.doOutput = true
             connection.setRequestProperty("Content-Type", "application/json")
-            connection.setRequestProperty("x-goog-api-key", key)
+            headers.forEach { (k, v) -> connection.setRequestProperty(k, v) }
             connection.outputStream.use { it.write(body.toString().toByteArray()) }
             val code = connection.responseCode
             val reply = (if (code in 200..299) connection.inputStream else connection.errorStream)?.bufferedReader()?.use { it.readText() } ?: ""
-            when {
-                code == 429 -> throw CoachException(context.getString(R.string.coach_rate_limited))
-                code == 401 || code == 403 || (code == 400 && reply.contains("API key"))
-                -> throw CoachException(context.getString(R.string.coach_bad_key))
-                code !in 200..299 -> throw CoachException(
-                    context.getString(R.string.coach_failed, runCatching { JSONObject(reply).getJSONObject("error").getString("message") }.getOrDefault("HTTP $code")),
-                )
-            }
-            val parts = JSONObject(reply).optJSONArray("candidates")?.optJSONObject(0)?.optJSONObject("content")?.optJSONArray("parts")
-            return parts?.let { p -> (0 until p.length()).joinToString("") { p.getJSONObject(it).optString("text") } } ?: ""
+            return HttpReply(code, reply)
         } catch (e: java.io.IOException) {
             throw CoachException(context.getString(R.string.coach_failed, e.message ?: e.javaClass.simpleName))
         } finally {
             connection.disconnect()
         }
+    }
+
+    /** The message a provider's error body carries ({"error": {"message": ...}}), or the HTTP code. */
+    private fun errorText(reply: HttpReply) =
+        runCatching { JSONObject(reply.body).getJSONObject("error").getString("message") }.getOrDefault("HTTP ${reply.code}")
+
+    private fun askClaude(context: Context, key: String, system: String, digest: String): String {
+        val body = JSONObject()
+            .put("model", CLAUDE_MODEL)
+            .put("max_tokens", 8000) // the model's own thinking counts against this
+            .put("system", system)
+            .put("output_config", JSONObject().put("effort", "medium"))
+            .put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", digest)))
+        val reply = postJson(context, "https://api.anthropic.com/v1/messages", mapOf("x-api-key" to key, "anthropic-version" to "2023-06-01"), body)
+        when {
+            reply.code == 401 || reply.code == 403 -> throw CoachException(context.getString(R.string.coach_bad_key))
+            reply.code == 429 -> throw CoachException(context.getString(R.string.coach_rate_limited))
+            reply.code !in 200..299 -> throw CoachException(context.getString(R.string.coach_failed, errorText(reply)))
+        }
+        val json = JSONObject(reply.body)
+        if (json.optString("stop_reason") == "refusal") throw CoachException(context.getString(R.string.coach_failed, "declined"))
+        val blocks = json.optJSONArray("content") ?: return ""
+        return (0 until blocks.length()).map { blocks.getJSONObject(it) }.filter { it.optString("type") == "text" }.joinToString("") { it.optString("text") }
+    }
+
+    // Gemini answers JSON when asked to
+    private fun askGemini(context: Context, key: String, system: String, digest: String, json: Boolean): String {
+        val body = JSONObject()
+            .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", system))))
+            .put("contents", JSONArray().put(JSONObject().put("role", "user").put("parts", JSONArray().put(JSONObject().put("text", digest)))))
+            .put("generationConfig", JSONObject().apply { if (json) put("responseMimeType", "application/json"); put("maxOutputTokens", 8000) })
+        val reply = postJson(context, "https://generativelanguage.googleapis.com/v1beta/models/$GEMINI_MODEL:generateContent", mapOf("x-goog-api-key" to key), body)
+        when {
+            reply.code == 429 -> throw CoachException(context.getString(R.string.coach_rate_limited))
+            reply.code == 401 || reply.code == 403 || (reply.code == 400 && reply.body.contains("API key")) ->
+                throw CoachException(context.getString(R.string.coach_bad_key))
+            reply.code !in 200..299 -> throw CoachException(context.getString(R.string.coach_failed, errorText(reply)))
+        }
+        val parts = JSONObject(reply.body).optJSONArray("candidates")?.optJSONObject(0)?.optJSONObject("content")?.optJSONArray("parts")
+        return parts?.let { p -> (0 until p.length()).joinToString("") { p.getJSONObject(it).optString("text") } } ?: ""
     }
 }
 
