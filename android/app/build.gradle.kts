@@ -11,8 +11,8 @@ android {
         applicationId = "net.webstas.sleepsense"
         minSdk = 28
         targetSdk = 37
-        versionCode = 12
-        versionName = "0.7.2"
+        versionCode = 13
+        versionName = "0.8.0"
     }
 
     compileOptions {
@@ -41,6 +41,5 @@ dependencies {
     implementation(libs.pebblekit.client)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.paho.mqtt)
-    implementation("com.anthropic:anthropic-java:3.2.0") // the optional AI sleep summary
     testImplementation("junit:junit:4.13.2")
 }
