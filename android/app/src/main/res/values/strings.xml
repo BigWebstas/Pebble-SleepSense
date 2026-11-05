@@ -203,4 +203,7 @@
     <string name="backup_restore_confirm">Restore</string>
     <string name="backup_restored">Restored %d items</string>
     <string name="backup_restore_failed">Could not restore: that is not a SleepSense backup</string>
+    <string name="xdrip_label">Import blood sugar from xDrip+</string>
+    <string name="xdrip_setup">In xDrip+, turn on Settings, Inter-app settings, Broadcast locally. Readings are graphed next to each night in History.</string>
+    <string name="xdrip_last">Last reading: %1$d mg/dL, %2$s</string>
 </resources>

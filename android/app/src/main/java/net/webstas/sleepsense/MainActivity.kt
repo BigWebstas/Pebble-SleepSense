@@ -289,6 +289,13 @@ class MainActivity : AppCompatActivity() {
             }
         }
         setUpBackup()
+        id<MaterialSwitch>(R.id.xdrip_switch).apply {
+            isChecked = GlucoseLog.isEnabled(this@MainActivity)
+            setOnCheckedChangeListener { _, on ->
+                GlucoseLog.setEnabled(this@MainActivity, on)
+                refreshXdrip()
+            }
+        }
         id<View>(R.id.last_night_body).setOnClickListener { startActivity(Intent(this, HistoryActivity::class.java)) }
         setupCards()
         attachHaptics(id(R.id.root))
@@ -335,6 +342,7 @@ class MainActivity : AppCompatActivity() {
         refreshHealth()
         refreshWhiteNoise()
         refreshBackup()
+        refreshXdrip()
         refreshCalendar()
         refreshLastNight(force = true)
         handler.post(refreshLoop)
@@ -818,6 +826,14 @@ class MainActivity : AppCompatActivity() {
             }
         }
         id<Button>(R.id.backup_restore_button).setOnClickListener { pickBackupFile.launch(arrayOf("application/zip", "application/octet-stream")) }
+    }
+
+    private fun refreshXdrip() {
+        val status = id<TextView>(R.id.xdrip_status_text)
+        status.visibility = if (GlucoseLog.isEnabled(this)) View.VISIBLE else View.GONE
+        val last = GlucoseLog.latest(this)
+        status.text = if (last == null) getString(R.string.xdrip_setup) else
+            getString(R.string.xdrip_last, last.second, android.text.format.DateUtils.getRelativeTimeSpanString(last.first))
     }
 
     private fun refreshBackup() {

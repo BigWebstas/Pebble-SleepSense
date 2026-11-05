@@ -161,6 +161,18 @@ object SessionStore {
                 val sample = samples.getJSONObject(next)
                 sample.put("o2", minOf(spo2, sample.optInt("o2", 101)))
             }
+            // Blood sugar from xDrip+: "g", the mean (mg/dL) of the readings in each sample's interval
+            if (GlucoseLog.isEnabled(context)) {
+                val sums = IntArray(samples.length())
+                val counts = IntArray(samples.length())
+                next = 0
+                for ((at, mgdl) in GlucoseLog.readings(context, session.optLong("start"), end)) {
+                    while (next + 1 < samples.length() && samples.getJSONObject(next + 1).optLong("t") <= at) next++
+                    sums[next] += mgdl
+                    counts[next]++
+                }
+                for (k in counts.indices) if (counts[k] > 0) samples.getJSONObject(k).put("g", sums[k] / counts[k])
+            }
         }
         return all.toString()
     }

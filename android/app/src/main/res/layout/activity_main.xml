@@ -877,6 +877,22 @@
                 app:iconPadding="8dp"
                 android:text="@string/calendar_choose_button" />
 
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/xdrip_switch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/xdrip_label" />
+
+            <TextView
+                android:id="@+id/xdrip_status_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
             <Button
                 style="@style/Widget.Material3.Button.TonalButton"
                 android:id="@+id/grant_hc_button"

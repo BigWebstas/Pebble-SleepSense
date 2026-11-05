@@ -68,7 +68,7 @@ object Backup {
 
     // State of the moment, not settings; and this screen's own choice of folder stays where it is
     private val SKIP_PREFS = setOf("widget_state", "update", "sleep_state", "backup")
-    private val DATA_FILES = listOf("sessions.json", "oximeter.csv", "oximeter_wave.csv", "oximeter_events.csv", "chest_rate.csv")
+    private val DATA_FILES = listOf("sessions.json", "oximeter.csv", "oximeter_wave.csv", "oximeter_events.csv", "chest_rate.csv", "glucose.csv")
 
     /** Called when the watch starts or stops tracking, to back up if that was asked for. */
     fun onTracking(context: Context, started: Boolean) {
