@@ -226,6 +226,6 @@
     <string name="coach_suggestion">Suggested: %1$s asleep, bed %2$s, alarm %3$s, smart window %4$s</string>
     <string name="coach_next_alarms">Next alarms</string>
     <string name="coach_apply_button">Use suggested alarm and window</string>
-    <string name="coach_applied">Set the alarm to %1$s with a %2$d min smart wake window? Syncing the phone's alarm will be turned off.</string>
+    <string name="coach_applied">Set the alarm to %1$s with a %2$d min smart wake window? Syncing the phone\'s alarm will be turned off.</string>
     <string name="coach_disclaimer">Not medical advice.</string>
 </resources>
