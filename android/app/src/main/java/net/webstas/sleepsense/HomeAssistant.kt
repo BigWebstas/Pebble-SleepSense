@@ -25,6 +25,9 @@ private const val TRACKING_SET = "$BASE/tracking/set"
 private const val STAGE = "$BASE/stage"
 private const val HEART_RATE = "$BASE/heart_rate"
 private const val SPO2 = "$BASE/spo2"
+// HA's MQTT sensor maps the payload "None" to an unknown state. Any other non-numeric text
+// (e.g. "unknown") is rejected for a sensor with a state_class/unit, logging a ValueError.
+private const val NO_VALUE = "None"
 private const val SLEEP_DURATION = "$BASE/sleep_duration"
 private const val ALARM_TIME = "$BASE/alarm_time"
 private const val ALARM_TIME_SET = "$BASE/alarm_time/set"
@@ -151,7 +154,7 @@ object HomeAssistant {
                 this.spo2 = spo2
                 client?.takeIf { it.isConnected }?.let { c ->
                     try {
-                        c.publish(SPO2, retained(spo2?.toString() ?: "unknown"))
+                        c.publish(SPO2, retained(spo2?.toString() ?: NO_VALUE))
                     } catch (e: Exception) {
                         Log.w(TAG, "could not publish SpO2: $e")
                     }
@@ -360,7 +363,7 @@ object HomeAssistant {
             c.publish(TRACKING, retained(if (tracking) "ON" else "OFF"))
             c.publish(STAGE, retained(stage))
             c.publish(HEART_RATE, retained(heartRate?.takeIf { it > 0 }?.toString() ?: "0"))
-            c.publish(SPO2, retained(spo2?.toString() ?: "unknown"))
+            c.publish(SPO2, retained(spo2?.toString() ?: NO_VALUE))
             c.publish(SLEEP_DURATION, retained(sleepMinutesToday().toString()))
             appContext?.let { app ->
                 val alarm = PhoneAlarmSync.phoneAlarm(app) ?: PhoneAlarmSync.customAlarm(app) ?: (7 to 0)
