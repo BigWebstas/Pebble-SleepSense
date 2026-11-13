@@ -239,6 +239,7 @@ class MainActivity : AppCompatActivity() {
             setIcon(R.drawable.ic_graphic_eq)
             setOnClickListener { chooseWhiteNoiseSound() }
         }
+        id<Button>(R.id.white_noise_timer_button).setOnClickListener { chooseWhiteNoiseTimer() }
         id<Button>(R.id.white_noise_play_button).setOnClickListener {
             if (WhiteNoisePlayer.isPlaying) {
                 WhiteNoisePlayer.stop()
@@ -1121,9 +1122,30 @@ class MainActivity : AppCompatActivity() {
             },
         )
 
+        val timer = WhiteNoisePrefs.timerMinutes(this)
+        id<Button>(R.id.white_noise_timer_button).text = getString(
+            R.string.white_noise_timer_label,
+            if (timer == 0) getString(R.string.white_noise_timer_off) else getString(R.string.white_noise_timer_minutes, timer),
+        )
+
         val playing = WhiteNoisePlayer.isPlaying
         id<Button>(R.id.white_noise_play_button).setText(if (playing) R.string.white_noise_stop_button else R.string.white_noise_play_button)
         setPlayStopIcon(R.id.white_noise_play_button, playing)
+    }
+
+    private fun chooseWhiteNoiseTimer() {
+        val lengths = intArrayOf(0, 15, 30, 45, 60, 90, 120)
+        val labels = lengths.map { if (it == 0) getString(R.string.white_noise_timer_off) else getString(R.string.white_noise_timer_minutes, it) }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.white_noise_timer_dialog_title)
+            .setSingleChoiceItems(labels.toTypedArray(), lengths.indexOf(WhiteNoisePrefs.timerMinutes(this)).coerceAtLeast(0)) { dialog, which ->
+                WhiteNoisePrefs.setTimerMinutes(this, lengths[which])
+                WhiteNoisePlayer.rescheduleTimer(this) // counts from now when it is already playing
+                dialog.dismiss()
+                refreshWhiteNoise()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun chooseWhiteNoiseSound() {
