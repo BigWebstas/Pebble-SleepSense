@@ -120,6 +120,10 @@
         <item quantity="one">%d audio file</item>
         <item quantity="other">%d audio files</item>
     </plurals>
+    <string name="white_noise_timer_label">Sleep timer: %s</string>
+    <string name="white_noise_timer_off">off</string>
+    <string name="white_noise_timer_minutes">%d min</string>
+    <string name="white_noise_timer_dialog_title">Stop the sound after</string>
     <string name="white_noise_play_button">Play white noise</string>
     <string name="white_noise_stop_button">Stop white noise</string>
 

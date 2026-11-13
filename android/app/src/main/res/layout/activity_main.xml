@@ -779,6 +779,15 @@
                 android:text="@string/white_noise_sound_label" />
 
             <Button
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:id="@+id/white_noise_timer_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:minWidth="220dp"
+                android:text="@string/white_noise_timer_label" />
+
+            <Button
                 android:id="@+id/white_noise_play_button"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
