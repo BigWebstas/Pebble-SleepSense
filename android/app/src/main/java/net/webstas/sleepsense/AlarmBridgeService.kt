@@ -20,6 +20,7 @@ import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.net.BindException
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
@@ -27,6 +28,7 @@ import kotlin.concurrent.thread
 
 private const val TAG = "AlarmBridgeService"
 const val ALARM_BRIDGE_PORT = 8765
+private const val BIND_RETRY_MS = 5_000L
 private const val MAX_BODY = 5 * 1024 * 1024 // a month of history is ~150 KB
 
 /**
@@ -36,6 +38,7 @@ private const val MAX_BODY = 5 * 1024 * 1024 // a month of history is ~150 KB
  */
 class AlarmBridgeService : Service() {
     private var server: ServerSocket? = null
+    @Volatile private var stopped = false
     private val monitor by lazy { NoiseMonitor(applicationContext) }
     private val oximeter by lazy { OximeterMonitor(applicationContext) }
 
@@ -88,15 +91,23 @@ class AlarmBridgeService : Service() {
         WebhookPrefs.registerListener(this, webhookPrefsListener)
 
         thread(name = "alarm-bridge", isDaemon = true) {
-            try {
-                val s = ServerSocket(ALARM_BRIDGE_PORT, 8, InetAddress.getByName("127.0.0.1"))
-                server = s
-                while (!s.isClosed) {
-                    val client = s.accept()
-                    thread(isDaemon = true) { handle(client) }
+            // Another app can hold the port (the watchapp's JS would then talk to it instead): keep trying,
+            // so the bridge comes up by itself once the port is free, and say so on screen meanwhile
+            while (!stopped) {
+                try {
+                    val s = ServerSocket(ALARM_BRIDGE_PORT, 8, InetAddress.getByName("127.0.0.1"))
+                    server = s
+                    setBridgeBlocked(false)
+                    while (!s.isClosed) {
+                        val client = s.accept()
+                        thread(isDaemon = true) { handle(client) }
+                    }
+                } catch (e: Exception) {
+                    if (stopped) break
+                    Log.w(TAG, "bridge stopped: $e")
+                    if (e is BindException) setBridgeBlocked(true)
                 }
-            } catch (e: Exception) {
-                if (server?.isClosed != true) Log.w(TAG, "bridge stopped: $e")
+                Thread.sleep(BIND_RETRY_MS)
             }
         }
     }
@@ -344,7 +355,15 @@ class AlarmBridgeService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    private fun setBridgeBlocked(blocked: Boolean) {
+        if (WidgetState.bridgeBlocked == blocked) return
+        WidgetState.bridgeBlocked = blocked
+        SleepWidgetProvider.refreshAll(this)
+    }
+
     override fun onDestroy() {
+        stopped = true
+        WidgetState.bridgeBlocked = false
         WhiteNoisePlayer.stop()
         monitor.stop()
         oximeter.stop()

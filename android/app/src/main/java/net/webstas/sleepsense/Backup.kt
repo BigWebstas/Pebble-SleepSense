@@ -32,6 +32,23 @@ object BackupPrefs {
     private const val KEY_ON_STOP = "on_stop"
     private const val KEY_LAST = "last"
 
+    /** The choices kept in a backup; "last" is only a record of the latest backup made here. */
+    internal const val PREFS_NAME = PREFS
+    internal val BACKED_UP_KEYS = setOf(KEY_FOLDER, KEY_ON_START, KEY_ON_STOP)
+
+    /**
+     * Takes the backup settings of a backup back. The two toggles always come back; the folder only
+     * when none is chosen here and this app still has access to it (the system picker's permission is
+     * not part of a backup, so on a fresh install the folder has to be chosen again).
+     */
+    fun restore(context: Context, saved: Map<String, Any>) {
+        (saved[KEY_ON_START] as? Boolean)?.let { setOnStart(context, it) }
+        (saved[KEY_ON_STOP] as? Boolean)?.let { setOnStop(context, it) }
+        val uri = (saved[KEY_FOLDER] as? String)?.let(Uri::parse) ?: return
+        val held = context.contentResolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission && it.isWritePermission }
+        if (folder(context) == null && held) setFolder(context, uri)
+    }
+
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     fun folder(context: Context): Uri? = prefs(context).getString(KEY_FOLDER, null)?.let(Uri::parse)
@@ -55,7 +72,8 @@ object BackupPrefs {
 }
 
 /**
- * A backup is one zip with the app's settings (every preference file but the transient ones) and its
+ * A backup is one zip with the app's settings (every preference file but the transient ones; of the
+ * backup settings, the folder and the two automatic-backup toggles) and its
  * data files (sleep history, oximeter and chest logs; not the noise clips, which can be large). The
  * sleep sound files are only references and may need choosing again on a new phone.
  * Settings include the Home Assistant and webhook details, so keep the folder private.
@@ -66,8 +84,9 @@ object Backup {
     private const val KEEP_AUTO = 10
     private const val AFTER_STOP_MS = 30_000L // the finished night's history is pushed shortly after the stop
 
-    // State of the moment, not settings; this screen's own choice of folder stays where it is; the AI key stays on the phone
-    private val SKIP_PREFS = setOf("widget_state", "update", "sleep_state", "backup", "ai_coach")
+    // State of the moment, not settings; the AI key stays on the phone. The backup settings are handled
+    // on their own: see BackupPrefs.restore
+    private val SKIP_PREFS = setOf("widget_state", "update", "sleep_state", "ai_coach")
     private val DATA_FILES = listOf("sessions.json", "oximeter.csv", "oximeter_wave.csv", "oximeter_events.csv", "chest_rate.csv", "glucose.csv", "coach_summaries.json")
 
     /** Called when the watch starts or stops tracking, to back up if that was asked for. */
@@ -143,6 +162,7 @@ object Backup {
     private fun prefsToJson(context: Context, name: String): JSONObject {
         val json = JSONObject()
         for ((key, value) in context.getSharedPreferences(name, Context.MODE_PRIVATE).all) {
+            if (name == BackupPrefs.PREFS_NAME && key !in BackupPrefs.BACKED_UP_KEYS) continue
             val (type, v) = when (value) {
                 is Boolean -> "b" to value
                 is Int -> "i" to value
@@ -181,6 +201,11 @@ object Backup {
         require(prefs.isNotEmpty() || files.isNotEmpty()) { "not a SleepSense backup" }
 
         for ((name, json) in prefs) {
+            if (name == BackupPrefs.PREFS_NAME) {
+                BackupPrefs.restore(context, json.keys().asSequence().filter { it in BackupPrefs.BACKED_UP_KEYS }
+                    .mapNotNull { key -> json.getJSONObject(key).get("v").takeIf { it is Boolean || it is String }?.let { key to it } }.toMap())
+                continue
+            }
             context.getSharedPreferences(name, Context.MODE_PRIVATE).edit(commit = true) {
                 clear()
                 for (key in json.keys()) {

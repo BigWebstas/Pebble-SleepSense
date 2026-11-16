@@ -43,6 +43,12 @@ function checkbox(id, label, hint, checked) {
     '  <p class="hint">' + hint + '</p>\n';
 }
 
+var APP_SYNC_TEXT = {
+  ok: 'In sync with the SleepSense app: both hold the same sessions.',
+  failed: 'The SleepSense app did not accept the history just now, so its list may differ. Open this page again to retry.',
+  offline: 'The SleepSense app was not reachable, so its list may differ from this one. Open the app, then this page again.'
+};
+
 function buildConfigPageUrl(opts) {
   var alarm = opts.alarm;
   var sensors = opts.sensors;
@@ -121,6 +127,7 @@ checkbox('hrEn', 'Heart rate', 'Samples every minute while tracking. Needs a wat
 '\n' +
 '  <h2>Sleep history</h2>\n' +
 '  <p class="hint">Graphs for a recorded session. The phone keeps your last 35 days.</p>\n' +
+(APP_SYNC_TEXT[opts.appSync] ? '  <p class="hint">' + APP_SYNC_TEXT[opts.appSync] + '</p>\n' : '') +
 '  <div id="historyEmpty" class="hint" style="display:none">No sessions yet. Start tracking on the watch (Select) and they appear here.</div>\n' +
 '  <div id="historyBox">\n' +
 '    <label for="sessionPick">Session</label>\n' +

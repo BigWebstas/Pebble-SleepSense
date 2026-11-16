@@ -274,7 +274,7 @@ function syncPhoneAlarm() {
         console.log("SleepSense PKJS: Could not send smart wake window: " + JSON.stringify(err));
       });
     }
-    if (a && a.deleted) sleepHistory.removeSessions(a.deleted);
+    if (a && a.deleted) sleepHistory.removeSessions(a.deleted, !isTracking);
     if (a && a.ratings) sleepHistory.applyRatings(a.ratings);
     if (!a || !a.sync) return;
     var key = a.enabled ? (a.hour + ":" + a.min) : "none";
@@ -494,6 +494,22 @@ Pebble.addEventListener("appmessage", function(e) {
 
 // Settings page: alarm, sensors, session graphs and export
 Pebble.addEventListener("showConfiguration", function() {
+  // The phone JS only runs while the watchapp is open, so a night deleted (or rated) in the Android
+  // app can still be in this copy: take over the app's changes first, so both lists agree
+  phoneAlarm.fetchPhoneAlarm(function(a) {
+    if (a && a.deleted) sleepHistory.removeSessions(a.deleted, !isTracking);
+    if (a && a.ratings) sleepHistory.applyRatings(a.ratings);
+    if (!a) { openConfigPage("offline"); return; }
+    // And the other way: send this copy to the app, so both lists hold the same sessions
+    sessionPush.pushSessions(sleepHistory.getBucketedSessions(), function(ok) {
+      if (ok) lastPush = Date.now();
+      openConfigPage(ok ? "ok" : "failed");
+    });
+  });
+});
+
+// `appSync`: how syncing with the Android app went ("ok", "failed" or "offline")
+function openConfigPage(appSync) {
   Pebble.openURL(configPage.buildConfigPageUrl({
     alarm: {
       enabled: localStorage.getItem("alarm_en") !== "false",
@@ -509,10 +525,11 @@ Pebble.addEventListener("showConfiguration", function() {
     },
     sessions: sleepHistory.getBucketedSessions(),
     lastExport: sleepHistory.getLastExport(),
+    appSync: appSync,
     now: Date.now(),
     appVersion: APP_VERSION
   }));
-});
+}
 
 Pebble.addEventListener("webviewclosed", function(e) {
   if (!e.response) return;
