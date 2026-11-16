@@ -87,7 +87,7 @@ object Backup {
     // State of the moment, not settings; the AI key stays on the phone. The backup settings are handled
     // on their own: see BackupPrefs.restore
     private val SKIP_PREFS = setOf("widget_state", "update", "sleep_state", "ai_coach")
-    private val DATA_FILES = listOf("sessions.json", "oximeter.csv", "oximeter_wave.csv", "oximeter_events.csv", "chest_rate.csv", "glucose.csv", "coach_summaries.json")
+    private val DATA_FILES = listOf("sessions.json", "oximeter.csv", "oximeter_wave.csv", "oximeter_events.csv", "chest_rate.csv", "glucose.csv", "hrv.csv", "coach_summaries.json")
 
     /** Called when the watch starts or stops tracking, to back up if that was asked for. */
     fun onTracking(context: Context, started: Boolean) {

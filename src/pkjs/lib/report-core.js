@@ -56,12 +56,13 @@ function reportCore() {
 
   function summarize(s) {
     var mins = { 0: 0, 1: 0, 2: 0, 3: 0 };
-    var hrSum = 0, hrN = 0, o2Sum = 0, o2N = 0, o2Min = 101, nSum = 0, nN = 0, brSum = 0, brN = 0, mSum = 0, mN = 0, mMax = 0;
+    var hrSum = 0, hrN = 0, o2Sum = 0, o2N = 0, o2Min = 101, nSum = 0, nN = 0, brSum = 0, brN = 0, hrvSum = 0, hrvN = 0, mSum = 0, mN = 0, mMax = 0;
     spans(s).forEach(function (sp) {
       mins[sp.p.s] = (mins[sp.p.s] || 0) + (sp.to - sp.from) / MIN;
       if (sp.p.hr > 0) { hrSum += sp.p.hr; hrN++; }
       if (sp.p.o2 > 0) { o2Sum += sp.p.o2; o2N++; o2Min = Math.min(o2Min, sp.p.o2); }
       if (sp.p.br > 0) { brSum += sp.p.br; brN++; }
+      if (sp.p.hrv > 0) { hrvSum += sp.p.hrv; hrvN++; }
       if (sp.p.n > 0) { nSum += sp.p.n; nN++; }
       if (sp.p.m !== undefined) { mSum += sp.p.m; mN++; mMax = Math.max(mMax, sp.p.m); }
     });
@@ -74,6 +75,7 @@ function reportCore() {
       minSpo2: o2N ? o2Min : 0,
       avgNoise: nN ? Math.round(nSum / nN) : 0,
       avgBreathing: brN ? Math.round(brSum / brN) : 0,
+      avgHrv: hrvN ? Math.round(hrvSum / hrvN) : 0,
       avgMove: mN ? Math.round(mSum / mN) : null,
       peakMove: mN ? mMax : null,
       snoozes: s.snoozes || 0,
@@ -121,6 +123,7 @@ function reportCore() {
       ['Average heart rate', m.avgHr ? m.avgHr + ' bpm' : '-'],
       ['Blood oxygen (average / lowest)', m.avgSpo2 ? m.avgSpo2 + '% / ' + m.minSpo2 + '%' : '-'],
       ['Average breathing rate', m.avgBreathing ? m.avgBreathing + ' /min' : '-'],
+      ['Average HRV (RMSSD)', m.avgHrv ? m.avgHrv + ' ms' : '-'],
       ['Average room noise', m.avgNoise ? m.avgNoise + ' dB' : '-'],
       ['Movement (average / peak)', m.avgMove === null ? '-' : m.avgMove + ' / ' + m.peakMove],
       ['Snoozed', snoozeText(m)],
@@ -210,6 +213,7 @@ function reportCore() {
     { f: 'hr', name: 'Heart rate', color: '#ff6b6b', unit: ' bpm' },
     { f: 'br', name: 'Breathing', color: '#20c997', unit: '/min' },
     { f: 'o2', name: 'SpO2', color: '#9775fa', unit: '%' },
+    { f: 'hrv', name: 'HRV', color: '#a9e34b', unit: ' ms' },
     { f: 'n', name: 'Noise', color: '#e0a800', unit: ' dB' },
     { f: 'g', name: 'Blood sugar', color: '#f783ac', unit: ' mg/dL' }
   ];
@@ -248,6 +252,7 @@ function reportCore() {
       '<h3>Heart rate</h3>' + lineSvg(s, 'hr', '#ff6b6b', 'bpm') +
       (s.samples.some(function (p) { return p.br > 0; }) ? '<h3>Breathing rate</h3>' + lineSvg(s, 'br', '#20c997', 'breaths per minute') : '') +
       '<h3>Blood oxygen (SpO2)</h3>' + lineSvg(s, 'o2', '#9775fa', '%') +
+      (s.samples.some(function (p) { return p.hrv > 0; }) ? '<h3>HRV (pulse variability)</h3>' + lineSvg(s, 'hrv', '#a9e34b', 'ms RMSSD') : '') +
       (s.samples.some(function (p) { return p.g > 0; }) ? '<h3>Blood sugar (xDrip)</h3>' + lineSvg(s, 'g', '#f783ac', 'mg/dL') : '') +
       '<h3>Ambient light</h3>' + (hasLight ? stepSvg(s, 'l', LIGHT_ROWS) : '<p class="hint">No light data for this session.</p>') +
       '<h3>Room noise</h3>' + lineSvg(s, 'n', '#e0a800', 'dB');
@@ -358,6 +363,7 @@ function reportCore() {
         chartBlock(s, 'hr', 'Heart rate', 'bpm', null, null),
         chartBlock(s, 'br', 'Breathing rate (chest)', 'breaths/min', null, null),
         chartBlock(s, 'o2', 'Blood oxygen (lowest SpO2 per interval)', '%', null, 100),
+        chartBlock(s, 'hrv', 'HRV (RMSSD of the oximeter pulse)', 'ms', null, null),
         chartBlock(s, 'g', 'Blood sugar (xDrip, mean per interval)', 'mg/dL', null, null),
         chartBlock(s, 'l', 'Ambient light level (1 dark to 4 bright)', 'level', 0, 4),
         chartBlock(s, 'n', 'Room noise', 'dB', null, null)].forEach(function (block) {

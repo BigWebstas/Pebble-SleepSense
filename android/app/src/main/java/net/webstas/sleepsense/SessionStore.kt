@@ -154,12 +154,25 @@ object SessionStore {
             val samples = session.optJSONArray("samples") ?: continue
             if (samples.length() == 0) continue
             val end = session.optLong("end").takeIf { it > 0 } ?: now
+            if (!session.optBoolean("open")) HrvLog.backfill(context, session.optLong("start"), end) // the waveform holds one night
             var next = 0
             for ((at, spo2) in OximeterLog.samples(context, session.optLong("start"), end)) {
                 // The sample whose interval holds this reading: the last one that began at or before it
                 while (next + 1 < samples.length() && samples.getJSONObject(next + 1).optLong("t") <= at) next++
                 val sample = samples.getJSONObject(next)
                 sample.put("o2", minOf(spo2, sample.optInt("o2", 101)))
+            }
+            // HRV: "hrv", the mean RMSSD (ms) of the windows in each sample's interval
+            run {
+                val sums = DoubleArray(samples.length())
+                val counts = IntArray(samples.length())
+                var next = 0
+                for ((at, rmssd) in HrvLog.readings(context, session.optLong("start"), end)) {
+                    while (next + 1 < samples.length() && samples.getJSONObject(next + 1).optLong("t") <= at) next++
+                    sums[next] += rmssd
+                    counts[next]++
+                }
+                for (k in counts.indices) if (counts[k] > 0) samples.getJSONObject(k).put("hrv", Math.round(sums[k] / counts[k]).toInt())
             }
             // Blood sugar from xDrip+: "g", the mean (mg/dL) of the readings in each sample's interval
             if (GlucoseLog.isEnabled(context)) {
