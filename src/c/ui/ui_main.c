@@ -574,7 +574,23 @@ static void prv_window_unload(Window *window) {
 #endif
 }
 
+//! A system notification (or anything else the OS shows on top) takes the screen and the buttons
+//! from the app, and an app cannot raise its window above it. So take over again the moment it is
+//! gone: the ringing screen comes back lit, with a pulse, and a press stops the alarm again.
+static void prv_did_focus(bool in_focus) {
+  if (!in_focus || !smart_alarm_is_active()) return;
+  if (s_bell_on) {
+    light_enable(true); // the notification's own backlight timeout may have ended it
+    layer_mark_dirty(s_bell_layer);
+  } else {
+    prv_bell_show();
+  }
+  vibes_short_pulse();
+  ui_main_update(sleep_engine_get_session());
+}
+
 void ui_main_init(void) {
+  app_focus_service_subscribe_handlers((AppFocusHandlers) { .did_focus = prv_did_focus });
   s_main_window = window_create();
   window_set_click_config_provider(s_main_window, prv_click_config_provider);
   window_set_window_handlers(s_main_window, (WindowHandlers) {
@@ -587,6 +603,7 @@ void ui_main_init(void) {
 }
 
 void ui_main_deinit(void) {
+  app_focus_service_unsubscribe();
   if (s_main_window) {
     window_destroy(s_main_window);
     s_main_window = NULL;
