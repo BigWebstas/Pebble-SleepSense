@@ -585,14 +585,6 @@
                     android:contentDescription="@string/spectrogram_description" />
             </com.google.android.material.card.MaterialCardView>
 
-            <TextView
-                android:id="@+id/spectrogram_hint"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:textAppearance="?attr/textAppearanceBodySmall"
-                android:text="@string/spectrogram_hint" />
-
             <Button
                 android:id="@+id/white_noise_play_button"
                 android:layout_width="wrap_content"

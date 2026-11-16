@@ -1132,8 +1132,6 @@ class MainActivity : AppCompatActivity() {
         id<Button>(R.id.white_noise_play_button).setText(if (playing) R.string.white_noise_stop_button else R.string.white_noise_play_button)
         setPlayStopIcon(R.id.white_noise_play_button, playing)
         if (!playing) id<SpectrogramView>(R.id.spectrogram).clear()
-        id<View>(R.id.spectrogram_hint).visibility =
-            if (WhiteNoisePrefs.useFiles(this)) View.VISIBLE else View.GONE
     }
 
     private fun chooseWhiteNoiseTimer() {

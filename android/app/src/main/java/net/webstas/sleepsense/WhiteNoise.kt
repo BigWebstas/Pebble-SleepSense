@@ -180,6 +180,14 @@ object WhiteNoisePlayer {
 
     fun latestBands(): FloatArray? = if (isPlaying) bands else null
 
+    fun clearSpectrum() { bands = null }
+
+    /** The song loop hands over each stereo chunk it is about to play. */
+    fun feedSpectrum(stereo: ShortArray, frames: Int, sampleRate: Int) {
+        val mono = ShortArray(frames) { ((stereo[2 * it] + stereo[2 * it + 1]) / 2).toShort() }
+        bands = Spectrum.bands(mono, sampleRate)
+    }
+
     @Synchronized
     fun start(context: Context, sound: WhiteNoiseSound = WhiteNoisePrefs.sound(context)) {
         soundType = sound
@@ -658,6 +666,7 @@ private class SongLoop(
                     lastGain = gain
                 }
 
+                WhiteNoisePlayer.feedSpectrum(a, frames, OUT_RATE)
                 var written = 0
                 while (written < frames * 2) {
                     val w = track.write(a, written, frames * 2 - written)
@@ -675,6 +684,7 @@ private class SongLoop(
             try { track?.stop() } catch (e: Exception) { }
             track?.release()
             if (wake.isHeld) wake.release()
+            WhiteNoisePlayer.clearSpectrum()
             if (failed && !stopped) onFailed()
         }
     }

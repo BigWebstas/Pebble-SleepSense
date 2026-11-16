@@ -102,7 +102,6 @@
 
     <!-- White noise -->
     <string name="spectrogram_description">Spectrogram of the sound that is playing</string>
-    <string name="spectrogram_hint">Shows the built-in noises; your own audio files are not drawn.</string>
     <string name="white_noise_section">White Noise</string>
     <string name="white_noise_tracking_label">Play sound while tracking</string>
     <string name="white_noise_sound_label">Sound: %s</string>
