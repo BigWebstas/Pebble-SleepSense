@@ -37,6 +37,9 @@ class HistoryActivity : AppCompatActivity() {
     private inner class Bridge {
         @JavascriptInterface fun sessions(): String = SessionStore.loadWithOximeter(this@HistoryActivity)
 
+        /** Whether the watch is tracking right now: that night can't be deleted, but a stuck one can. */
+        @JavascriptInterface fun isTracking(): Boolean = WidgetState.tracking(this@HistoryActivity)
+
         @JavascriptInterface fun lastExport(): Long = SessionStore.lastExport(this@HistoryActivity)
 
         @JavascriptInterface fun markExported(at: Long) = SessionStore.markExported(this@HistoryActivity, at)

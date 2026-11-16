@@ -118,7 +118,7 @@
       return '<div class="card" style="animation-delay:' + (i * 60) + 'ms">' + html + '</div>';
     }).join('');
     renderStars(s);
-    $('deleteBtn').disabled = !!s.open; // the night being tracked can't be deleted
+    $('deleteBtn').disabled = !!s.open && Android.isTracking(); // the night being tracked can't be deleted, a stuck one can
   }
   // ---- AI summary (its own section under Overview) ----
   function esc(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }

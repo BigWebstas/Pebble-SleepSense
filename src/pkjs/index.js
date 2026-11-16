@@ -274,7 +274,7 @@ function syncPhoneAlarm() {
         console.log("SleepSense PKJS: Could not send smart wake window: " + JSON.stringify(err));
       });
     }
-    if (a && a.deleted) sleepHistory.removeSessions(a.deleted);
+    if (a && a.deleted) sleepHistory.removeSessions(a.deleted, !isTracking);
     if (a && a.ratings) sleepHistory.applyRatings(a.ratings);
     if (!a || !a.sync) return;
     var key = a.enabled ? (a.hour + ":" + a.min) : "none";
@@ -497,7 +497,7 @@ Pebble.addEventListener("showConfiguration", function() {
   // The phone JS only runs while the watchapp is open, so a night deleted (or rated) in the Android
   // app can still be in this copy: take over the app's changes first, so both lists agree
   phoneAlarm.fetchPhoneAlarm(function(a) {
-    if (a && a.deleted) sleepHistory.removeSessions(a.deleted);
+    if (a && a.deleted) sleepHistory.removeSessions(a.deleted, !isTracking);
     if (a && a.ratings) sleepHistory.applyRatings(a.ratings);
     openConfigPage();
   });
