@@ -147,6 +147,12 @@ object WhiteNoisePlayer {
         soundType = sound
     }
 
+    // What the built-in noise last played, as loudness bands for the spectrogram; null when nothing of ours plays
+    @Volatile
+    private var bands: FloatArray? = null
+
+    fun latestBands(): FloatArray? = if (isPlaying) bands else null
+
     @Synchronized
     fun start(context: Context, sound: WhiteNoiseSound = WhiteNoisePrefs.sound(context)) {
         soundType = sound
@@ -326,6 +332,7 @@ object WhiteNoisePlayer {
                     chunk[i] = (sample * 32767f * fadeFactor).toInt().coerceIn(-32768, 32767).toShort()
                 }
 
+                bands = Spectrum.bands(chunk, SAMPLE_RATE)
                 var written = 0
                 while (written < CHUNK_SIZE && isPlaying) {
                     val n = track.write(chunk, written, CHUNK_SIZE - written)
@@ -349,6 +356,7 @@ object WhiteNoisePlayer {
             } catch (e: Exception) {
                 // ignore
             }
+            bands = null
             isPlaying = false
             notifyListeners()
         }

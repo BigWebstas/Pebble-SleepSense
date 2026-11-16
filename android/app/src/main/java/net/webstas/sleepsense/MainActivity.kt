@@ -795,6 +795,9 @@ class MainActivity : AppCompatActivity() {
         val playing = WhiteNoisePlayer.isPlaying
         id<Button>(R.id.white_noise_play_button).setText(if (playing) R.string.white_noise_stop_button else R.string.white_noise_play_button)
         setPlayStopIcon(R.id.white_noise_play_button, playing)
+        if (!playing) id<SpectrogramView>(R.id.spectrogram).clear()
+        id<View>(R.id.spectrogram_hint).visibility =
+            if (WhiteNoisePrefs.useSpotify(this) || WhiteNoisePrefs.useFiles(this)) View.VISIBLE else View.GONE
     }
 
     // The link of a Spotify playlist, offered from the clipboard when it holds one

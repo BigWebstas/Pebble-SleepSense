@@ -100,8 +100,10 @@
     <string name="noise_sens_high_desc">High — lighter sounds (42 dB)</string>
 
     <!-- White noise -->
+    <string name="spectrogram_description">Spectrogram of the sound that is playing</string>
+    <string name="spectrogram_hint">Shows the built-in noises; songs and Spotify are not drawn.</string>
     <string name="white_noise_section">White Noise</string>
-    <string name="white_noise_tracking_label">Play white noise while tracking</string>
+    <string name="white_noise_tracking_label">Play sound while tracking</string>
     <string name="white_noise_sound_label">Sound: %s</string>
     <string name="white_noise_sound_dialog_title">Choose sleep sound</string>
     <string name="white_noise_brown_title">Brown noise</string>
@@ -128,8 +130,8 @@
     <string name="white_noise_spotify_connected">Spotify is connected</string>
     <string name="white_noise_spotify_not_connected">Could not connect to Spotify. Open Spotify once and try again; the app must also be registered with it.</string>
     <string name="white_noise_spotify_invalid">That is not a Spotify link</string>
-    <string name="white_noise_play_button">Play white noise</string>
-    <string name="white_noise_stop_button">Stop white noise</string>
+    <string name="white_noise_play_button">Play sound</string>
+    <string name="white_noise_stop_button">Pause sound</string>
 
     <string name="oximeter_section">Pulse Oximeter</string>
     <string name="oximeter_label">Record SpO2 from a Wellue finger oximeter while tracking</string>

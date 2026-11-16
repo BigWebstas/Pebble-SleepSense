@@ -69,6 +69,7 @@ object WidgetState {
 object Commands {
     private val lock = Object()
     private var pending: String? = null
+    private var syncAfter = false // an alarm sync that a newer command would otherwise have replaced
     private var breathing: Int? = null
     private var newestPoll = 0
 
@@ -92,7 +93,12 @@ object Commands {
     }
 
     private fun queue(command: String) = synchronized(lock) {
-        pending = command // a newer request replaces an older one
+        // A newer request replaces an older one, but not an alarm sync: a nap queues one and then starts tracking
+        if (command == "sync") { if (pending == null) pending = command else if (pending != "sync") syncAfter = true }
+        else {
+            if (pending == "sync") syncAfter = true
+            pending = command
+        }
         lock.notifyAll()
     }
 
@@ -112,7 +118,8 @@ object Commands {
         }
         if (newestPoll != mine) return Update("none", null)
         val update = Update(pending ?: "none", breathing)
-        pending = null
+        pending = if (syncAfter && update.command != "sync") "sync" else null
+        syncAfter = false
         breathing = null
         update
     }
