@@ -499,11 +499,17 @@ Pebble.addEventListener("showConfiguration", function() {
   phoneAlarm.fetchPhoneAlarm(function(a) {
     if (a && a.deleted) sleepHistory.removeSessions(a.deleted, !isTracking);
     if (a && a.ratings) sleepHistory.applyRatings(a.ratings);
-    openConfigPage();
+    if (!a) { openConfigPage("offline"); return; }
+    // And the other way: send this copy to the app, so both lists hold the same sessions
+    sessionPush.pushSessions(sleepHistory.getBucketedSessions(), function(ok) {
+      if (ok) lastPush = Date.now();
+      openConfigPage(ok ? "ok" : "failed");
+    });
   });
 });
 
-function openConfigPage() {
+// `appSync`: how syncing with the Android app went ("ok", "failed" or "offline")
+function openConfigPage(appSync) {
   Pebble.openURL(configPage.buildConfigPageUrl({
     alarm: {
       enabled: localStorage.getItem("alarm_en") !== "false",
@@ -519,6 +525,7 @@ function openConfigPage() {
     },
     sessions: sleepHistory.getBucketedSessions(),
     lastExport: sleepHistory.getLastExport(),
+    appSync: appSync,
     now: Date.now(),
     appVersion: APP_VERSION
   }));
