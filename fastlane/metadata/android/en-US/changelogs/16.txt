@@ -1,1 +1,1 @@
-Fixed: the watch's settings page could list nights you had deleted in the app. It now picks up the app's deletions and ratings when it opens.
+Fixed: the watch's settings page could list nights you had deleted in the app; it now syncs with the app when it opens. A night stuck as tracking can be deleted. New: the app says when another app is using its port, and backups keep the backup folder and its toggles. Watch: the alarm takes the screen back after a notification closes.
