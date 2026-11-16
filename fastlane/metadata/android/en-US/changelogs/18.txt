@@ -1,0 +1,1 @@
+New: a nap's alarm time now reaches the watch (starting tracking no longer swallows the sync). A sound card between Review and Advanced has Play/Pause and a live spectrogram of the built-in noises and your own audio files.
