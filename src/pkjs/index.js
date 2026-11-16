@@ -494,6 +494,16 @@ Pebble.addEventListener("appmessage", function(e) {
 
 // Settings page: alarm, sensors, session graphs and export
 Pebble.addEventListener("showConfiguration", function() {
+  // The phone JS only runs while the watchapp is open, so a night deleted (or rated) in the Android
+  // app can still be in this copy: take over the app's changes first, so both lists agree
+  phoneAlarm.fetchPhoneAlarm(function(a) {
+    if (a && a.deleted) sleepHistory.removeSessions(a.deleted);
+    if (a && a.ratings) sleepHistory.applyRatings(a.ratings);
+    openConfigPage();
+  });
+});
+
+function openConfigPage() {
   Pebble.openURL(configPage.buildConfigPageUrl({
     alarm: {
       enabled: localStorage.getItem("alarm_en") !== "false",
@@ -512,7 +522,7 @@ Pebble.addEventListener("showConfiguration", function() {
     now: Date.now(),
     appVersion: APP_VERSION
   }));
-});
+}
 
 Pebble.addEventListener("webviewclosed", function(e) {
   if (!e.response) return;
