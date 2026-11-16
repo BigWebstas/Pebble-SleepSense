@@ -1,0 +1,24 @@
+SleepSense is the Android companion to the SleepSense sleep tracker and smart wake alarm for Pebble smartwatches. It needs the SleepSense watch app and the Pebble (Core Devices) app on the phone.
+
+<b>Sleep and alarm</b>
+• Start and stop sleep tracking from the phone, a home-screen widget or a local webhook (Pebble Index, Tasker)
+• Set the watch alarm, snooze length and smart wake window, and start 30, 45 or 60 minute naps
+• Suggestions for a later alarm or a wider smart wake window after repeated snoozing
+• Sleep history with graphs of stages, heart rate, breathing, blood oxygen, noise and movement, an all-in-one overlay, ratings and Markdown export
+• Last session summary on the home screen, calendar entries for finished nights, Health Connect export
+
+<b>Sensors and extras</b>
+• Finger pulse oximeter over Bluetooth (SpO2, pulse, pulse variability)
+• Breathing rate from the watch resting on your chest
+• Room noise clips while you sleep
+• Sleep sounds: synthesized brown, pink or white noise, or your own audio files with cross fades
+• Sleep mode that switches on Quiet Time while tracking
+• Blood sugar from xDrip+ (optional), graphed next to each night
+• Home Assistant (MQTT) status and control
+
+<b>Your data</b>
+• Everything stays on your phone. Backup and restore to a folder you choose, by hand or when tracking starts or stops
+• Optional AI sleep summary and suggestions with your own Claude or Gemini API key. It is off by default and sends a short text digest of your recent sessions only when you ask for a summary, or after each session if you switch that on
+• No account, no ads, no analytics. The only other network use is an optional check for new releases on GitHub and your own Home Assistant broker
+
+SleepSense is not a medical device.

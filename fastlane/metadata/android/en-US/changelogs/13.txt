@@ -1,0 +1,1 @@
+New: backup and restore, xDrip+ blood sugar import, optional AI sleep summary (Claude or Gemini with your own key), snooze advice, smart wake window setting, all-in-one and smoother graphs. Fixes for the sleep sound cross fade and the webhook stop. Reinstall the watch app from this release.

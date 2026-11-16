@@ -13,6 +13,9 @@ import androidx.health.connect.client.records.RespiratoryRateRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.metadata.Metadata
 import androidx.health.connect.client.units.Percentage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
@@ -91,6 +94,11 @@ object SleepRecorder {
                         hrv.put(JSONObject().put("at", it.at).put("rmssd", it.rmssdMs))
                     }
                     open.put("hrv", hrv)
+                }
+                if (OximeterLog.hrvEnabled(context)) {
+                    val start = open.getLong("start")
+                    val app = context.applicationContext
+                    CoroutineScope(Dispatchers.IO).launch { runCatching { HrvLog.record(app, start, now) } } // kept for History
                 }
                 queue(prefs, open)
                 prefs.edit { remove(KEY_OPEN) }

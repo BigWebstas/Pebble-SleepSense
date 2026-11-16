@@ -39,6 +39,7 @@ object TrackingControl {
     fun stop(context: Context) {
         context.startForegroundService(Intent(context, AlarmBridgeService::class.java))
         Commands.queueStop()
+        PhoneAlarmSync.endNap(context)
         HomeAssistant.publishState(false)
         if (WhiteNoisePlayer.isPlaying) {
             WhiteNoisePlayer.stop()

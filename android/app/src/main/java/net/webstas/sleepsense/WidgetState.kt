@@ -15,6 +15,12 @@ object WidgetState {
     private const val ALIVE_MS = 150_000L      // check-ins come every 60 s
     private const val STARTING_MS = 60_000L    // how long "Starting..." is shown after a tap
 
+    /**
+     * True while the bridge can't listen on its port because another app already does. Held in
+     * memory: the service and the screens share one process, and it is false again after a restart.
+     */
+    @Volatile var bridgeBlocked = false
+
     fun note(context: Context, tracking: Boolean, since: Long, now: Long = System.currentTimeMillis()) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
             putBoolean("tracking", tracking)
@@ -57,6 +63,8 @@ object WidgetState {
         else PhoneAlarmSync.phoneAlarm(context)?.let { "Alarm %02d:%02d".format(it.first, it.second) } ?: "No alarm"
         val since = prefs(context).getLong("since", 0)
         return when {
+            // No check-in can arrive then, which would otherwise read as "Watch app closed"
+            bridgeBlocked -> "Another app uses port $ALARM_BRIDGE_PORT" to "It blocks the watch link"
             tracking(context, now) -> ("Tracking sleep" + if (since > 0) " since ${clock(since)}" else "") to alarm
             starting(context, now) -> "Starting..." to alarm
             watchAppOpen(context, now) -> "Not tracking" to alarm

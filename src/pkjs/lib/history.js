@@ -33,10 +33,11 @@ function save(sessions) {
   }
 }
 
-// Drops finished sessions by start time (deleted in the Android app); the open one is never touched.
-function removeSessions(starts) {
+// Drops sessions by start time (deleted in the Android app). The open one is only dropped when
+// `allowOpen` says nothing is being tracked: it is then a night whose end was never recorded.
+function removeSessions(starts, allowOpen) {
   var sessions = load();
-  var kept = sessions.filter(function (s) { return !(s.end && starts.indexOf(s.start) !== -1); });
+  var kept = sessions.filter(function (s) { return !((s.end || allowOpen) && starts.indexOf(s.start) !== -1); });
   if (kept.length !== sessions.length) save(kept);
 }
 

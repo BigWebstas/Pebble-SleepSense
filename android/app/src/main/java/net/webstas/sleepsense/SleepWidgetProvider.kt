@@ -18,11 +18,18 @@ class SleepWidgetProvider : AppWidgetProvider() {
     }
 
     companion object {
+        private const val REQUEST_OPEN = 1
+
         private fun views(context: Context): RemoteViews {
             val (title, subtitle) = WidgetState.lines(context)
             val tap = PendingIntent.getActivity(
-                context, 0,
-                Intent(context, MainActivity::class.java),
+                context, REQUEST_OPEN,
+                // Same intent the launcher icon fires. It no longer matches the service notification's
+                // PendingIntent, which also targets MainActivity and shares this request code otherwise.
+                Intent(Intent.ACTION_MAIN)
+                    .addCategory(Intent.CATEGORY_LAUNCHER)
+                    .setComponent(ComponentName(context, MainActivity::class.java))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED),
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             )
             return RemoteViews(context.packageName, R.layout.widget_status).apply {

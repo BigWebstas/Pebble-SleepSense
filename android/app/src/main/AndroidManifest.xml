@@ -35,7 +35,10 @@
             <action android:name="android.intent.action.SHOW_ALARMS" />
         </intent>
         <package android:name="com.google.android.apps.healthdata" />
-        <package android:name="com.spotify.music" />
+        <!-- xDrip+ finds the apps that listen for its local broadcast of blood sugar readings -->
+        <intent>
+            <action android:name="com.eveningoutpost.dexdrip.BgEstimate" />
+        </intent>
     </queries>
 
     <application
@@ -92,19 +95,6 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
-        <!-- Spotify's Share button: choosing SleepSense there sets the playlist for the sleep sound -->
-        <activity
-            android:name=".SpotifyShareActivity"
-            android:exported="true"
-            android:excludeFromRecents="true"
-            android:theme="@style/TranslucentShare">
-            <intent-filter>
-                <action android:name="android.intent.action.SEND" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="text/plain" />
-            </intent-filter>
-        </activity>
-
         <activity
             android:name=".ClipsActivity"
             android:exported="false" />
@@ -144,6 +134,15 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Blood sugar readings, when xDrip+ has "Broadcast locally" on and the import is switched on here -->
+        <receiver
+            android:name=".XdripReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.eveningoutpost.dexdrip.BgEstimate" />
             </intent-filter>
         </receiver>
 

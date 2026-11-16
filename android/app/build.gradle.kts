@@ -11,8 +11,8 @@ android {
         applicationId = "net.webstas.sleepsense"
         minSdk = 28
         targetSdk = 37
-        versionCode = 12
-        versionName = "0.7.2"
+        versionCode = 17
+        versionName = "0.8.4"
     }
 
     compileOptions {
@@ -41,7 +41,5 @@ dependencies {
     implementation(libs.pebblekit.client)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.paho.mqtt)
-    implementation(files("libs/spotify-app-remote-release-0.8.0.aar")) // Spotify App Remote, from github.com/spotify/android-sdk
-    implementation("com.google.code.gson:gson:2.10.1") // which the App Remote needs
     testImplementation("junit:junit:4.13.2")
 }

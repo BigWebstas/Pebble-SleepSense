@@ -1,0 +1,1 @@
+Fixes: tapping the widget now opens the app, and Home Assistant no longer logs an error for the SpO2 sensor when the oximeter is not reading.

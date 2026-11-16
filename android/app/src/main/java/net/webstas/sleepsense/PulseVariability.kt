@@ -1,6 +1,9 @@
 package net.webstas.sleepsense
 
+import android.content.Context
+import androidx.core.content.edit
 import java.io.File
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.sqrt
@@ -133,5 +136,59 @@ object PulseVariability {
     private fun median(values: List<Double>): Double {
         val s = values.sorted()
         return if (s.size % 2 == 1) s[s.size / 2] else (s[s.size / 2 - 1] + s[s.size / 2]) / 2
+    }
+}
+
+/**
+ * The HRV windows of past nights, kept for the History graphs ("<millis>,<RMSSD ms>" per line). The waveform
+ * they come from only holds the latest oximeter run, so each night's windows are worked out once, when it ends
+ * (or when History first opens for the latest night, if that was before this log existed), and kept here.
+ */
+object HrvLog {
+    private const val PREFS = "hrv_log"
+    private const val KEY_TRIED = "tried" // start of the night whose waveform was last worked out
+    private const val KEEP_MS = 40L * 24 * 3600 * 1000 // the watch keeps 35 days of nights
+
+    private fun file(context: Context) = File(context.filesDir, "hrv.csv")
+
+    private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    /** The windows between [start] and [end] as (time in millis, RMSSD in ms), oldest first. */
+    @Synchronized
+    fun readings(context: Context, start: Long, end: Long): List<Pair<Long, Double>> {
+        val f = file(context)
+        if (!f.exists()) return emptyList()
+        return f.readLines().mapNotNull { line ->
+            val p = line.split(',')
+            val at = p.getOrNull(0)?.toLongOrNull()
+            val rmssd = p.getOrNull(1)?.toDoubleOrNull()
+            if (p.size == 2 && at != null && rmssd != null && at in start..end) at to rmssd else null
+        }.sortedBy { it.first }
+    }
+
+    /** Works out the night [start]..[end] from the waveform and keeps it, replacing what was kept for those times. */
+    fun record(context: Context, start: Long, end: Long, now: Long = System.currentTimeMillis()) {
+        val windows = PulseVariability.windows(OximeterLog.waveFile(context), start, end)
+        synchronized(this) {
+            val f = file(context)
+            val kept = if (f.exists()) f.readLines().filter { line ->
+                val at = line.substringBefore(',').toLongOrNull() ?: return@filter false
+                at !in start..end && at >= now - KEEP_MS
+            } else emptyList()
+            f.writeText((kept + windows.map { "${it.at},${"%.1f".format(Locale.US, it.rmssdMs)}" }).joinToString("") { it + "\n" })
+            prefs(context).edit { putLong(KEY_TRIED, start) }
+        }
+    }
+
+    /**
+     * For a finished night whose HRV was never kept (it ended before this log existed): works it out from the
+     * waveform if that still holds this night's run, which is the case when it starts inside the night. Done once.
+     */
+    fun backfill(context: Context, start: Long, end: Long) {
+        if (!OximeterLog.hrvEnabled(context) || prefs(context).getLong(KEY_TRIED, 0) == start) return
+        val wave = OximeterLog.waveFile(context)
+        val first = wave.takeIf { it.exists() }?.bufferedReader()?.use { it.readLine() }?.substringBefore(',')?.toLongOrNull()
+        if (first == null || first !in start..end) return // the waveform is from another night, or empty
+        record(context, start, end)
     }
 }

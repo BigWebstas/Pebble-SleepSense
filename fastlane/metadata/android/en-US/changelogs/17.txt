@@ -1,0 +1,1 @@
+New: an HRV graph in History (with an overview row and an export chart) for nights where the oximeter's pulse gives HRV. Backups keep it. The watch's settings page code is updated to match.
