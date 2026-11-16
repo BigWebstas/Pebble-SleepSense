@@ -549,6 +549,55 @@
                 </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
+        <com.google.android.material.card.MaterialCardView
+            style="@style/SectionCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:paddingHorizontal="16dp"
+                android:paddingBottom="16dp">
+
+            <TextView
+                android:id="@+id/sound_player_label"
+                style="@style/SectionHeader"
+                android:drawableStart="@drawable/ic_graphic_eq"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/white_noise_section" />
+
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.Material3.CardView.Filled"
+                android:layout_width="match_parent"
+                android:layout_height="96dp"
+                android:layout_marginTop="12dp">
+
+                <net.webstas.sleepsense.SpectrogramView
+                    android:id="@+id/spectrogram"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:contentDescription="@string/spectrogram_description" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <Button
+                android:id="@+id/white_noise_play_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:minWidth="220dp"
+                app:icon="@drawable/ic_play_arrow"
+                app:iconPadding="8dp"
+                android:text="@string/white_noise_play_button" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
         <Button
             style="@style/Widget.Material3.Button.TonalButton"
             android:id="@+id/advanced_toggle_button"
@@ -786,16 +835,6 @@
                 android:layout_marginTop="8dp"
                 android:minWidth="220dp"
                 android:text="@string/white_noise_timer_label" />
-
-            <Button
-                android:id="@+id/white_noise_play_button"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:minWidth="220dp"
-                app:icon="@drawable/ic_play_arrow"
-                app:iconPadding="8dp"
-                android:text="@string/white_noise_play_button" />
 
             </LinearLayout>
                 </LinearLayout>
