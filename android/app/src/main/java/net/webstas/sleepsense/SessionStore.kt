@@ -34,6 +34,7 @@ object SessionStore {
         tmp.writeText(adjusted(context, json))
         tmp.renameTo(file(context)) // a reader never sees a half-written file
         CalendarSync.sync(context)
+        NightExport.sync(context)
     }
 
     /** Ratings set here (session start to 0-5 stars), which the JS is still being told. */

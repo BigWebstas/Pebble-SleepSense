@@ -92,6 +92,7 @@ Open the app's settings in the Pebble app. The page has:
 - **Sensors**: light, room noise, heart rate.
 - **Sleep history**: pick a session to see its stats and graphs: sleep stages (with the alarm ringing, snoozed and stopped marked), movement, heart rate, breathing rate, SpO2, ambient light and room noise. The phone keeps the last 35 days.
 - **Export**: your sleep data as Markdown with mermaid charts, for the last 7, 14 or 30 days or since the last export. Copy it to the clipboard or download it.
+- **Nightly note folder** (Android, Connectivity): after tracking stops, each finished night is written as a Markdown note with mermaid charts into a folder you choose, for a hot-folder sync such as Joplin's. Only nights recorded after you turn it on are written.
 
 ---
 
