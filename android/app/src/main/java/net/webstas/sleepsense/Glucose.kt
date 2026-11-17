@@ -26,6 +26,14 @@ object GlucoseLog {
 
     private fun file(context: Context) = File(context.filesDir, "glucose.csv")
 
+    /** Records that a broadcast came in and what became of it, as (time, note). */
+    fun noteBroadcast(context: Context, note: String) =
+        prefs(context).edit { putString("last_broadcast", "${System.currentTimeMillis()}|$note") }
+
+    fun lastBroadcast(context: Context): Pair<Long, String>? =
+        prefs(context).getString("last_broadcast", null)?.split('|', limit = 2)?.takeIf { it.size == 2 }
+            ?.let { (it[0].toLongOrNull() ?: return null) to it[1] }
+
     /** Adds a reading ("<millis>,<mg/dL>" per line); one xDrip+ sent twice is kept once. */
     @Synchronized
     fun add(context: Context, at: Long, mgdl: Int, now: Long = System.currentTimeMillis()) {
@@ -62,13 +70,28 @@ object GlucoseLog {
         }?.maxByOrNull { it.first }
 }
 
-/** Takes xDrip+'s local broadcast of a new reading, when the import is switched on. */
+/**
+ * Takes xDrip+'s local broadcast of a new reading, when the import is switched on. It is declared in the
+ * manifest and also registered by [AlarmBridgeService] while that runs, so a broadcast that is not aimed at
+ * this app's package (Android does not deliver those to a manifest receiver) still arrives. What happened to
+ * the latest broadcast is kept for the settings card, so a silent import can be told from a missing one.
+ */
 class XdripReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != ACTION || !GlucoseLog.isEnabled(context)) return
-        val mgdl = intent.getDoubleExtra(EXTRA_VALUE, 0.0)
-        val at = intent.getLongExtra(EXTRA_TIME, 0L)
-        if (mgdl > 0 && at > 0) GlucoseLog.add(context, at, Math.round(mgdl).toInt())
+        if (intent.action != ACTION) return
+        if (!GlucoseLog.isEnabled(context)) {
+            GlucoseLog.noteBroadcast(context, "ignored, import is off")
+            return
+        }
+        val extras = intent.extras
+        val mgdl = (extras?.get(EXTRA_VALUE) as? Number)?.toDouble() ?: 0.0
+        val at = (extras?.get(EXTRA_TIME) as? Number)?.toLong()?.takeIf { it > 0 } ?: System.currentTimeMillis()
+        if (mgdl <= 0) {
+            GlucoseLog.noteBroadcast(context, "no reading in it (extras: ${extras?.keySet()?.joinToString { it.substringAfterLast('.') } ?: "none"})")
+            return
+        }
+        GlucoseLog.add(context, at, Math.round(mgdl).toInt())
+        GlucoseLog.noteBroadcast(context, "${Math.round(mgdl)} mg/dL")
     }
 
     companion object {

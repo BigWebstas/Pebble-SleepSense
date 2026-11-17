@@ -75,6 +75,8 @@ class AlarmBridgeService : Service() {
         if (WebhookPrefs.isEnabled(this)) webhook.start(WEBHOOK_PORT) else webhook.stop()
     }
 
+    private val xdrip = XdripReceiver()
+
     override fun onCreate() {
         super.onCreate()
         val channel = NotificationChannel("bridge", "Alarm bridge", NotificationManager.IMPORTANCE_MIN)
@@ -85,6 +87,9 @@ class AlarmBridgeService : Service() {
             this, alarmChanged, IntentFilter(AlarmManager.ACTION_NEXT_ALARM_CLOCK_CHANGED),
             ContextCompat.RECEIVER_NOT_EXPORTED,
         )
+
+        // xDrip+'s broadcast of blood sugar readings, for when it is not aimed at this package
+        ContextCompat.registerReceiver(this, xdrip, IntentFilter(XdripReceiver.ACTION), ContextCompat.RECEIVER_EXPORTED)
 
         HomeAssistant.start(this)
         syncWebhookServer()
@@ -368,6 +373,7 @@ class AlarmBridgeService : Service() {
         monitor.stop()
         oximeter.stop()
         unregisterReceiver(alarmChanged)
+        unregisterReceiver(xdrip)
         WebhookPrefs.unregisterListener(this, webhookPrefsListener)
         webhook.stop()
         server?.close()

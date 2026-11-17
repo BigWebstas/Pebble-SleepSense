@@ -967,6 +967,32 @@
                 android:textSize="13sp"
                 android:visibility="gone" />
 
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/night_export_switch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/night_export_label" />
+
+            <Button
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:id="@+id/night_export_folder_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:minWidth="220dp"
+                app:icon="@drawable/ic_history"
+                app:iconPadding="8dp"
+                android:text="@string/night_export_folder_button" />
+
+            <TextView
+                android:id="@+id/night_export_status_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center"
+                android:textSize="13sp" />
+
             <Button
                 style="@style/Widget.Material3.Button.TonalButton"
                 android:id="@+id/grant_hc_button"

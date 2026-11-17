@@ -202,6 +202,13 @@
     <string name="backup_restore_failed">Could not restore: that is not a SleepSense backup</string>
     <string name="xdrip_label">Import blood sugar from xDrip+</string>
     <string name="xdrip_setup">In xDrip+, turn on Settings, Inter-app settings, Broadcast locally. Readings are graphed next to each night in History.</string>
+    <string name="xdrip_none_received">Nothing has arrived from xDrip+ yet. In xDrip+ set Inter-app settings, Broadcast locally, and put net.webstas.sleepsense in Identify receiver.</string>
+    <string name="xdrip_broadcast">Last broadcast from xDrip+: %1$s, %2$s</string>
+    <string name="night_export_label">Save each night as a Markdown note</string>
+    <string name="night_export_folder_button">Choose note folder</string>
+    <string name="night_export_none">No note folder chosen. Point a hot-folder sync (Joplin) at it.</string>
+    <string name="night_export_folder">Folder: %s</string>
+    <string name="night_export_last">Last note: %1$s (%2$s)</string>
     <string name="xdrip_last">Last reading: %1$d mg/dL, %2$s</string>
     <string name="coach_section">Sleep coach (AI)</string>
     <string name="coach_label">AI sleep summary</string>

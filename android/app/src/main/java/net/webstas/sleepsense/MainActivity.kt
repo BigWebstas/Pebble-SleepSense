@@ -103,6 +103,18 @@ class MainActivity : AppCompatActivity() {
             BackupPrefs.setFolder(this, uri)
             refreshBackup()
         }
+    private val pickNoteFolder =
+        registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+            if (uri == null) {
+                id<MaterialSwitch>(R.id.night_export_switch).isChecked = NightExport.isEnabled(this) && NightExport.folder(this) != null
+                return@registerForActivityResult
+            }
+            Backup.keepAccess(this, uri)
+            NightExport.setFolder(this, uri)
+            if (!NightExport.isEnabled(this)) NightExport.setEnabled(this, true)
+            id<MaterialSwitch>(R.id.night_export_switch).isChecked = true
+            refreshNightExport()
+        }
     private val pickBackupFile =
         registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) confirmRestore(uri) }
 
@@ -300,6 +312,17 @@ class MainActivity : AppCompatActivity() {
                 refreshXdrip()
             }
         }
+        id<MaterialSwitch>(R.id.night_export_switch).apply {
+            isChecked = NightExport.isEnabled(this@MainActivity)
+            setOnCheckedChangeListener { _, on ->
+                if (!on) NightExport.setEnabled(this@MainActivity, false)
+                else if (NightExport.folder(this@MainActivity) == null) pickNoteFolder.launch(null)
+                else NightExport.setEnabled(this@MainActivity, true)
+                refreshNightExport()
+            }
+        }
+        id<Button>(R.id.night_export_folder_button).setOnClickListener { pickNoteFolder.launch(NightExport.folder(this)) }
+        refreshNightExport()
         id<View>(R.id.last_night_body).setOnClickListener { startActivity(Intent(this, HistoryActivity::class.java)) }
         setupCards()
         attachHaptics(id(R.id.root))
@@ -1075,8 +1098,22 @@ class MainActivity : AppCompatActivity() {
         val status = id<TextView>(R.id.xdrip_status_text)
         status.visibility = if (GlucoseLog.isEnabled(this)) View.VISIBLE else View.GONE
         val last = GlucoseLog.latest(this)
-        status.text = if (last == null) getString(R.string.xdrip_setup) else
-            getString(R.string.xdrip_last, last.second, android.text.format.DateUtils.getRelativeTimeSpanString(last.first))
+        val broadcast = GlucoseLog.lastBroadcast(this)
+        status.text = when {
+            last != null -> getString(R.string.xdrip_last, last.second, android.text.format.DateUtils.getRelativeTimeSpanString(last.first))
+            broadcast != null -> getString(R.string.xdrip_broadcast, broadcast.second, android.text.format.DateUtils.getRelativeTimeSpanString(broadcast.first))
+            else -> getString(R.string.xdrip_none_received)
+        }
+    }
+
+    private fun refreshNightExport() {
+        val folder = NightExport.folder(this)
+        val last = NightExport.last(this)
+        id<TextView>(R.id.night_export_status_text).text = when {
+            folder == null -> getString(R.string.night_export_none)
+            last != null -> getString(R.string.night_export_last, last.second, android.text.format.DateUtils.getRelativeTimeSpanString(last.first))
+            else -> getString(R.string.night_export_folder, folder.lastPathSegment?.substringAfterLast(':').orEmpty())
+        }
     }
 
     private fun refreshBackup() {
