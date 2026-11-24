@@ -1,4 +1,5 @@
 #include "ui_main.h"
+#include "ui_rating.h"
 #include "../engine/sleep_engine.h"
 #include "../engine/smart_alarm.h"
 #include "../comm/comm.h"
@@ -388,9 +389,16 @@ static void prv_select_long_click_handler(ClickRecognizerRef recognizer, void *c
     return;
   }
   prv_confirm_buzz();
+  bool ending = sleep_engine_is_tracking();
+  if (ending) {
+    sleep_engine_set_rating_pending(true); // before the stop: its update to the phone already carries it
+  }
   sleep_engine_toggle_session();
   comm_send_session_update(sleep_engine_get_session());
   ui_main_update(sleep_engine_get_session());
+  if (ending) {
+    ui_rating_show(); // Quiet Time stays on until the night is rated
+  }
 }
 
 // Voice dream journal: double-press Select
